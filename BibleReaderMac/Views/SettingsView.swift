@@ -212,7 +212,7 @@ struct AppearanceSettingsTab: View {
             Section("Custom Colors") {
                 HStack {
                     Toggle("Text Color", isOn: $useCustomTextColor)
-                        .onChange(of: useCustomTextColor) { enabled in
+                        .onChange(of: useCustomTextColor) { _, enabled in
                             if !enabled {
                                 textColorHex = ""
                                 textColor = .primary
@@ -226,7 +226,7 @@ struct AppearanceSettingsTab: View {
                         .labelsHidden()
                         .disabled(!useCustomTextColor)
                         .opacity(useCustomTextColor ? 1.0 : 0.4)
-                        .onChange(of: textColor) { newColor in
+                        .onChange(of: textColor) { _, newColor in
                             if useCustomTextColor {
                                 textColorHex = newColor.toHex() ?? ""
                             }
@@ -235,7 +235,7 @@ struct AppearanceSettingsTab: View {
 
                 HStack {
                     Toggle("Background Color", isOn: $useCustomBgColor)
-                        .onChange(of: useCustomBgColor) { enabled in
+                        .onChange(of: useCustomBgColor) { _, enabled in
                             if !enabled {
                                 backgroundColorHex = ""
                                 bgColor = .clear
@@ -249,7 +249,7 @@ struct AppearanceSettingsTab: View {
                         .labelsHidden()
                         .disabled(!useCustomBgColor)
                         .opacity(useCustomBgColor ? 1.0 : 0.4)
-                        .onChange(of: bgColor) { newColor in
+                        .onChange(of: bgColor) { _, newColor in
                             if useCustomBgColor {
                                 backgroundColorHex = newColor.toHex() ?? ""
                             }
@@ -357,7 +357,7 @@ struct ProfileSettingsTab: View {
                         Text(name).tag(name)
                     }
                 }
-                .onChange(of: activeProfile) { newProfile in
+                .onChange(of: activeProfile) { _, newProfile in
                     store.switchProfile(to: newProfile)
                 }
 

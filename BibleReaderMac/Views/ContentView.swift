@@ -18,6 +18,30 @@ struct ContentView: View {
     }
 
     var body: some View {
+        mainLayout
+            .toolbar { toolbarContent }
+            .sheet(isPresented: $showImportSheet) { ImportModuleView() }
+            .sheet(isPresented: $showManageTranslations) { ManageTranslationsView() }
+            .navigationTitle(windowState.windowTitle)
+            .environmentObject(windowState)
+            .onAppear(perform: handleOnAppear)
+            .modifier(NotificationHandlers(store: store, windowState: windowState,
+                                           showImportSheet: $showImportSheet,
+                                           showManageTranslations: $showManageTranslations,
+                                           importHandler: importHandler,
+                                           navigateChapter: navigateChapter,
+                                           navigateBook: navigateBook))
+            .modifier(DragDropModifier(isDragTargeted: $isDragTargeted,
+                                       importHandler: importHandler,
+                                       store: store,
+                                       dropOverlay: dropOverlay))
+            .modifier(ImportToastModifier(importHandler: importHandler))
+            .preferredColorScheme(resolvedColorScheme)
+    }
+
+    // MARK: - Extracted Sub-Views
+
+    private var mainLayout: some View {
         NavigationSplitView {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
@@ -30,152 +54,46 @@ struct ContentView: View {
             InspectorPanelView()
                 .inspectorColumnWidth(min: 240, ideal: 280, max: 400)
         }
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                // Import button
-                Button(action: { showImportSheet = true }) {
-                    Label("Import", systemImage: "square.and.arrow.down")
-                }
-                .help("Import .brbmod module")
-                .keyboardShortcut("i", modifiers: [.command])
+    }
 
-                Divider()
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button(action: { showImportSheet = true }) {
+                Label("Import", systemImage: "square.and.arrow.down")
+            }
+            .help("Import .brbmod module")
+            .keyboardShortcut("i", modifiers: [.command])
 
-                // Inspector toggle buttons
-                Button(action: { windowState.toggleInspector(tab: .strongs) }) {
-                    Label("Strong's", systemImage: "textformat.abc")
-                }
-                .help("Toggle Strong's Concordance")
+            Divider()
 
-                Button(action: { windowState.toggleInspector(tab: .crossRefs) }) {
-                    Label("Cross-Refs", systemImage: "link")
-                }
-                .help("Toggle Cross-References")
+            Button(action: { windowState.toggleInspector(tab: .strongs) }) {
+                Label("Strong's", systemImage: "textformat.abc")
+            }
+            .help("Toggle Strong's Concordance")
 
-                Button(action: { windowState.showSearchInspector() }) {
-                    Label("Search", systemImage: "magnifyingglass")
-                }
-                .help("Search (⌘F)")
+            Button(action: { windowState.toggleInspector(tab: .crossRefs) }) {
+                Label("Cross-Refs", systemImage: "link")
             }
-        }
-        .sheet(isPresented: $showImportSheet) {
-            ImportModuleView()
-        }
-        .sheet(isPresented: $showManageTranslations) {
-            ManageTranslationsView()
-        }
-        .navigationTitle(windowState.windowTitle)
-        .environmentObject(windowState)
-        .onAppear {
-            // Restore last reading position for the first pane
-            if let pane = windowState.panes.first {
-                store.restoreLastPosition(into: pane)
-                if let firstTranslation = store.loadedTranslations.first,
-                   pane.selectedTranslationId == ReaderPane().selectedTranslationId {
-                    pane.selectedTranslationId = firstTranslation.id
-                }
-                store.loadVerses(for: pane)
+            .help("Toggle Cross-References")
+
+            Button(action: { windowState.showSearchInspector() }) {
+                Label("Search", systemImage: "magnifyingglass")
             }
-            windowState.updateTitle()
+            .help("Search (⌘F)")
         }
-        // MARK: - Notification Handlers
-        .onReceive(NotificationCenter.default.publisher(for: .importModule)) { _ in
-            showImportSheet = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .manageTranslations)) { _ in
-            showManageTranslations = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .addTranslationPane)) { _ in
-            let tId = store.loadedTranslations.first?.id
-            windowState.addPane(translationId: tId)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .bookmarkCurrentVerse)) { _ in
-            guard let pane = windowState.panes.first else { return }
-            let verseId = "\(pane.selectedBook):\(pane.selectedChapter):1"
-            if let translation = store.loadedTranslations.first(where: { $0.id == pane.selectedTranslationId }) {
-                store.addBookmark(verseId: verseId, translationId: translation.id)
+    }
+
+    private func handleOnAppear() {
+        if let pane = windowState.panes.first {
+            store.restoreLastPosition(into: pane)
+            if let firstTranslation = store.loadedTranslations.first,
+               pane.selectedTranslationId == ReaderPane().selectedTranslationId {
+                pane.selectedTranslationId = firstTranslation.id
             }
+            store.loadVerses(for: pane)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .navigatePreviousChapter)) { _ in
-            navigateChapter(delta: -1)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateNextChapter)) { _ in
-            navigateChapter(delta: 1)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .navigatePreviousBook)) { _ in
-            navigateBook(delta: -1)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateNextBook)) { _ in
-            navigateBook(delta: 1)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .translationRemoved)) { notification in
-            guard let removedId = notification.userInfo?["translationId"] as? UUID else { return }
-            for pane in windowState.panes where pane.selectedTranslationId == removedId {
-                pane.selectedTranslationId = store.loadedTranslations.first?.id ?? UUID()
-            }
-        }
-        // Cross-references: show in inspector instead of navigating sidebar
-        .onReceive(NotificationCenter.default.publisher(for: .showCrossReferences)) { notification in
-            if let verseId = notification.userInfo?["verseId"] as? String {
-                windowState.showCrossRefsInspector(verseId: verseId)
-            }
-        }
-        // Search: show in inspector
-        .onReceive(NotificationCenter.default.publisher(for: .globalSearch)) { _ in
-            windowState.showSearchInspector()
-        }
-        // Sidebar tab switching via Cmd+1/2/3
-        .onReceive(NotificationCenter.default.publisher(for: .switchSidebarTab)) { notification in
-            if let tab = notification.userInfo?["tab"] as? SidebarTab {
-                windowState.selectedSidebarTab = tab
-            }
-        }
-        // Toggle inspector tabs via keyboard shortcuts
-        .onReceive(NotificationCenter.default.publisher(for: .toggleStrongsInspector)) { _ in
-            windowState.toggleInspector(tab: .strongs)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .toggleCrossRefsInspector)) { _ in
-            windowState.toggleInspector(tab: .crossRefs)
-        }
-        // Legacy: navigateToReader no longer needed (reader always visible), but handle gracefully
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToReader)) { _ in
-            // No-op: reader is always visible now
-        }
-        // Settings
-        .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        }
-        // App-wide drag-and-drop for .brbmod files
-        .onDrop(of: [.fileURL], isTargeted: $isDragTargeted) { providers in
-            importHandler.handleDrop(providers: providers, store: store)
-        }
-        .overlay {
-            if isDragTargeted {
-                dropOverlay
-            }
-        }
-        .animation(.easeInOut(duration: 0.2), value: isDragTargeted)
-        // Import status toast
-        .overlay(alignment: .bottom) {
-            if importHandler.showResult, let result = importHandler.lastResult {
-                importToast(result)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                            withAnimation { importHandler.showResult = false }
-                        }
-                    }
-            }
-        }
-        .animation(.spring(duration: 0.3), value: importHandler.showResult)
-        .preferredColorScheme(resolvedColorScheme)
-        .onReceive(NotificationCenter.default.publisher(for: .importModuleFile)) { notification in
-            if let url = notification.object as? URL {
-                Task {
-                    _ = await importHandler.importFile(at: url, into: store)
-                }
-            }
-        }
+        windowState.updateTitle()
     }
 
     // MARK: - Navigation Helpers
@@ -221,7 +139,131 @@ struct ContentView: View {
         .transition(.opacity)
     }
 
-    // MARK: - Toast
+}
+
+// MARK: - Notification Handlers Modifier
+
+private struct NotificationHandlers: ViewModifier {
+    @ObservedObject var store: BibleStore
+    @ObservedObject var windowState: WindowState
+    @Binding var showImportSheet: Bool
+    @Binding var showManageTranslations: Bool
+    var importHandler: FileImportHandler
+    var navigateChapter: (Int) -> Void
+    var navigateBook: (Int) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .importModule)) { _ in
+                showImportSheet = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .manageTranslations)) { _ in
+                showManageTranslations = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .addTranslationPane)) { _ in
+                let tId = store.loadedTranslations.first?.id
+                windowState.addPane(translationId: tId)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .bookmarkCurrentVerse)) { _ in
+                guard let pane = windowState.panes.first else { return }
+                let verseId = "\(pane.selectedBook):\(pane.selectedChapter):1"
+                if let translation = store.loadedTranslations.first(where: { $0.id == pane.selectedTranslationId }) {
+                    store.addBookmark(verseId: verseId, translationId: translation.id)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .navigatePreviousChapter)) { _ in
+                navigateChapter(-1)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .navigateNextChapter)) { _ in
+                navigateChapter(1)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .navigatePreviousBook)) { _ in
+                navigateBook(-1)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .navigateNextBook)) { _ in
+                navigateBook(1)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .translationRemoved)) { notification in
+                guard let removedId = notification.userInfo?["translationId"] as? UUID else { return }
+                for pane in windowState.panes where pane.selectedTranslationId == removedId {
+                    pane.selectedTranslationId = store.loadedTranslations.first?.id ?? UUID()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showCrossReferences)) { notification in
+                if let verseId = notification.userInfo?["verseId"] as? String {
+                    windowState.showCrossRefsInspector(verseId: verseId)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .globalSearch)) { _ in
+                windowState.showSearchInspector()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .switchSidebarTab)) { notification in
+                if let tab = notification.userInfo?["tab"] as? SidebarTab {
+                    windowState.selectedSidebarTab = tab
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleStrongsInspector)) { _ in
+                windowState.toggleInspector(tab: .strongs)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleCrossRefsInspector)) { _ in
+                windowState.toggleInspector(tab: .crossRefs)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .navigateToReader)) { _ in }
+            .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .importModuleFile)) { notification in
+                if let url = notification.object as? URL {
+                    Task {
+                        _ = await importHandler.importFile(at: url, into: store)
+                    }
+                }
+            }
+    }
+}
+
+// MARK: - Drag-Drop Modifier
+
+private struct DragDropModifier<Overlay: View>: ViewModifier {
+    @Binding var isDragTargeted: Bool
+    var importHandler: FileImportHandler
+    var store: BibleStore
+    var dropOverlay: Overlay
+
+    func body(content: Content) -> some View {
+        content
+            .onDrop(of: [.fileURL], isTargeted: $isDragTargeted) { providers in
+                importHandler.handleDrop(providers: providers, store: store)
+            }
+            .overlay {
+                if isDragTargeted {
+                    dropOverlay
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: isDragTargeted)
+    }
+}
+
+// MARK: - Import Toast Modifier
+
+private struct ImportToastModifier: ViewModifier {
+    @ObservedObject var importHandler: FileImportHandler
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .bottom) {
+                if importHandler.showResult, let result = importHandler.lastResult {
+                    importToast(result)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                withAnimation { importHandler.showResult = false }
+                            }
+                        }
+                }
+            }
+            .animation(.spring(duration: 0.3), value: importHandler.showResult)
+    }
 
     private func importToast(_ status: ModuleImportStatus) -> some View {
         HStack(spacing: 8) {

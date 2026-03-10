@@ -295,20 +295,20 @@ struct SearchView: View {
         let currentBook = windowState.panes.first?.selectedBook
         let currentChapter = windowState.panes.first?.selectedChapter
         let capturedModuleIds = selectedModuleIds
+        let capturedScope = scope
+        let capturedTranslations = store.loadedTranslations.filter { t in
+            capturedModuleIds.contains(t.id)
+        }
 
         Task.detached {
-            var allResults: [SearchResult] = []
+            var collected: [SearchResult] = []
 
-            let translations = await store.loadedTranslations.filter { t in
-                capturedModuleIds.contains(t.id)
-            }
-
-            for translation in translations {
+            for translation in capturedTranslations {
                 do {
                     let hits = try ModuleService.search(
                         in: translation.filePath,
                         query: query,
-                        scope: scope,
+                        scope: capturedScope,
                         currentBook: currentBook,
                         currentChapter: currentChapter
                     )
@@ -322,17 +322,18 @@ struct SearchView: View {
                             matchRange: hit.matchRange
                         )
                     }
-                    allResults.append(contentsOf: tagged)
+                    collected.append(contentsOf: tagged)
                 } catch {
                     print("Search failed for \(translation.abbreviation): \(error)")
                 }
             }
 
             // Check if any individual translation hit the 500 cap
-            let capped = allResults.count >= 500
+            let capped = collected.count >= 500
+            let finalResults = collected
 
             await MainActor.run {
-                results = allResults
+                results = finalResults
                 resultsCapped = capped
                 isSearching = false
             }

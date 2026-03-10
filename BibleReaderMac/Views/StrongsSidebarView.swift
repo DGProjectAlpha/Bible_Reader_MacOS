@@ -33,7 +33,7 @@ struct StrongsSidebarView: View {
         .frame(minWidth: 260, idealWidth: 300, maxWidth: 400)
         .vibrancyBackground(material: .sidebar)
         .onAppear { loadStrongsData() }
-        .onChange(of: verseId) { _ in loadStrongsData() }
+        .onChange(of: verseId) { loadStrongsData() }
     }
 
     // MARK: - Header
