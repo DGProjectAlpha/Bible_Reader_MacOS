@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var showImportSheet = false
     @State private var showManageTranslations = false
     @State private var isDragTargeted = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @AppStorage("readerTheme") private var readerTheme: String = "auto"
 
     private var resolvedColorScheme: ColorScheme? {
@@ -42,13 +43,23 @@ struct ContentView: View {
     // MARK: - Extracted Sub-Views
 
     private var mainLayout: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
                 .vibrancyBackground(material: .sidebar)
         } detail: {
-            ReaderView()
-                .vibrancyBackground(material: .contentBackground, blendingMode: .behindWindow)
+            if windowState.showSearchPanel {
+                VSplitView {
+                    SearchView()
+                        .frame(minHeight: 200, idealHeight: 350)
+                    ReaderView()
+                        .vibrancyBackground(material: .contentBackground, blendingMode: .behindWindow)
+                        .frame(minHeight: 200)
+                }
+            } else {
+                ReaderView()
+                    .vibrancyBackground(material: .contentBackground, blendingMode: .behindWindow)
+            }
         }
         .inspector(isPresented: $windowState.showInspector) {
             InspectorPanelView()
@@ -77,7 +88,7 @@ struct ContentView: View {
             }
             .help("Toggle Cross-References")
 
-            Button(action: { windowState.showSearchInspector() }) {
+            Button(action: { windowState.toggleSearchPanel() }) {
                 Label("Search", systemImage: "magnifyingglass")
             }
             .help("Search (⌘F)")
@@ -236,7 +247,7 @@ private struct InspectorNotifications: ViewModifier {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .globalSearch)) { _ in
-                windowState.showSearchInspector()
+                windowState.toggleSearchPanel()
             }
             .onReceive(NotificationCenter.default.publisher(for: .switchSidebarTab)) { notification in
                 if let tab = notification.userInfo?["tab"] as? SidebarTab {
@@ -387,8 +398,6 @@ struct InspectorPanelView: View {
                 )
             }
 
-        case .search:
-            SearchView()
         }
     }
 

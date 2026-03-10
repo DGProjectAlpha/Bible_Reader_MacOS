@@ -196,6 +196,7 @@ class BibleStore: ObservableObject {
     }
 
     /// Load verses for a pane, updating its published verses array.
+    /// For tagged modules, also batch-loads word tags so Strong's numbers are clickable.
     func loadVerses(for pane: ReaderPane) {
         guard let translation = loadedTranslations.first(where: { $0.id == pane.selectedTranslationId }) else {
             pane.verses = []
@@ -204,11 +205,36 @@ class BibleStore: ObservableObject {
         // Keep pane's versification scheme in sync with the selected translation
         pane.versificationScheme = translation.versificationScheme
         do {
-            pane.verses = try ModuleService.loadVerses(
+            var verses = try ModuleService.loadVerses(
                 from: translation.filePath,
                 book: pane.selectedBook,
                 chapter: pane.selectedChapter
             )
+
+            // For tagged modules, merge word tags into verses for clickable Strong's display
+            if translation.metadata.format == .tagged {
+                let tagsByVerse = try ModuleService.loadWordTagsForChapter(
+                    from: translation.filePath,
+                    book: pane.selectedBook,
+                    chapter: pane.selectedChapter
+                )
+                if !tagsByVerse.isEmpty {
+                    verses = verses.map { verse in
+                        if let tags = tagsByVerse[verse.id], !tags.isEmpty {
+                            return Verse(
+                                book: verse.book,
+                                chapter: verse.chapter,
+                                number: verse.number,
+                                text: verse.text,
+                                wordTags: tags
+                            )
+                        }
+                        return verse
+                    }
+                }
+            }
+
+            pane.verses = verses
             // Record reading history
             recordHistory(book: pane.selectedBook, chapter: pane.selectedChapter, translationAbbreviation: translation.abbreviation)
         } catch {

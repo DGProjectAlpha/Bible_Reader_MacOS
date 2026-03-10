@@ -219,26 +219,56 @@ final class ModuleConnection {
     }
 
     /// Batch word tags for all verses in a chapter.
+    /// Includes ALL words (with and without Strong's numbers) so the full verse text is rendered.
+    /// Merges multiple Strong's numbers for the same word into a single WordTag.
     func loadWordTagsForChapter(book: String, chapter: Int) throws -> [String: [WordTag]] {
         guard try tableExists("word_tags") else { return [:] }
 
         let rows = try query(
-            "SELECT verse_id, word_index, word, strongs_number FROM word_tags WHERE verse_id LIKE ?1 AND strongs_number IS NOT NULL ORDER BY verse_id, word_index",
+            "SELECT verse_id, word_index, word, strongs_number FROM word_tags WHERE verse_id LIKE ?1 ORDER BY verse_id, word_index",
             bindings: ["\(book):\(chapter):%"]
         ) { stmt in
             (
                 verseId: Self.text(stmt, 0),
-                tag: WordTag(
-                    wordIndex: Self.int(stmt, 1),
-                    word: Self.text(stmt, 2),
-                    strongsNumbers: [Self.text(stmt, 3)]
-                )
+                wordIndex: Self.int(stmt, 1),
+                word: Self.text(stmt, 2),
+                strongsNumber: sqlite3_column_text(stmt, 3).map { String(cString: $0) }
             )
         }
 
+        // Group by verse, then merge rows with the same word_index (multiple Strong's per word)
         var grouped: [String: [WordTag]] = [:]
         for row in rows {
-            grouped[row.verseId, default: []].append(row.tag)
+            var verseTags = grouped[row.verseId, default: []]
+
+            // Check if last tag in this verse has the same wordIndex — merge Strong's numbers
+            if let lastIdx = verseTags.indices.last,
+               verseTags[lastIdx].wordIndex == row.wordIndex {
+                if let sn = row.strongsNumber, !sn.isEmpty {
+                    var existing = verseTags[lastIdx]
+                    var numbers = existing.strongsNumbers
+                    numbers.append(sn)
+                    verseTags[lastIdx] = WordTag(
+                        wordIndex: existing.wordIndex,
+                        word: existing.word,
+                        strongsNumbers: numbers
+                    )
+                }
+            } else {
+                let strongsNumbers: [String]
+                if let sn = row.strongsNumber, !sn.isEmpty {
+                    strongsNumbers = [sn]
+                } else {
+                    strongsNumbers = []
+                }
+                verseTags.append(WordTag(
+                    wordIndex: row.wordIndex,
+                    word: row.word,
+                    strongsNumbers: strongsNumbers
+                ))
+            }
+
+            grouped[row.verseId] = verseTags
         }
         return grouped
     }

@@ -23,11 +23,8 @@ struct SearchView: View {
             Divider()
             if hasSearched {
                 resultsList
-            } else {
-                emptyState
             }
         }
-        .navigationTitle("Search")
         .onAppear {
             selectedModuleIds = Set(store.loadedTranslations.map(\.id))
             // If windowState has a pending search query, use it
@@ -86,6 +83,16 @@ struct SearchView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .disabled(searchText.trimmingCharacters(in: .whitespaces).isEmpty || isSearching)
+
+                Divider().frame(height: 16)
+
+                Button(action: { windowState.showSearchPanel = false }) {
+                    Image(systemName: "xmark")
+                        .font(.callout)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Close search")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -195,26 +202,25 @@ struct SearchView: View {
     private var resultsList: some View {
         Group {
             if isSearching {
-                VStack(spacing: 8) {
+                HStack(spacing: 8) {
                     ProgressView()
+                        .controlSize(.small)
                     Text("Searching...")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
             } else if results.isEmpty {
-                VStack(spacing: 8) {
+                HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 36))
                         .foregroundStyle(.quaternary)
-                    Text("No results found")
-                        .font(.title3)
+                    Text("No results found — try a different search term or scope")
+                        .font(.callout)
                         .foregroundStyle(.secondary)
-                    Text("Try a different search term or scope")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
             } else {
                 VStack(spacing: 0) {
                     // Result count header
@@ -260,25 +266,6 @@ struct SearchView: View {
             return "500+ results"
         }
         return "\(results.count) result\(results.count == 1 ? "" : "s")"
-    }
-
-    // MARK: - Empty State
-
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 48))
-                .foregroundStyle(.quaternary)
-            Text("Search the Bible")
-                .font(.title2)
-                .foregroundStyle(.tertiary)
-            Text("Enter a word or phrase to search across all loaded translations")
-                .font(.caption)
-                .foregroundStyle(.quaternary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Actions
@@ -584,7 +571,7 @@ struct SearchResultRow: View {
                 Text("\(result.verse - 1). \(prev)")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .italic()
             }
 
@@ -592,14 +579,14 @@ struct SearchResultRow: View {
             highlightedText
                 .font(.callout)
                 .foregroundStyle(.primary)
-                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
 
             // Next verse context
             if let next = nextVerseText {
                 Text("\(result.verse + 1). \(next)")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .italic()
             }
         }

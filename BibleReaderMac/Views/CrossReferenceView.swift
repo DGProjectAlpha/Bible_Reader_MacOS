@@ -2,10 +2,21 @@ import SwiftUI
 
 // MARK: - Cross-Reference Navigation View
 
+/// A TSK cross-reference with resolved verse text for display.
+struct TSKDisplayRef: Identifiable {
+    let id = UUID()
+    let book: String
+    let chapter: Int
+    let verse: Int
+    let verseId: String       // "Book:Chapter:Verse"
+    let label: String         // "John 3:16"
+    let verseText: String     // Actual verse text from loaded module
+    let translationAbbr: String
+}
+
 struct CrossReferenceView: View {
     @EnvironmentObject var store: BibleStore
-    @State private var forwardRefs: [ResolvedCrossReference] = []
-    @State private var reverseRefs: [ResolvedCrossReference] = []
+    @State private var tskRefs: [TSKDisplayRef] = []
     @State private var isLoading = false
     @State private var selectedVerseId: String?
     @State private var manualRefInput: String = ""
@@ -102,23 +113,14 @@ struct CrossReferenceView: View {
         } else if isLoading {
             ProgressView("Loading cross-references...")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if forwardRefs.isEmpty && reverseRefs.isEmpty {
+        } else if tskRefs.isEmpty {
             noRefsState
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    if !forwardRefs.isEmpty {
-                        sectionHeader("References from this verse", count: forwardRefs.count)
-                        ForEach(forwardRefs) { ref in
-                            crossRefRow(ref, direction: .forward)
-                        }
-                    }
-
-                    if !reverseRefs.isEmpty {
-                        sectionHeader("Verses that reference this one", count: reverseRefs.count)
-                        ForEach(reverseRefs) { ref in
-                            crossRefRow(ref, direction: .reverse)
-                        }
+                    sectionHeader("Cross References (TSK)", count: tskRefs.count)
+                    ForEach(tskRefs) { ref in
+                        tskRefRow(ref)
                     }
                 }
                 .padding(.vertical, 8)
@@ -147,36 +149,23 @@ struct CrossReferenceView: View {
         .padding(.top, 4)
     }
 
-    // MARK: - Cross-Reference Row
+    // MARK: - TSK Reference Row
 
-    private enum RefDirection { case forward, reverse }
-
-    private func crossRefRow(_ ref: ResolvedCrossReference, direction: RefDirection) -> some View {
+    private func tskRefRow(_ ref: TSKDisplayRef) -> some View {
         Button(action: {
-            let targetId = direction == .forward
-                ? ref.reference.toVerseId
-                : ref.reference.fromVerseId
-            navigateToRef(targetId)
+            navigateToRef(ref.verseId)
         }) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    // Reference type badge
-                    Text(ref.typeBadge)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(badgeColor(ref.reference.referenceType), in: Capsule())
-
                     // Target verse reference
-                    Text(ref.displayRef)
+                    Text(ref.label)
                         .font(.callout.weight(.medium))
                         .foregroundStyle(Color.accentColor)
 
                     Spacer()
 
                     // Module badge
-                    Text(ref.translationAbbreviation)
+                    Text(ref.translationAbbr)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 5)
@@ -188,12 +177,14 @@ struct CrossReferenceView: View {
                         .foregroundStyle(.tertiary)
                 }
 
-                // Verse text preview (truncated)
-                Text(ref.targetText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                // Verse text preview
+                if !ref.verseText.isEmpty {
+                    Text(ref.verseText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -297,32 +288,40 @@ struct CrossReferenceView: View {
             (filePath: $0.filePath, abbreviation: $0.abbreviation)
         }
 
-        // Run off main thread for large datasets
         Task.detached {
-            let forward = CrossReferenceService.loadResolved(
-                verseId: verseId,
-                translations: translations
-            )
-            let reverse = CrossReferenceService.loadReverse(
-                verseId: verseId,
-                translations: translations
-            )
+            let rawRefs = TSKService.getRefs(for: verseId)
+            var displayRefs: [TSKDisplayRef] = []
+
+            // Use first loaded translation for verse text
+            let primaryTranslation = translations.first
+
+            for ref in rawRefs {
+                var verseText = ""
+                var translationAbbr = ""
+
+                if let primary = primaryTranslation,
+                   let conn = try? ModuleConnectionPool.shared.connection(for: primary.filePath),
+                   let verses = try? conn.loadVerses(book: ref.book, chapter: ref.chapter),
+                   let verse = verses.first(where: { $0.number == ref.verse }) {
+                    verseText = verse.text
+                    translationAbbr = primary.abbreviation
+                }
+
+                displayRefs.append(TSKDisplayRef(
+                    book: ref.book,
+                    chapter: ref.chapter,
+                    verse: ref.verse,
+                    verseId: ref.verseId,
+                    label: ref.label,
+                    verseText: verseText,
+                    translationAbbr: translationAbbr
+                ))
+            }
+
             await MainActor.run {
-                forwardRefs = forward
-                reverseRefs = reverse
+                tskRefs = displayRefs
                 isLoading = false
             }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func badgeColor(_ type: CrossReferenceType) -> Color {
-        switch type {
-        case .parallel:  return .blue
-        case .quotation: return .orange
-        case .allusion:  return .purple
-        case .related:   return .green
         }
     }
 

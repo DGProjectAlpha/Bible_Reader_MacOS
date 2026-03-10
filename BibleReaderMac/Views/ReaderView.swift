@@ -21,17 +21,7 @@ struct ReaderView: View {
                     coordinator: syncCoordinator
                 )
             } else {
-                HSplitView {
-                    ForEach(windowState.panes) { pane in
-                        ReaderPaneView(
-                            pane: pane,
-                            isSolo: false,
-                            syncScrolling: $syncScrolling,
-                            coordinator: syncCoordinator
-                        )
-                        .frame(minWidth: 280)
-                    }
-                }
+                splitPaneGrid(windowState.panes)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -84,6 +74,64 @@ struct ReaderView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Split Pane Grid (static children — ForEach inside HSplitView causes hangs)
+
+    /// Lays out panes in a grid: up to 4 columns per row, 2 rows max (= 8 panes).
+    /// HSplitView/VSplitView require static children; ForEach causes macOS hangs.
+    @ViewBuilder
+    private func splitPaneGrid(_ panes: [ReaderPane]) -> some View {
+        let count = panes.count
+        if count <= 4 {
+            horizontalSplitRow(Array(panes))
+        } else {
+            let midpoint = (count + 1) / 2 // top row gets the extra pane if odd
+            VSplitView {
+                horizontalSplitRow(Array(panes.prefix(midpoint)))
+                    .frame(minHeight: 150)
+                horizontalSplitRow(Array(panes.suffix(from: midpoint)))
+                    .frame(minHeight: 150)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func horizontalSplitRow(_ panes: [ReaderPane]) -> some View {
+        switch panes.count {
+        case 1:
+            paneView(panes[0])
+        case 2:
+            HSplitView {
+                paneView(panes[0])
+                paneView(panes[1])
+            }
+        case 3:
+            HSplitView {
+                paneView(panes[0])
+                paneView(panes[1])
+                paneView(panes[2])
+            }
+        case 4:
+            HSplitView {
+                paneView(panes[0])
+                paneView(panes[1])
+                paneView(panes[2])
+                paneView(panes[3])
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    private func paneView(_ pane: ReaderPane) -> some View {
+        ReaderPaneView(
+            pane: pane,
+            isSolo: false,
+            syncScrolling: $syncScrolling,
+            coordinator: syncCoordinator
+        )
+        .frame(minWidth: 250)
     }
 
     // MARK: - Empty State
@@ -351,22 +399,26 @@ struct ReaderPaneView: View {
                 Spacer()
 
                 // Font size controls
-                HStack(spacing: 2) {
+                HStack(spacing: 6) {
                     Button(action: { fontSize = max(10, fontSize - 1) }) {
                         Image(systemName: "textformat.size.smaller")
-                            .font(.caption2)
+                            .font(.body)
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
                     .help("Decrease font size")
 
                     Text("\(Int(fontSize))")
-                        .font(.caption2.monospacedDigit())
+                        .font(.callout.monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .frame(width: 20, alignment: .center)
+                        .frame(width: 24, alignment: .center)
 
                     Button(action: { fontSize = min(36, fontSize + 1) }) {
                         Image(systemName: "textformat.size.larger")
-                            .font(.caption2)
+                            .font(.body)
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
                     .help("Increase font size")

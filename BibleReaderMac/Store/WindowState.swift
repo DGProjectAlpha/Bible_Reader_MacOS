@@ -31,13 +31,11 @@ enum SidebarTab: String, CaseIterable, Hashable {
 enum InspectorTab: String, CaseIterable, Hashable {
     case strongs
     case crossRefs
-    case search
 
     var label: String {
         switch self {
         case .strongs: return "Strong's"
         case .crossRefs: return "Cross-Refs"
-        case .search: return "Search"
         }
     }
 
@@ -45,7 +43,6 @@ enum InspectorTab: String, CaseIterable, Hashable {
         switch self {
         case .strongs: return "textformat.abc"
         case .crossRefs: return "link"
-        case .search: return "magnifyingglass"
         }
     }
 }
@@ -87,6 +84,7 @@ class WindowState: ObservableObject {
     @Published var inspectorCrossRefVerseId: String?
 
     // Search state
+    @Published var showSearchPanel: Bool = false
     @Published var searchQuery: String = ""
 
     private var titleCancellables = Set<AnyCancellable>()
@@ -127,8 +125,11 @@ class WindowState: ObservableObject {
         if !query.isEmpty {
             searchQuery = query
         }
-        inspectorTab = .search
-        showInspector = true
+        showSearchPanel = true
+    }
+
+    func toggleSearchPanel() {
+        showSearchPanel.toggle()
     }
 
     func toggleInspector(tab: InspectorTab) {
