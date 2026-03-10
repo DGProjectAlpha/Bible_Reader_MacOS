@@ -457,8 +457,18 @@ struct ReaderPaneView: View {
                                 highlightOpacity: verseHighlightOpacity,
                                 isHovered: hoveredVerse == verse.number,
                                 isSelected: selectedVerse == verse.number,
+                                isBookmarked: store.isBookmarked(verseId: verse.id, translationId: pane.selectedTranslationId),
                                 customTextColor: Color.fromHex(textColorHex),
-                                customBackgroundColor: Color.fromHex(backgroundColorHex)
+                                customBackgroundColor: Color.fromHex(backgroundColorHex),
+                                onToggleBookmark: {
+                                    if store.isBookmarked(verseId: verse.id, translationId: pane.selectedTranslationId) {
+                                        if let bm = store.bookmarks.first(where: { $0.verseId == verse.id && $0.translationId == pane.selectedTranslationId }) {
+                                            store.removeBookmark(bm.id)
+                                        }
+                                    } else {
+                                        store.addBookmark(verseId: verse.id, translationId: pane.selectedTranslationId)
+                                    }
+                                }
                             )
                             .id(verseAnchor(verse.number))
                             .onHover { isHovered in
@@ -637,8 +647,14 @@ struct VerseRow: View {
     var highlightOpacity: Double = 0.12
     var isHovered: Bool = false
     var isSelected: Bool = false
+    var isBookmarked: Bool = false
     var customTextColor: Color? = nil
     var customBackgroundColor: Color? = nil
+    var onToggleBookmark: (() -> Void)? = nil
+
+    private var showBookmarkButton: Bool {
+        isBookmarked || isHovered || isSelected
+    }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -666,6 +682,18 @@ struct VerseRow: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            // Bookmark toggle button — visible on hover/select or when bookmarked
+            if showBookmarkButton {
+                Button(action: { onToggleBookmark?() }) {
+                    Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                        .font(.system(size: fontSize * 0.75))
+                        .foregroundColor(isBookmarked ? .accentColor : .secondary.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+                .help(isBookmarked ? "Remove bookmark" : "Bookmark this verse")
+                .transition(.opacity)
+            }
         }
         .padding(.vertical, 3)
         .padding(.horizontal, 4)
@@ -678,6 +706,7 @@ struct VerseRow: View {
                 .strokeBorder(isSelected ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 1)
         )
         .contentShape(Rectangle())
+        .animation(.easeInOut(duration: 0.15), value: showBookmarkButton)
     }
 
     private var verseNumberColor: Color {
