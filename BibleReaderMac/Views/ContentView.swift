@@ -154,6 +154,26 @@ private struct NotificationHandlers: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .modifier(SheetNotifications(showImportSheet: $showImportSheet,
+                                         showManageTranslations: $showManageTranslations,
+                                         store: store, windowState: windowState))
+            .modifier(NavigationNotifications(windowState: windowState,
+                                              navigateChapter: navigateChapter,
+                                              navigateBook: navigateBook))
+            .modifier(InspectorNotifications(windowState: windowState, store: store))
+            .modifier(MiscNotifications(importHandler: importHandler, store: store))
+    }
+}
+
+// MARK: - Sheet Notifications
+private struct SheetNotifications: ViewModifier {
+    @Binding var showImportSheet: Bool
+    @Binding var showManageTranslations: Bool
+    @ObservedObject var store: BibleStore
+    @ObservedObject var windowState: WindowState
+
+    func body(content: Content) -> some View {
+        content
             .onReceive(NotificationCenter.default.publisher(for: .importModule)) { _ in
                 showImportSheet = true
             }
@@ -171,6 +191,17 @@ private struct NotificationHandlers: ViewModifier {
                     store.addBookmark(verseId: verseId, translationId: translation.id)
                 }
             }
+    }
+}
+
+// MARK: - Navigation Notifications
+private struct NavigationNotifications: ViewModifier {
+    @ObservedObject var windowState: WindowState
+    var navigateChapter: (Int) -> Void
+    var navigateBook: (Int) -> Void
+
+    func body(content: Content) -> some View {
+        content
             .onReceive(NotificationCenter.default.publisher(for: .navigatePreviousChapter)) { _ in
                 navigateChapter(-1)
             }
@@ -183,6 +214,16 @@ private struct NotificationHandlers: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .navigateNextBook)) { _ in
                 navigateBook(1)
             }
+    }
+}
+
+// MARK: - Inspector Notifications
+private struct InspectorNotifications: ViewModifier {
+    @ObservedObject var windowState: WindowState
+    @ObservedObject var store: BibleStore
+
+    func body(content: Content) -> some View {
+        content
             .onReceive(NotificationCenter.default.publisher(for: .translationRemoved)) { notification in
                 guard let removedId = notification.userInfo?["translationId"] as? UUID else { return }
                 for pane in windowState.panes where pane.selectedTranslationId == removedId {
@@ -208,6 +249,16 @@ private struct NotificationHandlers: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .toggleCrossRefsInspector)) { _ in
                 windowState.toggleInspector(tab: .crossRefs)
             }
+    }
+}
+
+// MARK: - Misc Notifications
+private struct MiscNotifications: ViewModifier {
+    var importHandler: FileImportHandler
+    @ObservedObject var store: BibleStore
+
+    func body(content: Content) -> some View {
+        content
             .onReceive(NotificationCenter.default.publisher(for: .navigateToReader)) { _ in }
             .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)

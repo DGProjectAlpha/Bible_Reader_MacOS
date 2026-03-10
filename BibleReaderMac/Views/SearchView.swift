@@ -626,10 +626,10 @@ struct SearchResultRow: View {
         while let range = lower.range(of: term, range: searchStart..<lower.endIndex) {
             // Text before match
             if range.lowerBound > searchStart {
-                built = built + Text(text[searchStart..<range.lowerBound])
+                built = Text("\(built)\(Text(text[searchStart..<range.lowerBound]))")
             }
             // The matched portion — highlighted
-            built = built + Text(text[range])
+            built = Text("\(built)\(Text(text[range]))")
                 .foregroundColor(.orange)
                 .bold()
 
@@ -638,7 +638,7 @@ struct SearchResultRow: View {
 
         // Remainder after last match
         if searchStart < lower.endIndex {
-            built = built + Text(text[searchStart..<text.endIndex])
+            built = Text("\(built)\(Text(text[searchStart..<text.endIndex]))")
         }
 
         return built
