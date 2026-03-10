@@ -27,8 +27,8 @@ struct CrossReferenceView: View {
                 navigateToRef(verseId)
             }
         }
-        .onChange(of: initialVerseId) { newId in
-            if let verseId = newId {
+        .onChange(of: initialVerseId) {
+            if let verseId = initialVerseId {
                 navigateToRef(verseId)
             }
         }
@@ -65,7 +65,7 @@ struct CrossReferenceView: View {
                 HStack {
                     Text(formatVerseId(verseId))
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(Color.accentColor)
                     Spacer()
                     Button("Open in Reader") {
                         navigateReaderTo(verseId: verseId)
@@ -171,7 +171,7 @@ struct CrossReferenceView: View {
                     // Target verse reference
                     Text(ref.displayRef)
                         .font(.callout.weight(.medium))
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(Color.accentColor)
 
                     Spacer()
 

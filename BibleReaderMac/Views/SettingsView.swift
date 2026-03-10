@@ -370,7 +370,7 @@ struct ProfileSettingsTab: View {
                 ForEach(profiles, id: \.self) { name in
                     HStack {
                         Image(systemName: name == activeProfile ? "person.circle.fill" : "person.circle")
-                            .foregroundStyle(name == activeProfile ? .accentColor : .secondary)
+                            .foregroundStyle(name == activeProfile ? Color.accentColor : Color.secondary)
                         Text(name)
                             .fontWeight(name == activeProfile ? .semibold : .regular)
                         Spacer()

@@ -121,7 +121,7 @@ struct BookmarksView: View {
                             .font(.callout)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(groupByBook ? .accentColor : .secondary)
+                    .foregroundStyle(groupByBook ? Color.accentColor : Color.secondary)
                     .help(groupByBook ? "Show flat list" : "Group by book")
 
                     // Sort menu
@@ -376,7 +376,7 @@ struct BookmarkRow: View {
             HStack {
                 Image(systemName: "bookmark.fill")
                     .font(.caption)
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
                 Text(formatVerseId(bookmark.verseId))
                     .font(.callout.weight(.medium))
             }

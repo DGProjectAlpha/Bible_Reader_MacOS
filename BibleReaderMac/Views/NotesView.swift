@@ -119,7 +119,7 @@ struct NotesView: View {
                             .font(.callout)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(groupByBook ? .accentColor : .secondary)
+                    .foregroundStyle(groupByBook ? Color.accentColor : Color.secondary)
                     .help(groupByBook ? "Show flat list" : "Group by book")
 
                     // Sort menu
