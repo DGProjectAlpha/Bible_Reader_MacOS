@@ -70,6 +70,7 @@
 		B1000028 /* NotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesView.swift; sourceTree = "<group>"; };
 		B1000029 /* FileImportHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileImportHandler.swift; sourceTree = "<group>"; };
 		B1000030 /* BundledModules */ = {isa = PBXFileReference; lastKnownFileType = folder; path = BundledModules; sourceTree = "<group>"; };
+		B1000031 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B1000099 /* BibleReaderMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BibleReaderMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -105,6 +106,7 @@
 				D1000006 /* Services */,
 				B1000012 /* Assets.xcassets */,
 				B1000030 /* BundledModules */,
+				B1000031 /* Info.plist */,
 			);
 			path = BibleReaderMac;
 			sourceTree = "<group>";
@@ -355,6 +357,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"BibleReaderMac/Preview Content\"";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BibleReaderMac/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.reference";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -381,6 +384,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"BibleReaderMac/Preview Content\"";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BibleReaderMac/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.reference";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
