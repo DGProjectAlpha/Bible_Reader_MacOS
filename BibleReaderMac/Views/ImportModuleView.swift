@@ -68,7 +68,7 @@ struct ImportModuleView: View {
                     } else {
                         Image(systemName: isDragTargeted ? "arrow.down.circle.fill" : "square.and.arrow.down")
                             .font(.system(size: 40))
-                            .foregroundStyle(isDragTargeted ? .accent : .secondary)
+                            .foregroundColor(isDragTargeted ? .accentColor : .secondary)
                             .symbolEffect(.bounce, value: isDragTargeted)
 
                         Text("Drop .brbmod files here")
