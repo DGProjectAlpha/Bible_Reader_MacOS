@@ -219,9 +219,9 @@ struct ReaderPaneView: View {
             previousTranslationId = pane.selectedTranslationId
             loadCurrentChapter()
         }
-        .onChange(of: pane.selectedTranslationId) { oldId, newId in
+        .onChange(of: pane.selectedTranslationId) { _, newId in
             // Convert verse position between versification schemes when switching translations
-            if let oldId, oldId != newId {
+            if let oldId = previousTranslationId, oldId != newId {
                 let topVerse = visibleVerseNumbers.min() ?? 1
                 store.convertPanePosition(for: pane, from: oldId, to: newId, currentVerse: topVerse)
             }
