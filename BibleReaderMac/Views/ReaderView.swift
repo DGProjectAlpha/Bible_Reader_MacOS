@@ -241,11 +241,14 @@ struct ReaderPaneView: View {
     @AppStorage("fontSize") private var fontSize: Double = 15
     @AppStorage("fontFamily") private var fontFamily: String = "System"
     @AppStorage("lineSpacing") private var lineSpacing: Double = 1.3
+    @AppStorage("wordSpacing") private var wordSpacing: Double = 0.0
     @AppStorage("verseNumberStyle") private var verseNumberStyle: String = "superscript"
     @AppStorage("paragraphMode") private var paragraphMode: Bool = false
     @AppStorage("verseHighlightOpacity") private var verseHighlightOpacity: Double = 0.12
     @AppStorage("showChapterTitles") private var showChapterTitles: Bool = true
     @AppStorage("readerTheme") private var readerTheme: String = "auto"
+    @AppStorage("textColorHex") private var textColorHex: String = ""
+    @AppStorage("backgroundColorHex") private var backgroundColorHex: String = ""
 
     @State private var scrollProxy: ScrollViewProxy?
     @State private var showBookPicker = false
@@ -449,10 +452,13 @@ struct ReaderPaneView: View {
                                 fontSize: CGFloat(fontSize),
                                 fontFamily: fontFamily,
                                 lineSpacingMultiplier: CGFloat(lineSpacing),
+                                wordSpacing: CGFloat(wordSpacing),
                                 verseNumberStyle: verseNumberStyle,
                                 highlightOpacity: verseHighlightOpacity,
                                 isHovered: hoveredVerse == verse.number,
-                                isSelected: selectedVerse == verse.number
+                                isSelected: selectedVerse == verse.number,
+                                customTextColor: Color.fromHex(textColorHex),
+                                customBackgroundColor: Color.fromHex(backgroundColorHex)
                             )
                             .id(verseAnchor(verse.number))
                             .onHover { isHovered in
@@ -614,10 +620,13 @@ struct VerseRow: View {
     var fontSize: CGFloat = 15
     var fontFamily: String = "System"
     var lineSpacingMultiplier: CGFloat = 1.3
+    var wordSpacing: CGFloat = 0.0
     var verseNumberStyle: String = "superscript"
     var highlightOpacity: Double = 0.12
     var isHovered: Bool = false
     var isSelected: Bool = false
+    var customTextColor: Color? = nil
+    var customBackgroundColor: Color? = nil
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -625,7 +634,7 @@ struct VerseRow: View {
             if verseNumberStyle == "margin" {
                 Text("\(verse.number)")
                     .font(.system(size: fontSize * 0.7).monospacedDigit())
-                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .foregroundColor(verseNumberColor)
                     .frame(width: 30, alignment: .trailing)
             }
 
@@ -633,6 +642,7 @@ struct VerseRow: View {
                 // Verse number inline/superscript + text
                 (verseNumberText + Text(" ") + verseBodyText)
                     .lineSpacing(fontSize * (lineSpacingMultiplier - 1.0))
+                    .tracking(wordSpacing)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
@@ -640,6 +650,7 @@ struct VerseRow: View {
                 Text(verse.text)
                     .font(resolvedFont)
                     .lineSpacing(fontSize * (lineSpacingMultiplier - 1.0))
+                    .tracking(wordSpacing)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -657,23 +668,33 @@ struct VerseRow: View {
         .contentShape(Rectangle())
     }
 
+    private var verseNumberColor: Color {
+        if let custom = customTextColor {
+            return isSelected ? custom : custom.opacity(0.6)
+        }
+        return isSelected ? .primary : .secondary
+    }
+
     private var verseNumberText: Text {
         let numStr = "\(verse.number)"
         if verseNumberStyle == "superscript" {
             return Text(numStr)
                 .font(.system(size: fontSize * 0.6).monospacedDigit())
-                .foregroundColor(isSelected ? .primary : .secondary)
+                .foregroundColor(verseNumberColor)
                 .baselineOffset(fontSize * 0.3)
         } else {
             return Text(numStr)
                 .font(.system(size: fontSize * 0.7).monospacedDigit())
-                .foregroundColor(isSelected ? .primary : .secondary)
+                .foregroundColor(verseNumberColor)
         }
     }
 
     private var verseBodyText: Text {
-        Text(verse.text)
-            .font(resolvedFont)
+        let base = Text(verse.text).font(resolvedFont)
+        if let custom = customTextColor {
+            return base.foregroundColor(custom)
+        }
+        return base
     }
 
     private var resolvedFont: Font {
@@ -689,7 +710,7 @@ struct VerseRow: View {
         } else if isHovered {
             return Color.primary.opacity(0.04)
         }
-        return Color.clear
+        return customBackgroundColor ?? Color.clear
     }
 }
 
