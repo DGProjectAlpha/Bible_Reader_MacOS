@@ -37,9 +37,9 @@ struct SearchView: View {
                 performSearch()
             }
         }
-        .onChange(of: windowState.searchQuery) { newQuery in
-            if !newQuery.isEmpty {
-                searchText = newQuery
+        .onChange(of: windowState.searchQuery) { oldValue, newValue in
+            if !newValue.isEmpty {
+                searchText = newValue
                 windowState.searchQuery = ""
                 performSearch()
             }
@@ -294,12 +294,13 @@ struct SearchView: View {
 
         let currentBook = windowState.panes.first?.selectedBook
         let currentChapter = windowState.panes.first?.selectedChapter
+        let capturedModuleIds = selectedModuleIds
 
         Task.detached {
             var allResults: [SearchResult] = []
 
             let translations = await store.loadedTranslations.filter { t in
-                await selectedModuleIds.contains(t.id)
+                capturedModuleIds.contains(t.id)
             }
 
             for translation in translations {
@@ -628,9 +629,8 @@ struct SearchResultRow: View {
             }
             // The matched portion — highlighted
             built = built + Text(text[range])
-                .foregroundColor(.white)
+                .foregroundColor(.orange)
                 .bold()
-                .background(Color.orange.opacity(0.7))
 
             searchStart = range.upperBound
         }
