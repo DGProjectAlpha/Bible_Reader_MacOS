@@ -13,8 +13,21 @@ struct SidebarView: View {
                     .tag(SidebarItem.search)
                 Label("Strong's Concordance", systemImage: "character.book.closed")
                     .tag(SidebarItem.strongs)
-                Label("Bookmarks", systemImage: "bookmark")
+                Label {
+                    HStack {
+                        Text("Bookmarks")
+                        if !store.bookmarks.isEmpty {
+                            Text("\(store.bookmarks.count)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } icon: {
+                    Image(systemName: "bookmark")
+                }
                     .tag(SidebarItem.bookmarks)
+                Label("History", systemImage: "clock")
+                    .tag(SidebarItem.history)
                 Label("Notes", systemImage: "note.text")
                     .tag(SidebarItem.notes)
                 Label("Cross References", systemImage: "arrow.triangle.branch")
@@ -67,6 +80,7 @@ enum SidebarItem: Hashable {
     case search
     case strongs
     case bookmarks
+    case history
     case notes
     case crossRefs
 }

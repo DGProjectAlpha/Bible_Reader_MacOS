@@ -91,7 +91,9 @@ struct ContentView: View {
         case .strongs:
             StrongsLookupView()
         case .bookmarks:
-            PlaceholderView(title: "Bookmarks", icon: "bookmark")
+            BookmarksView()
+        case .history:
+            HistoryView()
         case .notes:
             PlaceholderView(title: "Notes", icon: "note.text")
         case .crossRefs:

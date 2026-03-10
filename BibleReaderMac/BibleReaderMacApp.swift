@@ -69,6 +69,17 @@ struct BibleReaderMacApp: App {
                 .keyboardShortcut("0", modifiers: [.command])
             }
 
+            CommandMenu("Bookmarks") {
+                Button("Bookmark Current Verse") {
+                    guard let pane = bibleStore.panes.first else { return }
+                    let verseId = "\(pane.selectedBook):\(pane.selectedChapter):1"
+                    if let translation = bibleStore.loadedTranslations.first(where: { $0.id == pane.selectedTranslationId }) {
+                        bibleStore.addBookmark(verseId: verseId, translationId: translation.id)
+                    }
+                }
+                .keyboardShortcut("d", modifiers: [.command])
+            }
+
             CommandMenu("Navigate") {
                 Button("Previous Chapter") {
                     navigateChapter(delta: -1)

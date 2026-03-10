@@ -28,9 +28,11 @@ class BibleStore: ObservableObject {
     @Published var panes: [ReaderPane] = [ReaderPane()]
     @Published var bookmarks: [Bookmark] = []
     @Published var notes: [Note] = []
+    @Published var readingHistory: [ReadingHistoryEntry] = []
     @Published var searchResults: [SearchResult] = []
 
     private let moduleManager = ModuleManager.shared
+    private let userDataService = UserDataService.shared
 
     static var modulesDirectory: URL {
         ModuleManager.shared.modulesDirectory
@@ -40,6 +42,45 @@ class BibleStore: ObservableObject {
         // Scan disk for modules — picks up manually-added files and validates everything
         moduleManager.scanModules()
         loadedTranslations = moduleManager.loadTranslations()
+        bookmarks = userDataService.loadBookmarks()
+        readingHistory = userDataService.loadHistory()
+    }
+
+    // MARK: - Bookmarks
+
+    func addBookmark(verseId: String, translationId: UUID, label: String? = nil) {
+        // Don't duplicate
+        guard !bookmarks.contains(where: { $0.verseId == verseId && $0.translationId == translationId }) else { return }
+        let bookmark = Bookmark(verseId: verseId, translationId: translationId, label: label)
+        bookmarks.insert(bookmark, at: 0)
+        userDataService.saveBookmarks(bookmarks)
+    }
+
+    func removeBookmark(_ id: UUID) {
+        bookmarks.removeAll { $0.id == id }
+        userDataService.saveBookmarks(bookmarks)
+    }
+
+    func isBookmarked(verseId: String, translationId: UUID) -> Bool {
+        bookmarks.contains { $0.verseId == verseId && $0.translationId == translationId }
+    }
+
+    // MARK: - Reading History
+
+    func recordHistory(book: String, chapter: Int, translationAbbreviation: String) {
+        // Deduplicate consecutive identical entries
+        if let last = readingHistory.last,
+           last.book == book && last.chapter == chapter && last.translationAbbreviation == translationAbbreviation {
+            return
+        }
+        let entry = ReadingHistoryEntry(book: book, chapter: chapter, translationAbbreviation: translationAbbreviation)
+        readingHistory.append(entry)
+        userDataService.saveHistory(readingHistory)
+    }
+
+    func clearHistory() {
+        readingHistory.removeAll()
+        userDataService.saveHistory(readingHistory)
     }
 
     func addPane() {
@@ -105,6 +146,8 @@ class BibleStore: ObservableObject {
                 book: pane.selectedBook,
                 chapter: pane.selectedChapter
             )
+            // Record reading history
+            recordHistory(book: pane.selectedBook, chapter: pane.selectedChapter, translationAbbreviation: translation.abbreviation)
         } catch {
             print("Failed to load verses: \(error.localizedDescription)")
             pane.verses = []

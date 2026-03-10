@@ -273,6 +273,27 @@ enum SearchScope: String, Codable, Hashable, CaseIterable {
     case chapter = "Current Chapter"
 }
 
+// MARK: - Reading History
+
+/// A single entry in the user's reading history, recorded when navigating chapters.
+struct ReadingHistoryEntry: Identifiable, Codable, Hashable {
+    let id: UUID
+    let book: String
+    let chapter: Int
+    let translationAbbreviation: String
+    let timestamp: Date
+
+    init(id: UUID = UUID(), book: String, chapter: Int, translationAbbreviation: String, timestamp: Date = Date()) {
+        self.id = id
+        self.book = book
+        self.chapter = chapter
+        self.translationAbbreviation = translationAbbreviation
+        self.timestamp = timestamp
+    }
+
+    var displayRef: String { "\(book) \(chapter)" }
+}
+
 // MARK: - Verse Key (lightweight reference)
 
 /// Lightweight value identifying a specific verse without carrying its text.

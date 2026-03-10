@@ -469,6 +469,18 @@ struct ReaderPaneView: View {
                                 onVerseTap?(verse, currentTranslation)
                             }
                             .contextMenu {
+                                if store.isBookmarked(verseId: verse.id, translationId: pane.selectedTranslationId) {
+                                    Button("Remove Bookmark") {
+                                        if let bm = store.bookmarks.first(where: { $0.verseId == verse.id && $0.translationId == pane.selectedTranslationId }) {
+                                            store.removeBookmark(bm.id)
+                                        }
+                                    }
+                                } else {
+                                    Button("Bookmark Verse") {
+                                        store.addBookmark(verseId: verse.id, translationId: pane.selectedTranslationId)
+                                    }
+                                }
+                                Divider()
                                 Button("View Cross-References") {
                                     NotificationCenter.default.post(
                                         name: .showCrossReferences,
