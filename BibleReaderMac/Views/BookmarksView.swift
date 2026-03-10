@@ -1,12 +1,80 @@
 import SwiftUI
 
+// MARK: - Sort & Group Options
+
+enum BookmarkSortOrder: String, CaseIterable {
+    case dateNewest = "Newest First"
+    case dateOldest = "Oldest First"
+    case bookOrder = "Book Order"
+}
+
+// MARK: - Bookmarks View
+
 struct BookmarksView: View {
     @EnvironmentObject var store: BibleStore
     @State private var editingBookmarkId: UUID?
     @State private var editingNoteText: String = ""
+    @State private var searchText: String = ""
+    @State private var sortOrder: BookmarkSortOrder = .dateNewest
+    @State private var groupByBook: Bool = false
+
+    private var filteredBookmarks: [Bookmark] {
+        var result = store.bookmarks
+
+        // Filter by search text
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            result = result.filter { bm in
+                formatVerseId(bm.verseId).lowercased().contains(query)
+                || (bm.label ?? "").lowercased().contains(query)
+                || (bm.note ?? "").lowercased().contains(query)
+            }
+        }
+
+        // Sort
+        switch sortOrder {
+        case .dateNewest:
+            result.sort { $0.createdAt > $1.createdAt }
+        case .dateOldest:
+            result.sort { $0.createdAt < $1.createdAt }
+        case .bookOrder:
+            result.sort { lhs, rhs in
+                let lBook = bookName(from: lhs.verseId)
+                let rBook = bookName(from: rhs.verseId)
+                let lIndex = BibleBooks.all.firstIndex(of: lBook) ?? 999
+                let rIndex = BibleBooks.all.firstIndex(of: rBook) ?? 999
+                if lIndex != rIndex { return lIndex < rIndex }
+                let lChapter = chapterNumber(from: lhs.verseId)
+                let rChapter = chapterNumber(from: rhs.verseId)
+                if lChapter != rChapter { return lChapter < rChapter }
+                return verseNumber(from: lhs.verseId) < verseNumber(from: rhs.verseId)
+            }
+        }
+
+        return result
+    }
+
+    private var groupedBookmarks: [(String, [Bookmark])] {
+        let bookmarks = filteredBookmarks
+        var groups: [(String, [Bookmark])] = []
+        var seen: [String: Int] = [:]
+
+        for bm in bookmarks {
+            let book = bookName(from: bm.verseId)
+            if let idx = seen[book] {
+                groups[idx].1.append(bm)
+            } else {
+                seen[book] = groups.count
+                groups.append((book, [bm]))
+            }
+        }
+
+        return groups
+    }
 
     var body: some View {
         VStack(spacing: 0) {
+            // Header
             HStack {
                 Text("Bookmarks")
                     .font(.title2.weight(.semibold))
@@ -21,57 +89,74 @@ struct BookmarksView: View {
             .padding(.top, 12)
             .padding(.bottom, 8)
 
-            Divider()
-
-            if store.bookmarks.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "bookmark")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.quaternary)
-                    Text("No Bookmarks")
-                        .font(.title2)
-                        .foregroundStyle(.tertiary)
-                    Text("Right-click a verse and select \"Bookmark Verse\" to save it here.")
-                        .font(.callout)
-                        .foregroundStyle(.quaternary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(store.bookmarks) { bookmark in
-                        BookmarkRow(bookmark: bookmark)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                navigateToBookmark(bookmark)
+            // Search & toolbar
+            if !store.bookmarks.isEmpty {
+                HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                        TextField("Filter bookmarks...", text: $searchText)
+                            .textFieldStyle(.plain)
+                            .font(.callout)
+                        if !searchText.isEmpty {
+                            Button(action: { searchText = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                                    .font(.caption)
                             }
-                            .contextMenu {
-                                Button("Go to Verse") {
-                                    navigateToBookmark(bookmark)
-                                }
-                                Divider()
-                                Button(bookmark.note == nil ? "Add Note" : "Edit Note") {
-                                    editingNoteText = bookmark.note ?? ""
-                                    editingBookmarkId = bookmark.id
-                                }
-                                if bookmark.note != nil {
-                                    Button("Remove Note") {
-                                        store.updateBookmarkNote(id: bookmark.id, note: nil)
-                                    }
-                                }
-                                Divider()
-                                Button("Remove Bookmark", role: .destructive) {
-                                    store.removeBookmark(bookmark.id)
-                                }
-                            }
-                    }
-                    .onDelete { indexSet in
-                        for index in indexSet {
-                            store.removeBookmark(store.bookmarks[index].id)
+                            .buttonStyle(.plain)
                         }
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(.quaternary.opacity(0.5))
+                    .cornerRadius(6)
+
+                    // Group by book toggle
+                    Button(action: { groupByBook.toggle() }) {
+                        Image(systemName: groupByBook ? "folder.fill" : "folder")
+                            .font(.callout)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(groupByBook ? .accentColor : .secondary)
+                    .help(groupByBook ? "Show flat list" : "Group by book")
+
+                    // Sort menu
+                    Menu {
+                        ForEach(BookmarkSortOrder.allCases, id: \.self) { order in
+                            Button(action: { sortOrder = order }) {
+                                HStack {
+                                    Text(order.rawValue)
+                                    if sortOrder == order {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.callout)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .frame(width: 20)
+                    .help("Sort order")
                 }
-                .listStyle(.inset)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+            }
+
+            Divider()
+
+            // Content
+            if store.bookmarks.isEmpty {
+                emptyState
+            } else if filteredBookmarks.isEmpty {
+                noResultsState
+            } else if groupByBook {
+                groupedList
+            } else {
+                flatList
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -93,6 +178,105 @@ struct BookmarksView: View {
                 )
             }
         }
+    }
+
+    // MARK: - Empty States
+
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "bookmark")
+                .font(.system(size: 48))
+                .foregroundStyle(.quaternary)
+            Text("No Bookmarks")
+                .font(.title2)
+                .foregroundStyle(.tertiary)
+            Text("Right-click a verse and select \"Bookmark Verse\" to save it here.")
+                .font(.callout)
+                .foregroundStyle(.quaternary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var noResultsState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 32))
+                .foregroundStyle(.quaternary)
+            Text("No matching bookmarks")
+                .font(.callout)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - List Views
+
+    private var flatList: some View {
+        List {
+            ForEach(filteredBookmarks) { bookmark in
+                bookmarkRow(bookmark)
+            }
+            .onDelete { indexSet in
+                let filtered = filteredBookmarks
+                for index in indexSet {
+                    store.removeBookmark(filtered[index].id)
+                }
+            }
+        }
+        .listStyle(.inset)
+    }
+
+    private var groupedList: some View {
+        List {
+            ForEach(groupedBookmarks, id: \.0) { bookName, bookmarks in
+                Section {
+                    ForEach(bookmarks) { bookmark in
+                        bookmarkRow(bookmark)
+                    }
+                } header: {
+                    HStack {
+                        Text(bookName)
+                            .font(.callout.weight(.semibold))
+                        Spacer()
+                        Text("\(bookmarks.count)")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
+        .listStyle(.inset)
+    }
+
+    // MARK: - Row Builder
+
+    @ViewBuilder
+    private func bookmarkRow(_ bookmark: Bookmark) -> some View {
+        BookmarkRow(bookmark: bookmark)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                navigateToBookmark(bookmark)
+            }
+            .contextMenu {
+                Button("Go to Verse") {
+                    navigateToBookmark(bookmark)
+                }
+                Divider()
+                Button(bookmark.note == nil ? "Add Note" : "Edit Note") {
+                    editingNoteText = bookmark.note ?? ""
+                    editingBookmarkId = bookmark.id
+                }
+                if bookmark.note != nil {
+                    Button("Remove Note") {
+                        store.updateBookmarkNote(id: bookmark.id, note: nil)
+                    }
+                }
+                Divider()
+                Button("Remove Bookmark", role: .destructive) {
+                    store.removeBookmark(bookmark.id)
+                }
+            }
     }
 
     // MARK: - Navigation
@@ -122,6 +306,30 @@ struct BookmarksView: View {
                 userInfo: ["book": book, "chapter": chapter, "verse": verse]
             )
         }
+    }
+
+    // MARK: - Helpers
+
+    private func formatVerseId(_ id: String) -> String {
+        let parts = id.split(separator: ":")
+        guard parts.count == 3 else { return id }
+        return "\(parts[0]) \(parts[1]):\(parts[2])"
+    }
+
+    private func bookName(from verseId: String) -> String {
+        String(verseId.split(separator: ":").first ?? "")
+    }
+
+    private func chapterNumber(from verseId: String) -> Int {
+        let parts = verseId.split(separator: ":")
+        guard parts.count >= 2 else { return 0 }
+        return Int(parts[1]) ?? 0
+    }
+
+    private func verseNumber(from verseId: String) -> Int {
+        let parts = verseId.split(separator: ":")
+        guard parts.count >= 3 else { return 0 }
+        return Int(parts[2]) ?? 0
     }
 }
 
