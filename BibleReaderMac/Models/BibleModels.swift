@@ -181,14 +181,18 @@ struct Bookmark: Identifiable, Codable, Hashable {
     let verseId: String         // "Book:Chapter:Verse"
     let translationId: UUID
     let label: String?
+    var note: String?           // user-written note attached to this bookmark
     let createdAt: Date
+    var updatedAt: Date
 
-    init(id: UUID = UUID(), verseId: String, translationId: UUID, label: String? = nil, createdAt: Date = Date()) {
+    init(id: UUID = UUID(), verseId: String, translationId: UUID, label: String? = nil, note: String? = nil, createdAt: Date = Date(), updatedAt: Date? = nil) {
         self.id = id
         self.verseId = verseId
         self.translationId = translationId
         self.label = label
+        self.note = note
         self.createdAt = createdAt
+        self.updatedAt = updatedAt ?? createdAt
     }
 }
 

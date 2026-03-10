@@ -24,6 +24,7 @@ class UserDataService {
         openDatabase()
         createTables()
         migrateJsonHistoryIfNeeded()
+        migrateJsonBookmarksIfNeeded()
     }
 
     deinit {
@@ -60,6 +61,17 @@ class UserDataService {
         );
         CREATE INDEX IF NOT EXISTS idx_history_timestamp ON reading_history(timestamp DESC);
         CREATE INDEX IF NOT EXISTS idx_history_book_chapter ON reading_history(book, chapter);
+        CREATE TABLE IF NOT EXISTS bookmarks (
+            id TEXT PRIMARY KEY,
+            verse_id TEXT NOT NULL,
+            translation_id TEXT NOT NULL,
+            label TEXT,
+            note TEXT,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_bookmarks_verse ON bookmarks(verse_id, translation_id);
+        CREATE INDEX IF NOT EXISTS idx_bookmarks_created ON bookmarks(created_at DESC);
         """
         sqlite3_exec(db, sql, nil, nil, nil)
     }
@@ -78,16 +90,124 @@ class UserDataService {
         try? fileManager.removeItem(at: jsonURL)
     }
 
-    // MARK: - Bookmarks (still JSON — simple and works fine)
+    // MARK: - Bookmarks (SQLite)
 
-    func loadBookmarks() -> [Bookmark] {
-        guard let data = try? Data(contentsOf: bookmarksURL) else { return [] }
-        return (try? JSONDecoder().decode([Bookmark].self, from: data)) ?? []
+    /// One-time migration: import existing bookmarks.json into SQLite, then delete the file.
+    private func migrateJsonBookmarksIfNeeded() {
+        guard fileManager.fileExists(atPath: bookmarksURL.path),
+              let data = try? Data(contentsOf: bookmarksURL),
+              let bookmarks = try? JSONDecoder().decode([Bookmark].self, from: data),
+              !bookmarks.isEmpty else { return }
+
+        for bm in bookmarks {
+            insertBookmark(bm)
+        }
+        try? fileManager.removeItem(at: bookmarksURL)
     }
 
-    func saveBookmarks(_ bookmarks: [Bookmark]) {
-        guard let data = try? JSONEncoder().encode(bookmarks) else { return }
-        try? data.write(to: bookmarksURL, options: .atomic)
+    func insertBookmark(_ bookmark: Bookmark) {
+        guard let db else { return }
+        let sql = "INSERT OR REPLACE INTO bookmarks (id, verse_id, translation_id, label, note, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, bookmark.id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 2, bookmark.verseId, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 3, bookmark.translationId.uuidString, -1, SQLITE_TRANSIENT)
+        if let label = bookmark.label {
+            sqlite3_bind_text(stmt, 4, label, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(stmt, 4)
+        }
+        if let note = bookmark.note {
+            sqlite3_bind_text(stmt, 5, note, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(stmt, 5)
+        }
+        sqlite3_bind_double(stmt, 6, bookmark.createdAt.timeIntervalSince1970)
+        sqlite3_bind_double(stmt, 7, bookmark.updatedAt.timeIntervalSince1970)
+
+        sqlite3_step(stmt)
+    }
+
+    func loadBookmarks() -> [Bookmark] {
+        guard let db else { return [] }
+        let sql = "SELECT id, verse_id, translation_id, label, note, created_at, updated_at FROM bookmarks ORDER BY created_at DESC"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+
+        var results: [Bookmark] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let idStr = String(cString: sqlite3_column_text(stmt, 0))
+            let verseId = String(cString: sqlite3_column_text(stmt, 1))
+            let transIdStr = String(cString: sqlite3_column_text(stmt, 2))
+            let label: String? = sqlite3_column_type(stmt, 3) == SQLITE_NULL ? nil : String(cString: sqlite3_column_text(stmt, 3))
+            let note: String? = sqlite3_column_type(stmt, 4) == SQLITE_NULL ? nil : String(cString: sqlite3_column_text(stmt, 4))
+            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 5))
+            let updatedAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 6))
+
+            results.append(Bookmark(
+                id: UUID(uuidString: idStr) ?? UUID(),
+                verseId: verseId,
+                translationId: UUID(uuidString: transIdStr) ?? UUID(),
+                label: label,
+                note: note,
+                createdAt: createdAt,
+                updatedAt: updatedAt
+            ))
+        }
+        return results
+    }
+
+    func deleteBookmark(_ id: UUID) {
+        guard let db else { return }
+        let sql = "DELETE FROM bookmarks WHERE id = ?1"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_step(stmt)
+    }
+
+    func updateBookmarkNote(_ id: UUID, note: String?) {
+        guard let db else { return }
+        let sql = "UPDATE bookmarks SET note = ?1, updated_at = ?2 WHERE id = ?3"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+
+        if let note {
+            sqlite3_bind_text(stmt, 1, note, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(stmt, 1)
+        }
+        sqlite3_bind_double(stmt, 2, Date().timeIntervalSince1970)
+        sqlite3_bind_text(stmt, 3, id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_step(stmt)
+    }
+
+    func updateBookmarkLabel(_ id: UUID, label: String?) {
+        guard let db else { return }
+        let sql = "UPDATE bookmarks SET label = ?1, updated_at = ?2 WHERE id = ?3"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+
+        if let label {
+            sqlite3_bind_text(stmt, 1, label, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(stmt, 1)
+        }
+        sqlite3_bind_double(stmt, 2, Date().timeIntervalSince1970)
+        sqlite3_bind_text(stmt, 3, id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_step(stmt)
+    }
+
+    func clearBookmarks() {
+        guard let db else { return }
+        sqlite3_exec(db, "DELETE FROM bookmarks", nil, nil, nil)
     }
 
     // MARK: - Reading History (SQLite)

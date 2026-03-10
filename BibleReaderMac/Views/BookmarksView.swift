@@ -2,6 +2,8 @@ import SwiftUI
 
 struct BookmarksView: View {
     @EnvironmentObject var store: BibleStore
+    @State private var editingBookmarkId: UUID?
+    @State private var editingNoteText: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -48,6 +50,16 @@ struct BookmarksView: View {
                                     navigateToBookmark(bookmark)
                                 }
                                 Divider()
+                                Button(bookmark.note == nil ? "Add Note" : "Edit Note") {
+                                    editingNoteText = bookmark.note ?? ""
+                                    editingBookmarkId = bookmark.id
+                                }
+                                if bookmark.note != nil {
+                                    Button("Remove Note") {
+                                        store.updateBookmarkNote(id: bookmark.id, note: nil)
+                                    }
+                                }
+                                Divider()
                                 Button("Remove Bookmark", role: .destructive) {
                                     store.removeBookmark(bookmark.id)
                                 }
@@ -63,6 +75,24 @@ struct BookmarksView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: Binding(
+            get: { editingBookmarkId != nil },
+            set: { if !$0 { editingBookmarkId = nil } }
+        )) {
+            if let bmId = editingBookmarkId {
+                BookmarkNoteEditor(
+                    noteText: $editingNoteText,
+                    onSave: { text in
+                        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                        store.updateBookmarkNote(id: bmId, note: trimmed.isEmpty ? nil : trimmed)
+                        editingBookmarkId = nil
+                    },
+                    onCancel: {
+                        editingBookmarkId = nil
+                    }
+                )
+            }
+        }
     }
 
     // MARK: - Navigation
@@ -122,6 +152,16 @@ struct BookmarkRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
+            if let note = bookmark.note, !note.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "note.text")
+                        .font(.caption2)
+                    Text(note)
+                        .lineLimit(2)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
             Text(Self.dateFormatter.string(from: bookmark.createdAt))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
@@ -133,6 +173,34 @@ struct BookmarkRow: View {
         let parts = id.split(separator: ":")
         guard parts.count == 3 else { return id }
         return "\(parts[0]) \(parts[1]):\(parts[2])"
+    }
+}
+
+// MARK: - Bookmark Note Editor
+
+struct BookmarkNoteEditor: View {
+    @Binding var noteText: String
+    var onSave: (String) -> Void
+    var onCancel: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Bookmark Note")
+                .font(.headline)
+            TextEditor(text: $noteText)
+                .font(.body)
+                .frame(minHeight: 120)
+                .border(Color.secondary.opacity(0.3), width: 1)
+            HStack {
+                Button("Cancel", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Save") { onSave(noteText) }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 400, height: 260)
     }
 }
 

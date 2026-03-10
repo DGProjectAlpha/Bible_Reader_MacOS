@@ -67,17 +67,35 @@ class BibleStore: ObservableObject {
         // Don't duplicate
         guard !bookmarks.contains(where: { $0.verseId == verseId && $0.translationId == translationId }) else { return }
         let bookmark = Bookmark(verseId: verseId, translationId: translationId, label: label)
+        userDataService.insertBookmark(bookmark)
         bookmarks.insert(bookmark, at: 0)
-        userDataService.saveBookmarks(bookmarks)
     }
 
     func removeBookmark(_ id: UUID) {
+        userDataService.deleteBookmark(id)
         bookmarks.removeAll { $0.id == id }
-        userDataService.saveBookmarks(bookmarks)
     }
 
     func isBookmarked(verseId: String, translationId: UUID) -> Bool {
         bookmarks.contains { $0.verseId == verseId && $0.translationId == translationId }
+    }
+
+    func updateBookmarkNote(id: UUID, note: String?) {
+        userDataService.updateBookmarkNote(id, note: note)
+        if let idx = bookmarks.firstIndex(where: { $0.id == id }) {
+            bookmarks[idx].note = note
+            bookmarks[idx].updatedAt = Date()
+        }
+    }
+
+    func updateBookmarkLabel(id: UUID, label: String?) {
+        userDataService.updateBookmarkLabel(id, label: label)
+        // Reload from DB since label is let
+        bookmarks = userDataService.loadBookmarks()
+    }
+
+    func bookmarkFor(verseId: String, translationId: UUID) -> Bookmark? {
+        bookmarks.first { $0.verseId == verseId && $0.translationId == translationId }
     }
 
     // MARK: - Reading History
