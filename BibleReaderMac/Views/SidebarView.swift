@@ -151,9 +151,7 @@ struct SidebarView: View {
 
     private var sidebarFooter: some View {
         HStack(spacing: 16) {
-            Button(action: {
-                NotificationCenter.default.post(name: .openSettings, object: nil)
-            }) {
+            SettingsLink {
                 Image(systemName: "gearshape")
                     .font(.callout)
             }

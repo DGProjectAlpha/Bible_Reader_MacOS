@@ -184,6 +184,4 @@ extension Notification.Name {
     static let toggleStrongsInspector = Notification.Name("toggleStrongsInspector")
     static let toggleCrossRefsInspector = Notification.Name("toggleCrossRefsInspector")
 
-    // Settings
-    static let openSettings = Notification.Name("openSettings")
 }

@@ -260,10 +260,7 @@ private struct MiscNotifications: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onReceive(NotificationCenter.default.publisher(for: .navigateToReader)) { _ in }
-            .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .importModuleFile)) { notification in
+.onReceive(NotificationCenter.default.publisher(for: .importModuleFile)) { notification in
                 if let url = notification.object as? URL {
                     Task {
                         _ = await importHandler.importFile(at: url, into: store)
