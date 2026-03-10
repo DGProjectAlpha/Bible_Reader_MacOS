@@ -67,20 +67,21 @@ class BibleStore: ObservableObject {
 
     // MARK: - Reading History
 
-    func recordHistory(book: String, chapter: Int, translationAbbreviation: String) {
+    func recordHistory(book: String, chapter: Int, verse: Int? = nil, translationAbbreviation: String) {
         // Deduplicate consecutive identical entries
-        if let last = readingHistory.last,
-           last.book == book && last.chapter == chapter && last.translationAbbreviation == translationAbbreviation {
+        if userDataService.lastEntryMatches(book: book, chapter: chapter, verse: verse, translationAbbreviation: translationAbbreviation) {
             return
         }
-        let entry = ReadingHistoryEntry(book: book, chapter: chapter, translationAbbreviation: translationAbbreviation)
-        readingHistory.append(entry)
-        userDataService.saveHistory(readingHistory)
+        let entry = ReadingHistoryEntry(book: book, chapter: chapter, verse: verse, translationAbbreviation: translationAbbreviation)
+        userDataService.insertHistoryEntry(entry)
+        userDataService.trimHistory(keepLast: 500)
+        // Refresh in-memory list
+        readingHistory = userDataService.loadHistory()
     }
 
     func clearHistory() {
+        userDataService.clearHistory()
         readingHistory.removeAll()
-        userDataService.saveHistory(readingHistory)
     }
 
     func addPane() {

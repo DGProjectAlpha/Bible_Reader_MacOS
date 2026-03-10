@@ -152,9 +152,15 @@ struct HistoryRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.displayRef)
                     .font(.callout.weight(.medium))
-                Text(entry.translationAbbreviation)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text(entry.translationAbbreviation)
+                    if let v = entry.verse {
+                        Text("·")
+                        Text("verse \(v)")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             Spacer()
             Text(Self.dateFormatter.localizedString(for: entry.timestamp, relativeTo: Date()))

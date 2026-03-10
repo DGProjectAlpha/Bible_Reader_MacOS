@@ -73,7 +73,8 @@ struct HistoryView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
 
-        let reversed = store.readingHistory.reversed()
+        // readingHistory is already sorted DESC from SQLite, no need to reverse
+        let reversed = store.readingHistory
         var groups: [String: [ReadingHistoryEntry]] = [:]
         var order: [String] = []
 

@@ -280,18 +280,25 @@ struct ReadingHistoryEntry: Identifiable, Codable, Hashable {
     let id: UUID
     let book: String
     let chapter: Int
+    let verse: Int?             // 1-indexed, nil = chapter-level navigation
     let translationAbbreviation: String
     let timestamp: Date
 
-    init(id: UUID = UUID(), book: String, chapter: Int, translationAbbreviation: String, timestamp: Date = Date()) {
+    init(id: UUID = UUID(), book: String, chapter: Int, verse: Int? = nil, translationAbbreviation: String, timestamp: Date = Date()) {
         self.id = id
         self.book = book
         self.chapter = chapter
+        self.verse = verse
         self.translationAbbreviation = translationAbbreviation
         self.timestamp = timestamp
     }
 
-    var displayRef: String { "\(book) \(chapter)" }
+    var displayRef: String {
+        if let v = verse {
+            return "\(book) \(chapter):\(v)"
+        }
+        return "\(book) \(chapter)"
+    }
 }
 
 // MARK: - Verse Key (lightweight reference)
