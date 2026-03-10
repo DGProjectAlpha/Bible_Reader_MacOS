@@ -44,6 +44,21 @@ class BibleStore: ObservableObject {
         loadedTranslations = moduleManager.loadTranslations()
         bookmarks = userDataService.loadBookmarks()
         readingHistory = userDataService.loadHistory()
+        restoreLastPosition()
+    }
+
+    /// Restore the first pane to the last viewed book/chapter/translation on startup.
+    private func restoreLastPosition() {
+        guard let last = userDataService.lastViewedPosition(),
+              let pane = panes.first else { return }
+
+        // Match the translation by abbreviation
+        if let translation = loadedTranslations.first(where: { $0.abbreviation == last.translationAbbreviation }) {
+            pane.selectedTranslationId = translation.id
+        }
+
+        pane.selectedBook = last.book
+        pane.selectedChapter = last.chapter
     }
 
     // MARK: - Bookmarks
