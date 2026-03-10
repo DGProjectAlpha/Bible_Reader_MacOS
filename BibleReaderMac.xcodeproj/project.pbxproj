@@ -36,6 +36,7 @@
 		A1000027 /* WindowState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000027; };
 		A1000028 /* NotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000028; };
 		A1000029 /* FileImportHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000029; };
+		A1000030 /* BundledModules in Resources */ = {isa = PBXBuildFile; fileRef = B1000030; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -68,6 +69,7 @@
 		B1000027 /* WindowState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowState.swift; sourceTree = "<group>"; };
 		B1000028 /* NotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesView.swift; sourceTree = "<group>"; };
 		B1000029 /* FileImportHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileImportHandler.swift; sourceTree = "<group>"; };
+		B1000030 /* BundledModules */ = {isa = PBXFileReference; lastKnownFileType = folder; path = BundledModules; sourceTree = "<group>"; };
 		B1000099 /* BibleReaderMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BibleReaderMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -102,6 +104,7 @@
 				D1000005 /* Store */,
 				D1000006 /* Services */,
 				B1000012 /* Assets.xcassets */,
+				B1000030 /* BundledModules */,
 			);
 			path = BibleReaderMac;
 			sourceTree = "<group>";
@@ -234,6 +237,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000012 /* Assets.xcassets in Resources */,
+				A1000030 /* BundledModules in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

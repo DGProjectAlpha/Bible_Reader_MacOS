@@ -87,6 +87,9 @@ final class ModuleManager {
         // Ensure directories exist
         try? fileManager.createDirectory(at: modulesDirectory, withIntermediateDirectories: true)
 
+        // Seed bundled modules on first launch
+        seedBundledModules()
+
         // Load persisted cache
         loadCache()
     }
@@ -247,6 +250,24 @@ final class ModuleManager {
         cache.removeAll()
         lock.unlock()
         try? fileManager.removeItem(at: cacheFileURL)
+    }
+
+    // MARK: - Bundled Modules
+
+    /// Copy bundled .brbmod files from the app bundle to the modules directory if not already present.
+    private func seedBundledModules() {
+        guard let bundledURL = Bundle.main.url(forResource: "BundledModules", withExtension: nil) else { return }
+        guard let contents = try? fileManager.contentsOfDirectory(
+            at: bundledURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return }
+
+        for fileURL in contents where fileURL.pathExtension.lowercased() == "brbmod" {
+            let destination = modulesDirectory.appendingPathComponent(fileURL.lastPathComponent)
+            if fileManager.fileExists(atPath: destination.path) { continue }
+            try? fileManager.copyItem(at: fileURL, to: destination)
+        }
     }
 
     // MARK: - Discovery

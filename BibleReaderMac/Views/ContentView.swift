@@ -52,7 +52,7 @@ struct ContentView: View {
         }
         .inspector(isPresented: $windowState.showInspector) {
             InspectorPanelView()
-                .inspectorColumnWidth(min: 240, ideal: 280, max: 400)
+                .inspectorColumnWidth(min: 300, ideal: 320, max: 450)
         }
     }
 
@@ -348,7 +348,7 @@ struct InspectorPanelView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 8)
             .padding(.vertical, 8)
 
             Divider()
