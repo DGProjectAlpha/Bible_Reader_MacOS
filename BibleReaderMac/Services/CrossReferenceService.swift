@@ -88,17 +88,17 @@ enum CrossReferenceService {
             guard let conn = try? ModuleConnectionPool.shared.connection(for: filePath) else { continue }
             guard (try? conn.tableExists("cross_references")) == true else { continue }
 
-            guard let reverseRefs = try? conn.query(
+            let reverseRefResult = try? conn.query(
                 "SELECT from_verse_id, to_verse_id, ref_type FROM cross_references WHERE to_verse_id = ?1",
-                bindings: [verseId],
-                mapper: { stmt in
-                    CrossReference(
-                        fromVerseId: ModuleConnection.text(stmt, 0),
-                        toVerseId: ModuleConnection.text(stmt, 1),
-                        referenceType: CrossReferenceType(rawValue: ModuleConnection.text(stmt, 2)) ?? .related
-                    )
-                }
-            ) else { continue }
+                bindings: [verseId]
+            ) { stmt in
+                CrossReference(
+                    fromVerseId: ModuleConnection.text(stmt, 0),
+                    toVerseId: ModuleConnection.text(stmt, 1),
+                    referenceType: CrossReferenceType(rawValue: ModuleConnection.text(stmt, 2)) ?? .related
+                )
+            }
+            guard let reverseRefs = reverseRefResult else { continue }
 
             for ref in reverseRefs {
                 let parts = parseVerseId(ref.fromVerseId)
