@@ -238,8 +238,16 @@ struct ReaderPaneView: View {
     @ObservedObject var coordinator: ScrollSyncCoordinator
     var onVerseTap: ((Verse, Translation?) -> Void)?
 
+    @AppStorage("fontSize") private var fontSize: Double = 15
+    @AppStorage("fontFamily") private var fontFamily: String = "System"
+    @AppStorage("lineSpacing") private var lineSpacing: Double = 1.3
+    @AppStorage("verseNumberStyle") private var verseNumberStyle: String = "superscript"
+    @AppStorage("paragraphMode") private var paragraphMode: Bool = false
+    @AppStorage("verseHighlightOpacity") private var verseHighlightOpacity: Double = 0.12
+    @AppStorage("showChapterTitles") private var showChapterTitles: Bool = true
+    @AppStorage("readerTheme") private var readerTheme: String = "auto"
+
     @State private var scrollProxy: ScrollViewProxy?
-    @State private var fontSize: CGFloat = 15
     @State private var showBookPicker = false
     @State private var previousTranslationId: UUID?
     @State private var hoveredVerse: Int?
@@ -383,7 +391,7 @@ struct ReaderPaneView: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 20, alignment: .center)
 
-                    Button(action: { fontSize = min(28, fontSize + 1) }) {
+                    Button(action: { fontSize = min(36, fontSize + 1) }) {
                         Image(systemName: "textformat.size.larger")
                             .font(.caption2)
                     }
@@ -407,19 +415,21 @@ struct ReaderPaneView: View {
             .padding(.vertical, 6)
 
             // Chapter title
-            HStack {
-                Text("\(displayBookName) \(pane.selectedChapter)")
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                Spacer()
-                if let translation = currentTranslation {
-                    Text(translation.name)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+            if showChapterTitles {
+                HStack {
+                    Text("\(displayBookName) \(pane.selectedChapter)")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    if let translation = currentTranslation {
+                        Text(translation.name)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
         }
         .glassHeader()
     }
@@ -436,7 +446,11 @@ struct ReaderPaneView: View {
                         ForEach(pane.verses) { verse in
                             VerseRow(
                                 verse: verse,
-                                fontSize: fontSize,
+                                fontSize: CGFloat(fontSize),
+                                fontFamily: fontFamily,
+                                lineSpacingMultiplier: CGFloat(lineSpacing),
+                                verseNumberStyle: verseNumberStyle,
+                                highlightOpacity: verseHighlightOpacity,
                                 isHovered: hoveredVerse == verse.number,
                                 isSelected: selectedVerse == verse.number
                             )
@@ -598,21 +612,37 @@ struct ReaderPaneView: View {
 struct VerseRow: View {
     let verse: Verse
     var fontSize: CGFloat = 15
+    var fontFamily: String = "System"
+    var lineSpacingMultiplier: CGFloat = 1.3
+    var verseNumberStyle: String = "superscript"
+    var highlightOpacity: Double = 0.12
     var isHovered: Bool = false
     var isSelected: Bool = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("\(verse.number)")
-                .font(.system(size: fontSize * 0.7).monospacedDigit())
-                .foregroundStyle(isSelected ? .primary : .secondary)
-                .frame(width: 30, alignment: .trailing)
+            // Verse number
+            if verseNumberStyle == "margin" {
+                Text("\(verse.number)")
+                    .font(.system(size: fontSize * 0.7).monospacedDigit())
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .frame(width: 30, alignment: .trailing)
+            }
 
-            Text(verse.text)
-                .font(.system(size: fontSize, design: .serif))
-                .lineSpacing(fontSize * 0.3)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if verseNumberStyle == "superscript" || verseNumberStyle == "inline" {
+                // Verse number inline/superscript + text
+                (verseNumberText + Text(" ") + verseBodyText)
+                    .lineSpacing(fontSize * (lineSpacingMultiplier - 1.0))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                // Margin style — text separate from number
+                Text(verse.text)
+                    .font(resolvedFont)
+                    .lineSpacing(fontSize * (lineSpacingMultiplier - 1.0))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(.vertical, 3)
         .padding(.horizontal, 4)
@@ -627,9 +657,35 @@ struct VerseRow: View {
         .contentShape(Rectangle())
     }
 
+    private var verseNumberText: Text {
+        let numStr = "\(verse.number)"
+        if verseNumberStyle == "superscript" {
+            return Text(numStr)
+                .font(.system(size: fontSize * 0.6).monospacedDigit())
+                .foregroundColor(isSelected ? .primary : .secondary)
+                .baselineOffset(fontSize * 0.3)
+        } else {
+            return Text(numStr)
+                .font(.system(size: fontSize * 0.7).monospacedDigit())
+                .foregroundColor(isSelected ? .primary : .secondary)
+        }
+    }
+
+    private var verseBodyText: Text {
+        Text(verse.text)
+            .font(resolvedFont)
+    }
+
+    private var resolvedFont: Font {
+        if fontFamily == "System" {
+            return .system(size: fontSize, design: .serif)
+        }
+        return .custom(fontFamily, size: fontSize)
+    }
+
     private var backgroundColor: Color {
         if isSelected {
-            return Color.accentColor.opacity(0.12)
+            return Color.accentColor.opacity(highlightOpacity)
         } else if isHovered {
             return Color.primary.opacity(0.04)
         }

@@ -48,6 +48,27 @@ struct BibleReaderMacApp: App {
                 .keyboardShortcut("\\", modifiers: [.command])
             }
 
+            CommandMenu("View") {
+                Button("Increase Font Size") {
+                    let current = UserDefaults.standard.double(forKey: "fontSize")
+                    let size = current > 0 ? current : 15
+                    UserDefaults.standard.set(min(36, size + 1), forKey: "fontSize")
+                }
+                .keyboardShortcut("+", modifiers: [.command])
+
+                Button("Decrease Font Size") {
+                    let current = UserDefaults.standard.double(forKey: "fontSize")
+                    let size = current > 0 ? current : 15
+                    UserDefaults.standard.set(max(10, size - 1), forKey: "fontSize")
+                }
+                .keyboardShortcut("-", modifiers: [.command])
+
+                Button("Reset Font Size") {
+                    UserDefaults.standard.set(15.0, forKey: "fontSize")
+                }
+                .keyboardShortcut("0", modifiers: [.command])
+            }
+
             CommandMenu("Navigate") {
                 Button("Previous Chapter") {
                     navigateChapter(delta: -1)
