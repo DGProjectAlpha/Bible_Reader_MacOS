@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct BibleReaderMacApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var bibleStore = BibleStore()
     @StateObject private var importHandler = FileImportHandler()
 
@@ -21,7 +22,7 @@ struct BibleReaderMacApp: App {
         .windowToolbarStyle(.unified(showsTitle: true))
         .defaultSize(width: 1200, height: 800)
         .commands {
-            CommandGroup(replacing: .newItem) {}
+            // Keep default New Window (Cmd+N) behavior from WindowGroup
             CommandMenu("Bible") {
                 Button("Import Module...") {
                     NotificationCenter.default.post(name: .importModule, object: nil)
@@ -43,7 +44,7 @@ struct BibleReaderMacApp: App {
                 Divider()
 
                 Button("Add Translation Pane") {
-                    bibleStore.addPane()
+                    NotificationCenter.default.post(name: .addTranslationPane, object: nil)
                 }
                 .keyboardShortcut("\\", modifiers: [.command])
             }
@@ -71,35 +72,31 @@ struct BibleReaderMacApp: App {
 
             CommandMenu("Bookmarks") {
                 Button("Bookmark Current Verse") {
-                    guard let pane = bibleStore.panes.first else { return }
-                    let verseId = "\(pane.selectedBook):\(pane.selectedChapter):1"
-                    if let translation = bibleStore.loadedTranslations.first(where: { $0.id == pane.selectedTranslationId }) {
-                        bibleStore.addBookmark(verseId: verseId, translationId: translation.id)
-                    }
+                    NotificationCenter.default.post(name: .bookmarkCurrentVerse, object: nil)
                 }
                 .keyboardShortcut("d", modifiers: [.command])
             }
 
             CommandMenu("Navigate") {
                 Button("Previous Chapter") {
-                    navigateChapter(delta: -1)
+                    NotificationCenter.default.post(name: .navigatePreviousChapter, object: nil)
                 }
                 .keyboardShortcut(.leftArrow, modifiers: [.command])
 
                 Button("Next Chapter") {
-                    navigateChapter(delta: 1)
+                    NotificationCenter.default.post(name: .navigateNextChapter, object: nil)
                 }
                 .keyboardShortcut(.rightArrow, modifiers: [.command])
 
                 Divider()
 
                 Button("Previous Book") {
-                    navigateBook(delta: -1)
+                    NotificationCenter.default.post(name: .navigatePreviousBook, object: nil)
                 }
                 .keyboardShortcut(.leftArrow, modifiers: [.command, .shift])
 
                 Button("Next Book") {
-                    navigateBook(delta: 1)
+                    NotificationCenter.default.post(name: .navigateNextBook, object: nil)
                 }
                 .keyboardShortcut(.rightArrow, modifiers: [.command, .shift])
             }
@@ -110,28 +107,9 @@ struct BibleReaderMacApp: App {
                 .environmentObject(bibleStore)
         }
     }
-
-    // MARK: - Navigation Helpers
-
-    private func navigateChapter(delta: Int) {
-        guard let pane = bibleStore.panes.first else { return }
-        let newChapter = pane.selectedChapter + delta
-        if newChapter >= 1 && newChapter <= pane.chapterCount {
-            pane.selectedChapter = newChapter
-            bibleStore.loadVerses(for: pane)
-        }
-    }
-
-    private func navigateBook(delta: Int) {
-        guard let pane = bibleStore.panes.first else { return }
-        guard let idx = BibleBooks.all.firstIndex(of: pane.selectedBook) else { return }
-        let newIdx = idx + delta
-        guard newIdx >= 0 && newIdx < BibleBooks.all.count else { return }
-        pane.selectedBook = BibleBooks.all[newIdx]
-        pane.selectedChapter = 1
-        bibleStore.loadVerses(for: pane)
-    }
 }
+
+// MARK: - Notification Names
 
 extension Notification.Name {
     static let importModule = Notification.Name("importModule")
@@ -139,4 +117,12 @@ extension Notification.Name {
     static let globalSearch = Notification.Name("globalSearch")
     static let showCrossReferences = Notification.Name("showCrossReferences")
     static let crossRefLookup = Notification.Name("crossRefLookup")
+    static let importModuleFile = Notification.Name("importModuleFile")
+    static let addTranslationPane = Notification.Name("addTranslationPane")
+    static let bookmarkCurrentVerse = Notification.Name("bookmarkCurrentVerse")
+    static let navigatePreviousChapter = Notification.Name("navigatePreviousChapter")
+    static let navigateNextChapter = Notification.Name("navigateNextChapter")
+    static let navigatePreviousBook = Notification.Name("navigatePreviousBook")
+    static let navigateNextBook = Notification.Name("navigateNextBook")
+    static let translationRemoved = Notification.Name("translationRemoved")
 }

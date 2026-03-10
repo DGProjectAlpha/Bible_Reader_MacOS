@@ -25,7 +25,6 @@ class ReaderPane: ObservableObject, Identifiable {
 @MainActor
 class BibleStore: ObservableObject {
     @Published var loadedTranslations: [Translation] = []
-    @Published var panes: [ReaderPane] = [ReaderPane()]
     @Published var bookmarks: [Bookmark] = []
     @Published var notes: [Note] = []
     @Published var readingHistory: [ReadingHistoryEntry] = []
@@ -44,13 +43,11 @@ class BibleStore: ObservableObject {
         loadedTranslations = moduleManager.loadTranslations()
         bookmarks = userDataService.loadBookmarks()
         readingHistory = userDataService.loadHistory()
-        restoreLastPosition()
     }
 
-    /// Restore the first pane to the last viewed book/chapter/translation on startup.
-    private func restoreLastPosition() {
-        guard let last = userDataService.lastViewedPosition(),
-              let pane = panes.first else { return }
+    /// Restore a pane to the last viewed book/chapter/translation.
+    func restoreLastPosition(into pane: ReaderPane) {
+        guard let last = userDataService.lastViewedPosition() else { return }
 
         // Match the translation by abbreviation
         if let translation = loadedTranslations.first(where: { $0.abbreviation == last.translationAbbreviation }) {
@@ -117,19 +114,6 @@ class BibleStore: ObservableObject {
         readingHistory.removeAll()
     }
 
-    func addPane() {
-        let pane = ReaderPane()
-        if let firstTranslation = loadedTranslations.first {
-            pane.selectedTranslationId = firstTranslation.id
-        }
-        panes.append(pane)
-    }
-
-    func removePane(_ id: UUID) {
-        guard panes.count > 1 else { return }
-        panes.removeAll { $0.id == id }
-    }
-
     func importModule(from url: URL) async throws {
         let translation = try moduleManager.importModule(from: url)
         loadedTranslations.append(translation)
@@ -139,10 +123,8 @@ class BibleStore: ObservableObject {
         guard let translation = loadedTranslations.first(where: { $0.id == id }) else { return }
         moduleManager.removeModule(filePath: translation.filePath)
         loadedTranslations.removeAll { $0.id == id }
-        // Clear any panes that pointed at this translation
-        for pane in panes where pane.selectedTranslationId == id {
-            pane.selectedTranslationId = loadedTranslations.first?.id ?? UUID()
-        }
+        // Notify windows to update any panes that pointed at this translation
+        NotificationCenter.default.post(name: .translationRemoved, object: nil, userInfo: ["translationId": id])
     }
 
     /// Reorder translations via drag/drop or list move.

@@ -5,6 +5,7 @@ import Combine
 
 struct ReaderView: View {
     @EnvironmentObject var store: BibleStore
+    @EnvironmentObject var windowState: WindowState
     @State private var syncScrolling = true
     @StateObject private var syncCoordinator = ScrollSyncCoordinator()
     @State private var showStrongsSidebar = false
@@ -16,7 +17,7 @@ struct ReaderView: View {
             Group {
                 if store.loadedTranslations.isEmpty {
                     emptyState
-                } else if store.panes.count == 1, let pane = store.panes.first {
+                } else if windowState.panes.count == 1, let pane = windowState.panes.first {
                     ReaderPaneView(
                         pane: pane,
                         isSolo: true,
@@ -28,7 +29,7 @@ struct ReaderView: View {
                     )
                 } else {
                     HSplitView {
-                        ForEach(store.panes) { pane in
+                        ForEach(windowState.panes) { pane in
                             ReaderPaneView(
                                 pane: pane,
                                 isSolo: false,
@@ -63,8 +64,10 @@ struct ReaderView: View {
                 }
                 .help(syncScrolling ? "Scroll syncing enabled" : "Scroll syncing disabled")
 
-                if store.panes.count < 4 {
-                    Button(action: { store.addPane() }) {
+                if windowState.panes.count < 4 {
+                    Button(action: {
+                        windowState.addPane(translationId: store.loadedTranslations.first?.id)
+                    }) {
                         Label("Add Pane", systemImage: "plus.rectangle.on.rectangle")
                     }
                     .help("Add parallel translation pane")
@@ -92,7 +95,7 @@ struct ReaderView: View {
                   let book = userInfo["book"] as? String,
                   let chapter = userInfo["chapter"] as? Int,
                   let verse = userInfo["verse"] as? Int,
-                  let pane = store.panes.first else { return }
+                  let pane = windowState.panes.first else { return }
 
             pane.selectedBook = book
             pane.selectedChapter = chapter
@@ -110,8 +113,8 @@ struct ReaderView: View {
         .onChange(of: syncScrolling) { enabled in
             if enabled {
                 // When re-enabling sync, align all panes to the first pane's position
-                guard let leader = store.panes.first else { return }
-                for pane in store.panes.dropFirst() {
+                guard let leader = windowState.panes.first else { return }
+                for pane in windowState.panes.dropFirst() {
                     pane.selectedBook = leader.selectedBook
                     pane.selectedChapter = leader.selectedChapter
                     store.loadVerses(for: pane)
@@ -232,6 +235,7 @@ class ScrollSyncCoordinator: ObservableObject {
 
 struct ReaderPaneView: View {
     @EnvironmentObject var store: BibleStore
+    @EnvironmentObject var windowState: WindowState
     @ObservedObject var pane: ReaderPane
     let isSolo: Bool
     @Binding var syncScrolling: Bool
@@ -405,7 +409,7 @@ struct ReaderPaneView: View {
                 // Close pane button
                 if !isSolo {
                     Divider().frame(height: 20)
-                    Button(action: { store.removePane(pane.id) }) {
+                    Button(action: { windowState.removePane(pane.id) }) {
                         Image(systemName: "xmark")
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(.secondary)
@@ -771,8 +775,8 @@ struct SelectedVerseInfo: Equatable {
 
 extension ReaderView {
     /// Keyboard shortcut handler — wire to .onKeyPress or Commands
-    static func handleKeyNav(store: BibleStore, event: KeyEquivalent) {
-        guard let pane = store.panes.first else { return }
+    static func handleKeyNav(windowState: WindowState, store: BibleStore, event: KeyEquivalent) {
+        guard let pane = windowState.panes.first else { return }
         switch event {
         case .leftArrow:
             if pane.selectedChapter > 1 {

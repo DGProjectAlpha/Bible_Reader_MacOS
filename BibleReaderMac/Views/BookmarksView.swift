@@ -12,11 +12,13 @@ enum BookmarkSortOrder: String, CaseIterable {
 
 struct BookmarksView: View {
     @EnvironmentObject var store: BibleStore
+    @EnvironmentObject var windowState: WindowState
     @State private var editingBookmarkId: UUID?
     @State private var editingNoteText: String = ""
     @State private var searchText: String = ""
     @State private var sortOrder: BookmarkSortOrder = .dateNewest
     @State private var groupByBook: Bool = false
+    @State private var showDeleteAllConfirmation: Bool = false
 
     private var filteredBookmarks: [Bookmark] {
         var result = store.bookmarks
@@ -141,6 +143,15 @@ struct BookmarksView: View {
                     .menuStyle(.borderlessButton)
                     .frame(width: 20)
                     .help("Sort order")
+
+                    // Delete all
+                    Button(action: { showDeleteAllConfirmation = true }) {
+                        Image(systemName: "trash")
+                            .font(.callout)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Delete all bookmarks")
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
@@ -160,6 +171,16 @@ struct BookmarksView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .alert("Delete All Bookmarks?", isPresented: $showDeleteAllConfirmation) {
+            Button("Delete All", role: .destructive) {
+                for bm in store.bookmarks {
+                    store.removeBookmark(bm.id)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently remove all \(store.bookmarks.count) bookmarks. This cannot be undone.")
+        }
         .sheet(isPresented: Binding(
             get: { editingBookmarkId != nil },
             set: { if !$0 { editingBookmarkId = nil } }
@@ -234,6 +255,11 @@ struct BookmarksView: View {
                     ForEach(bookmarks) { bookmark in
                         bookmarkRow(bookmark)
                     }
+                    .onDelete { indexSet in
+                        for index in indexSet {
+                            store.removeBookmark(bookmarks[index].id)
+                        }
+                    }
                 } header: {
                     HStack {
                         Text(bookName)
@@ -288,7 +314,7 @@ struct BookmarksView: View {
         let chapter = Int(parts[1]) ?? 1
         let verse = parts.count >= 3 ? (Int(parts[2]) ?? 1) : 1
 
-        guard let pane = store.panes.first else { return }
+        guard let pane = windowState.panes.first else { return }
 
         if store.loadedTranslations.contains(where: { $0.id == bookmark.translationId }) {
             pane.selectedTranslationId = bookmark.translationId

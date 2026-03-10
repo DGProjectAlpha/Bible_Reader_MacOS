@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SearchView: View {
     @EnvironmentObject var store: BibleStore
+    @EnvironmentObject var windowState: WindowState
     @State private var searchText = ""
     @State private var scope: SearchScope = .bible
     @State private var isSearching = false
@@ -219,8 +220,8 @@ struct SearchView: View {
         results = []
 
         // Get current book/chapter from the first pane for scope filtering
-        let currentBook = store.panes.first?.selectedBook
-        let currentChapter = store.panes.first?.selectedChapter
+        let currentBook = windowState.panes.first?.selectedBook
+        let currentChapter = windowState.panes.first?.selectedChapter
 
         Task.detached {
             var allResults: [SearchResult] = []
@@ -263,7 +264,7 @@ struct SearchView: View {
 
     private func navigateToResult(_ result: SearchResult) {
         // Navigate the first pane to the result's location
-        guard let pane = store.panes.first else { return }
+        guard let pane = windowState.panes.first else { return }
 
         // Find the translation matching the abbreviation
         if let translation = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation }) {

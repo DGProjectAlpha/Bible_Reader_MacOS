@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HistoryView: View {
     @EnvironmentObject var store: BibleStore
+    @EnvironmentObject var windowState: WindowState
 
     var body: some View {
         VStack(spacing: 0) {
@@ -100,7 +101,7 @@ struct HistoryView: View {
     }
 
     private func navigateToHistory(_ entry: ReadingHistoryEntry) {
-        guard let pane = store.panes.first else { return }
+        guard let pane = windowState.panes.first else { return }
         if let translation = store.loadedTranslations.first(where: { $0.abbreviation == entry.translationAbbreviation }) {
             pane.selectedTranslationId = translation.id
         }

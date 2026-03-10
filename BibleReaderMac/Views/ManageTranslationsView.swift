@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ManageTranslationsView: View {
     @EnvironmentObject var store: BibleStore
+    @EnvironmentObject var windowState: WindowState
     @Environment(\.dismiss) private var dismiss
     @State private var selectedTranslationId: UUID?
     @State private var showDeleteConfirm = false
@@ -83,7 +84,7 @@ struct ManageTranslationsView: View {
                 ForEach(store.loadedTranslations) { translation in
                     TranslationListRow(
                         translation: translation,
-                        isAssignedToPane: store.panes.contains(where: { $0.selectedTranslationId == translation.id }),
+                        isAssignedToPane: windowState.panes.contains(where: { $0.selectedTranslationId == translation.id }),
                         paneIndex: paneIndex(for: translation.id)
                     )
                     .tag(translation.id)
@@ -100,11 +101,11 @@ struct ManageTranslationsView: View {
                         Button("Assign to New Pane") {
                             assignToNewPane(translation)
                         }
-                        .disabled(store.panes.count >= 4)
+                        .disabled(windowState.panes.count >= 4)
 
-                        if store.panes.count > 0 {
+                        if windowState.panes.count > 0 {
                             Menu("Assign to Pane") {
-                                ForEach(Array(store.panes.enumerated()), id: \.element.id) { idx, pane in
+                                ForEach(Array(windowState.panes.enumerated()), id: \.element.id) { idx, pane in
                                     Button("Pane \(idx + 1)\(paneLabel(pane))") {
                                         pane.selectedTranslationId = translation.id
                                     }
@@ -187,20 +188,20 @@ struct ManageTranslationsView: View {
             // Pane controls
             Divider().frame(height: 20)
 
-            Text("Panes: \(store.panes.count)")
+            Text("Panes: \(windowState.panes.count)")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            Button(action: { store.addPane() }) {
+            Button(action: { windowState.addPane(translationId: store.loadedTranslations.first?.id) }) {
                 Image(systemName: "plus.rectangle.on.rectangle")
             }
-            .disabled(store.panes.count >= 4 || store.loadedTranslations.isEmpty)
+            .disabled(windowState.panes.count >= 4 || store.loadedTranslations.isEmpty)
             .help("Add reader pane")
 
-            if store.panes.count > 1 {
+            if windowState.panes.count > 1 {
                 Button(action: {
-                    if let last = store.panes.last {
-                        store.removePane(last.id)
+                    if let last = windowState.panes.last {
+                        windowState.removePane(last.id)
                     }
                 }) {
                     Image(systemName: "minus.rectangle")
@@ -221,7 +222,7 @@ struct ManageTranslationsView: View {
     // MARK: - Helpers
 
     private func paneIndex(for translationId: UUID) -> Int? {
-        guard let idx = store.panes.firstIndex(where: { $0.selectedTranslationId == translationId }) else {
+        guard let idx = windowState.panes.firstIndex(where: { $0.selectedTranslationId == translationId }) else {
             return nil
         }
         return idx
@@ -235,10 +236,8 @@ struct ManageTranslationsView: View {
     }
 
     private func assignToNewPane(_ translation: Translation) {
-        guard store.panes.count < 4 else { return }
-        let pane = ReaderPane()
-        pane.selectedTranslationId = translation.id
-        store.panes.append(pane)
+        guard windowState.panes.count < 4 else { return }
+        windowState.addPane(translationId: translation.id)
     }
 }
 
@@ -294,6 +293,7 @@ struct TranslationListRow: View {
 struct TranslationDetailView: View {
     let translation: Translation
     @ObservedObject var store: BibleStore
+    @EnvironmentObject var windowState: WindowState
 
     private var moduleInfo: CachedModuleInfo? {
         store.moduleInfo(for: translation.id)
@@ -350,7 +350,7 @@ struct TranslationDetailView: View {
                     Text("Pane Assignment")
                         .font(.callout.weight(.medium))
 
-                    ForEach(Array(store.panes.enumerated()), id: \.element.id) { idx, pane in
+                    ForEach(Array(windowState.panes.enumerated()), id: \.element.id) { idx, pane in
                         HStack {
                             Text("Pane \(idx + 1)")
                                 .font(.callout)
