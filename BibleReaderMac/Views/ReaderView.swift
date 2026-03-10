@@ -241,6 +241,7 @@ struct ReaderPaneView: View {
     @State private var scrollProxy: ScrollViewProxy?
     @State private var fontSize: CGFloat = 15
     @State private var showBookPicker = false
+    @State private var previousTranslationId: UUID?
     @State private var hoveredVerse: Int?
     @State private var selectedVerse: Int?
     @State private var visibleVerseNumbers: Set<Int> = []
@@ -252,8 +253,19 @@ struct ReaderPaneView: View {
             verseContent
         }
         .vibrancyBackground(material: .contentBackground, blendingMode: .withinWindow)
-        .onAppear { loadCurrentChapter() }
-        .onChange(of: pane.selectedTranslationId) { _ in loadCurrentChapter() }
+        .onAppear {
+            previousTranslationId = pane.selectedTranslationId
+            loadCurrentChapter()
+        }
+        .onChange(of: pane.selectedTranslationId) { newId in
+            // Convert verse position between versification schemes when switching translations
+            if let oldId = previousTranslationId, oldId != newId {
+                let topVerse = visibleVerseNumbers.min() ?? 1
+                store.convertPanePosition(for: pane, from: oldId, to: newId, currentVerse: topVerse)
+            }
+            previousTranslationId = newId
+            loadCurrentChapter()
+        }
         .onChange(of: pane.selectedBook) { _ in
             pane.selectedChapter = 1
             loadCurrentChapter()
@@ -560,7 +572,7 @@ struct ReaderPaneView: View {
             if let idx = BibleBooks.all.firstIndex(of: pane.selectedBook), idx > 0 {
                 let prevBook = BibleBooks.all[idx - 1]
                 pane.selectedBook = prevBook
-                pane.selectedChapter = BibleBooks.chapterCounts[prevBook] ?? 1
+                pane.selectedChapter = pane.chapterCount
                 loadCurrentChapter()
             }
         }

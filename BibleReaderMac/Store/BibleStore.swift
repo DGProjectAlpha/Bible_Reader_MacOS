@@ -9,8 +9,12 @@ class ReaderPane: ObservableObject, Identifiable {
     @Published var selectedChapter: Int = 1
     @Published var verses: [Verse] = []
 
+    /// Versification scheme string from the currently selected translation (set by BibleStore).
+    var versificationScheme: String = "kjv"
+
     var chapterCount: Int {
-        BibleBooks.chapterCounts[selectedBook] ?? 1
+        let scheme = VersificationScheme.from(versificationScheme)
+        return VersificationService.shared.chapterCount(book: selectedBook, scheme: scheme)
     }
 
     init(id: UUID = UUID()) {
@@ -93,6 +97,8 @@ class BibleStore: ObservableObject {
             pane.verses = []
             return
         }
+        // Keep pane's versification scheme in sync with the selected translation
+        pane.versificationScheme = translation.versificationScheme
         do {
             pane.verses = try ModuleService.loadVerses(
                 from: translation.filePath,
@@ -103,6 +109,53 @@ class BibleStore: ObservableObject {
             print("Failed to load verses: \(error.localizedDescription)")
             pane.verses = []
         }
+    }
+
+    /// Convert a pane's current book/chapter/verse position from one translation's
+    /// versification scheme to another when the user switches translations.
+    /// Returns true if the position was adjusted.
+    @discardableResult
+    func convertPanePosition(for pane: ReaderPane, from oldTranslationId: UUID, to newTranslationId: UUID, currentVerse: Int? = nil) -> Bool {
+        guard let oldTranslation = loadedTranslations.first(where: { $0.id == oldTranslationId }),
+              let newTranslation = loadedTranslations.first(where: { $0.id == newTranslationId }) else {
+            return false
+        }
+
+        let sourceScheme = VersificationScheme.from(oldTranslation.versificationScheme)
+        let targetScheme = VersificationScheme.from(newTranslation.versificationScheme)
+
+        // Same scheme — no conversion needed
+        guard sourceScheme != targetScheme else { return false }
+
+        let versification = VersificationService.shared
+        let verse = currentVerse ?? 1
+
+        // Convert current position
+        let converted = versification.convert(
+            book: pane.selectedBook,
+            chapter: pane.selectedChapter,
+            verse: verse,
+            from: sourceScheme,
+            to: targetScheme
+        )
+
+        var changed = false
+
+        // Update book if it changed (e.g., "1 Kingdoms" ↔ "1 Samuel")
+        if converted.book != pane.selectedBook {
+            pane.selectedBook = converted.book
+            changed = true
+        }
+
+        // Clamp chapter to valid range for the target scheme
+        let maxChapter = versification.chapterCount(book: converted.book, scheme: targetScheme)
+        let newChapter = min(converted.chapter, max(1, maxChapter))
+        if newChapter != pane.selectedChapter {
+            pane.selectedChapter = newChapter
+            changed = true
+        }
+
+        return changed
     }
 
     /// Search across a specific translation.
