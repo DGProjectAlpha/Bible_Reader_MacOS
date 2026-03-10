@@ -176,8 +176,15 @@ final class ModuleManager {
             try fileManager.removeItem(at: destination)
         }
 
-        // Copy to modules directory
-        try fileManager.copyItem(at: sourceURL, to: destination)
+        // If JSON format, convert to SQLite first
+        if JSONModuleConverter.isJSONModule(at: sourceURL) {
+            let convertedURL = try JSONModuleConverter.convertToSQLite(jsonURL: sourceURL)
+            defer { try? fileManager.removeItem(at: convertedURL) }
+            try fileManager.copyItem(at: convertedURL, to: destination)
+        } else {
+            // Copy to modules directory
+            try fileManager.copyItem(at: sourceURL, to: destination)
+        }
 
         // Validate
         let result = performValidation(fileURL: destination)
@@ -307,6 +314,11 @@ final class ModuleManager {
             )
         }
 
+        // 1b. If JSON format, do a lightweight JSON validation instead of SQLite
+        if JSONModuleConverter.isJSONModule(at: fileURL) {
+            return performJSONValidation(fileURL: fileURL)
+        }
+
         // 2. Can open as SQLite?
         let conn: ModuleConnection
         do {
@@ -386,6 +398,74 @@ final class ModuleManager {
             hasCrossRefs: hasCrossRefs,
             errors: errors
         )
+    }
+
+    /// Validate a JSON-format .brbmod file.
+    private func performJSONValidation(fileURL: URL) -> ModuleValidationResult {
+        let path = fileURL.path
+
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let module = try JSONDecoder().decode(JSONBrbMod.self, from: data)
+
+            let meta = module.meta
+            let moduleFormat: ModuleFormat = (meta.format == "tagged") ? .tagged : .plain
+            let hasWordTags = meta.format == "tagged"
+
+            let bookCount = module.data.count
+            var totalVerses = 0
+            for book in module.data {
+                for chapter in book.chapters {
+                    totalVerses += chapter.count
+                }
+            }
+
+            var errors: [ModuleValidationError] = []
+            if bookCount == 0 {
+                errors.append(.corruptData("Module contains no books"))
+            }
+            if totalVerses == 0 {
+                errors.append(.corruptData("Module contains no verses"))
+            }
+
+            // Build book_names map for display
+            let nameMap = JSONModuleConverter.russianToEnglishMap()
+            var bookNames: [String: String] = [:]
+            for book in module.data {
+                if let eng = nameMap[book.name] {
+                    bookNames[eng] = book.name
+                }
+            }
+
+            let metadata = ModuleMetadata(
+                name: meta.name,
+                abbreviation: meta.abbreviation,
+                language: meta.language,
+                format: moduleFormat,
+                version: meta.version,
+                versificationScheme: "kjv",
+                copyright: meta.copyright,
+                notes: meta.notes,
+                bookNames: bookNames.isEmpty ? nil : bookNames
+            )
+
+            return ModuleValidationResult(
+                filePath: path,
+                isValid: errors.isEmpty,
+                metadata: metadata,
+                bookCount: bookCount,
+                verseCount: totalVerses,
+                hasWordTags: hasWordTags,
+                hasCrossRefs: false,
+                errors: errors
+            )
+        } catch {
+            return ModuleValidationResult(
+                filePath: path, isValid: false, metadata: nil,
+                bookCount: 0, verseCount: 0, hasWordTags: false, hasCrossRefs: false,
+                errors: [.corruptData("Invalid JSON module: \(error.localizedDescription)")]
+            )
+        }
     }
 
     // MARK: - Caching

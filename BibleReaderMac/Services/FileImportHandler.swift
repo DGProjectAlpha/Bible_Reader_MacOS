@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 // MARK: - BRBMod UTType
 
 extension UTType {
-    static let brbmod = UTType(exportedAs: "com.biblereader.brbmod", conformingTo: .database)
+    static let brbmod = UTType(exportedAs: "com.biblereader.brbmod", conformingTo: .data)
 }
 
 // MARK: - Import Result

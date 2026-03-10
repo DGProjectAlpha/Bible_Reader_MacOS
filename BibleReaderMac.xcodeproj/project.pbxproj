@@ -19,6 +19,7 @@
 		A1000010 /* BibleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000010; };
 		A1000011 /* ModuleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000011; };
 		A1000014 /* ModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000014; };
+		2E6ACCF3B2089F2968361787 /* JSONModuleConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBD9E746671A17D77FDCCEA9 /* JSONModuleConverter.swift */; };
 		A1000012 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1000012; };
 		A1000013 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = B1000013; };
 		A1000015 /* StrongsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000015; };
@@ -52,6 +53,7 @@
 		B1000010 /* BibleStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleStore.swift; sourceTree = "<group>"; };
 		B1000011 /* ModuleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleService.swift; sourceTree = "<group>"; };
 		B1000014 /* ModuleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleManager.swift; sourceTree = "<group>"; };
+		EBD9E746671A17D77FDCCEA9 /* JSONModuleConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONModuleConverter.swift; sourceTree = "<group>"; };
 		B1000012 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B1000013 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		B1000015 /* StrongsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrongsService.swift; sourceTree = "<group>"; };
@@ -155,6 +157,7 @@
 			children = (
 				B1000011 /* ModuleService.swift */,
 				B1000014 /* ModuleManager.swift */,
+				EBD9E746671A17D77FDCCEA9 /* JSONModuleConverter.swift */,
 				B1000015 /* StrongsService.swift */,
 				B1000020 /* CrossReferenceService.swift */,
 				B1000022 /* VersificationService.swift */,
@@ -262,6 +265,7 @@
 				A1000010 /* BibleStore.swift in Sources */,
 				A1000011 /* ModuleService.swift in Sources */,
 				A1000014 /* ModuleManager.swift in Sources */,
+				2E6ACCF3B2089F2968361787 /* JSONModuleConverter.swift in Sources */,
 				A1000015 /* StrongsService.swift in Sources */,
 				A1000016 /* StrongsSidebarView.swift in Sources */,
 				A1000017 /* StrongsLookupView.swift in Sources */,
