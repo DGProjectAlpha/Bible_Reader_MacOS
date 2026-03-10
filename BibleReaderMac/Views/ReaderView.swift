@@ -73,8 +73,8 @@ struct ReaderView: View {
                 }
             }
         }
-        .onChange(of: syncScrolling) { enabled in
-            if enabled {
+        .onChange(of: syncScrolling) {
+            if syncScrolling {
                 // When re-enabling sync, align all panes to the first pane's position
                 guard let leader = windowState.panes.first else { return }
                 for pane in windowState.panes.dropFirst() {
@@ -219,16 +219,16 @@ struct ReaderPaneView: View {
             previousTranslationId = pane.selectedTranslationId
             loadCurrentChapter()
         }
-        .onChange(of: pane.selectedTranslationId) { newId in
+        .onChange(of: pane.selectedTranslationId) { oldId, newId in
             // Convert verse position between versification schemes when switching translations
-            if let oldId = previousTranslationId, oldId != newId {
+            if let oldId, oldId != newId {
                 let topVerse = visibleVerseNumbers.min() ?? 1
                 store.convertPanePosition(for: pane, from: oldId, to: newId, currentVerse: topVerse)
             }
             previousTranslationId = newId
             loadCurrentChapter()
         }
-        .onChange(of: pane.selectedBook) { _ in
+        .onChange(of: pane.selectedBook) {
             pane.selectedChapter = 1
             loadCurrentChapter()
             if syncScrolling {
@@ -239,7 +239,7 @@ struct ReaderPaneView: View {
                 )
             }
         }
-        .onChange(of: pane.selectedChapter) { _ in
+        .onChange(of: pane.selectedChapter) {
             loadCurrentChapter()
             if syncScrolling {
                 coordinator.reportNavigation(
@@ -250,7 +250,7 @@ struct ReaderPaneView: View {
             }
         }
         // Respond to scroll sync from other panes
-        .onChange(of: coordinator.visibleVerse) { verse in
+        .onChange(of: coordinator.visibleVerse) { _, verse in
             guard syncScrolling,
                   let source = coordinator.sourcePane,
                   source != pane.id else { return }
@@ -260,7 +260,7 @@ struct ReaderPaneView: View {
             }
         }
         // Respond to navigation sync from other panes
-        .onChange(of: coordinator.navigationEvent) { event in
+        .onChange(of: coordinator.navigationEvent) { _, event in
             guard syncScrolling,
                   let event,
                   event.sourcePane != pane.id else { return }
@@ -1063,7 +1063,7 @@ struct NoteEditorSheet: View {
                 }
             }
         }
-        .frame(width: 400, minHeight: 280)
+        .frame(minWidth: 400, maxWidth: 400, minHeight: 280)
         .onAppear {
             noteText = initialText
         }
