@@ -17,6 +17,10 @@ struct SearchView: View {
     @State private var showVerseLookup = false
     @State private var lookupText = ""
 
+    private var allModuleIds: Set<UUID> {
+        Set(store.loadedTranslations.map(\.id))
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             searchBar
@@ -26,7 +30,7 @@ struct SearchView: View {
             }
         }
         .onAppear {
-            selectedModuleIds = Set(store.loadedTranslations.map(\.id))
+            selectedModuleIds = allModuleIds
             // If windowState has a pending search query, use it
             if !windowState.searchQuery.isEmpty {
                 searchText = windowState.searchQuery
@@ -56,10 +60,12 @@ struct SearchView: View {
 
                 if !searchText.isEmpty {
                     Button(action: {
-                        searchText = ""
-                        results = []
-                        hasSearched = false
-                        resultsCapped = false
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            searchText = ""
+                            results = []
+                            hasSearched = false
+                            resultsCapped = false
+                        }
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
@@ -159,7 +165,7 @@ struct SearchView: View {
             }
         }
         .padding(12)
-        .frame(minWidth: 280)
+        .frame(minWidth: 260, maxWidth: 400)
     }
 
     // MARK: - Module Filter Popover
@@ -170,7 +176,7 @@ struct SearchView: View {
                 Text("Search in").font(.headline)
                 Spacer()
                 Button("All") {
-                    selectedModuleIds = Set(store.loadedTranslations.map(\.id))
+                    selectedModuleIds = allModuleIds
                 }
                 .buttonStyle(.borderless)
                 .font(.caption)
@@ -194,7 +200,7 @@ struct SearchView: View {
             }
         }
         .padding(12)
-        .frame(minWidth: 240)
+        .frame(minWidth: 220, maxWidth: 360)
     }
 
     // MARK: - Results
@@ -236,7 +242,7 @@ struct SearchView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 8)
                     .glassToolbar()
 
                     Divider()
@@ -255,7 +261,7 @@ struct SearchView: View {
                             navigateToResult(result)
                         }
                     }
-                    .listStyle(.plain)
+                    .listStyle(.inset)
                 }
             }
         }
@@ -320,9 +326,11 @@ struct SearchView: View {
             let finalResults = collected
 
             await MainActor.run {
-                results = finalResults
-                resultsCapped = capped
-                isSearching = false
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    results = finalResults
+                    resultsCapped = capped
+                    isSearching = false
+                }
             }
         }
     }
@@ -534,10 +542,10 @@ struct SearchResultRow: View {
             HStack(spacing: 6) {
                 Text(result.translationAbbreviation)
                     .font(.caption2.weight(.bold))
-                    .padding(.horizontal, 5)
+                    .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 3))
-                    .foregroundStyle(.blue)
+                    .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
+                    .foregroundStyle(Color.accentColor)
 
                 Text("\(result.book) \(result.chapter):\(result.verse)")
                     .font(.callout.weight(.semibold))
@@ -592,7 +600,9 @@ struct SearchResultRow: View {
         }
         .padding(.vertical, 4)
         .onHover { hovering in
-            isHovered = hovering
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
         }
         .task {
             loadContextVerses()
@@ -607,25 +617,29 @@ struct SearchResultRow: View {
 
         guard !term.isEmpty else { return Text(text) }
 
-        var built = Text("")
+        // Collect all match ranges first, then build Text in one pass
+        var ranges: [Range<String.Index>] = []
         var searchStart = lower.startIndex
-
         while let range = lower.range(of: term, range: searchStart..<lower.endIndex) {
-            // Text before match
-            if range.lowerBound > searchStart {
-                built = Text("\(built)\(Text(text[searchStart..<range.lowerBound]))")
-            }
-            // The matched portion — highlighted
-            built = Text("\(built)\(Text(text[range]))")
-                .foregroundColor(.orange)
-                .bold()
-
+            ranges.append(range)
             searchStart = range.upperBound
         }
 
-        // Remainder after last match
-        if searchStart < lower.endIndex {
-            built = Text("\(built)\(Text(text[searchStart..<text.endIndex]))")
+        guard !ranges.isEmpty else { return Text(text) }
+
+        var built = Text("")
+        var cursor = text.startIndex
+
+        for range in ranges {
+            if range.lowerBound > cursor {
+                built = built + Text(text[cursor..<range.lowerBound])
+            }
+            built = built + Text(text[range]).foregroundColor(.accentColor).bold()
+            cursor = range.upperBound
+        }
+
+        if cursor < text.endIndex {
+            built = built + Text(text[cursor..<text.endIndex])
         }
 
         return built

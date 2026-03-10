@@ -30,14 +30,14 @@ struct StrongsLookupView: View {
                         .onSubmit { performLookup() }
 
                     if !searchText.isEmpty {
-                        Button(action: { searchText = ""; lookupResults = []; selectedEntry = nil }) {
+                        Button(action: { withAnimation(.easeOut(duration: 0.2)) { searchText = ""; lookupResults = []; selectedEntry = nil } }) {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.borderless)
                     }
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .glassPanel(cornerRadius: 8, material: .headerView)
 
@@ -82,7 +82,7 @@ struct StrongsLookupView: View {
                         .font(.callout)
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
+                        .padding(.horizontal, 32)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -93,11 +93,11 @@ struct StrongsLookupView: View {
                         HStack(spacing: 8) {
                             Text(entry.number)
                                 .font(.caption.monospacedDigit().weight(.semibold))
-                                .padding(.horizontal, 5)
+                                .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(entry.number.hasPrefix("H") ? Color.indigo : Color.teal)
                                 .foregroundStyle(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 3))
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
 
                             Text(entry.lemma)
                                 .font(.system(size: 14, design: .serif))
@@ -110,7 +110,7 @@ struct StrongsLookupView: View {
                         }
                         .tag(entry)
                         .contentShape(Rectangle())
-                        .onTapGesture { selectedEntry = entry }
+                        .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { selectedEntry = entry } }
                     }
                     .listStyle(.plain)
                     .frame(minWidth: 250, idealWidth: 300)
@@ -188,7 +188,7 @@ struct StrongsDetailView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text(entry.number)
                         .font(.title2.monospacedDigit().weight(.bold))
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 12)
                         .padding(.vertical, 4)
                         .background(entry.number.hasPrefix("H") ? Color.indigo : Color.teal)
                         .foregroundStyle(.white)

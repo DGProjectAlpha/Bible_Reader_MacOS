@@ -25,11 +25,31 @@ class ReaderPane: ObservableObject, Identifiable {
 @MainActor
 class BibleStore: ObservableObject {
     @Published var loadedTranslations: [Translation] = []
-    @Published var bookmarks: [Bookmark] = []
-    @Published var notes: [Note] = []
-    @Published var highlights: [Highlight] = []
+    @Published var bookmarks: [Bookmark] = [] { didSet { rebuildBookmarkIndex() } }
+    @Published var notes: [Note] = [] { didSet { rebuildNoteIndex() } }
+    @Published var highlights: [Highlight] = [] { didSet { rebuildHighlightIndex() } }
     @Published var readingHistory: [ReadingHistoryEntry] = []
     @Published var searchResults: [SearchResult] = []
+
+    // O(1) lookup indices — rebuilt when arrays change
+    private var bookmarkIndex: Set<String> = []          // "verseId|translationId"
+    private var bookmarkByVerse: [String: Bookmark] = [:] // same key → Bookmark
+    private var highlightByVerse: [String: Highlight] = [:]
+    private var noteByVerse: [String: Note] = [:]
+
+    private func verseKey(_ verseId: String, _ translationId: UUID) -> String {
+        "\(verseId)|\(translationId.uuidString)"
+    }
+    private func rebuildBookmarkIndex() {
+        bookmarkIndex = Set(bookmarks.map { verseKey($0.verseId, $0.translationId) })
+        bookmarkByVerse = Dictionary(bookmarks.map { (verseKey($0.verseId, $0.translationId), $0) }, uniquingKeysWith: { first, _ in first })
+    }
+    private func rebuildHighlightIndex() {
+        highlightByVerse = Dictionary(highlights.map { (verseKey($0.verseId, $0.translationId), $0) }, uniquingKeysWith: { _, last in last })
+    }
+    private func rebuildNoteIndex() {
+        noteByVerse = Dictionary(notes.map { (verseKey($0.verseId, $0.translationId), $0) }, uniquingKeysWith: { first, _ in first })
+    }
 
     private let moduleManager = ModuleManager.shared
     private let userDataService = UserDataService.shared
@@ -46,6 +66,10 @@ class BibleStore: ObservableObject {
         highlights = userDataService.loadHighlights()
         notes = userDataService.loadNotes()
         readingHistory = userDataService.loadHistory()
+        // Ensure lookup indices are built (didSet may not fire reliably in init)
+        rebuildBookmarkIndex()
+        rebuildHighlightIndex()
+        rebuildNoteIndex()
     }
 
     /// Restore a pane to the last viewed book/chapter/translation.
@@ -77,7 +101,7 @@ class BibleStore: ObservableObject {
     }
 
     func isBookmarked(verseId: String, translationId: UUID) -> Bool {
-        bookmarks.contains { $0.verseId == verseId && $0.translationId == translationId }
+        bookmarkIndex.contains(verseKey(verseId, translationId))
     }
 
     func updateBookmarkNote(id: UUID, note: String?) {
@@ -95,7 +119,7 @@ class BibleStore: ObservableObject {
     }
 
     func bookmarkFor(verseId: String, translationId: UUID) -> Bookmark? {
-        bookmarks.first { $0.verseId == verseId && $0.translationId == translationId }
+        bookmarkByVerse[verseKey(verseId, translationId)]
     }
 
     // MARK: - Highlights
@@ -114,7 +138,7 @@ class BibleStore: ObservableObject {
     }
 
     func highlightFor(verseId: String, translationId: UUID) -> Highlight? {
-        highlights.first { $0.verseId == verseId && $0.translationId == translationId }
+        highlightByVerse[verseKey(verseId, translationId)]
     }
 
     // MARK: - Notes
@@ -139,7 +163,7 @@ class BibleStore: ObservableObject {
     }
 
     func noteFor(verseId: String, translationId: UUID) -> Note? {
-        notes.first { $0.verseId == verseId && $0.translationId == translationId }
+        noteByVerse[verseKey(verseId, translationId)]
     }
 
     // MARK: - Reading History

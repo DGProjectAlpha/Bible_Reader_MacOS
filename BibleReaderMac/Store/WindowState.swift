@@ -68,6 +68,7 @@ class WindowState: ObservableObject {
     @Published var windowTitle: String = "BibleReader"
 
     // Sidebar state
+    @Published var showSidebar: Bool = false
     @Published var selectedSidebarTab: SidebarTab = .bookmarks
     @Published var selectedSidebarItem: SidebarItem? = .reader // legacy, kept for compat
 
@@ -126,6 +127,10 @@ class WindowState: ObservableObject {
             searchQuery = query
         }
         showSearchPanel = true
+    }
+
+    func toggleSidebar() {
+        showSidebar.toggle()
     }
 
     func toggleSearchPanel() {

@@ -22,7 +22,7 @@ struct SettingsView: View {
                 .environmentObject(store)
                 .tabItem { Label("General", systemImage: "gear") }
         }
-        .frame(width: 520, height: 480)
+        .frame(minWidth: 480, idealWidth: 520, minHeight: 400, idealHeight: 480)
         .vibrancyBackground(material: .underWindowBackground)
     }
 }
@@ -192,11 +192,12 @@ struct AppearanceSettingsTab: View {
                     ForEach(accentOptions, id: \.0) { name, color in
                         Circle()
                             .fill(color)
-                            .frame(width: 20, height: 20)
+                            .frame(width: 24, height: 24)
                             .overlay(
                                 Circle()
                                     .strokeBorder(name == accentColorName ? Color.primary : Color.clear, lineWidth: 2)
                             )
+                            .contentShape(Circle())
                             .onTapGesture { accentColorName = name }
                     }
                 }

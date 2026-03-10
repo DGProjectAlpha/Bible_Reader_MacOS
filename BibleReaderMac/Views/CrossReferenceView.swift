@@ -65,6 +65,8 @@ struct CrossReferenceView: View {
                     Button(action: navigateBack) {
                         Image(systemName: "chevron.left")
                             .font(.caption.weight(.semibold))
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
                     .help("Go back to previous verse")
@@ -100,7 +102,7 @@ struct CrossReferenceView: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
         .glassHeader()
     }
 
@@ -168,9 +170,9 @@ struct CrossReferenceView: View {
                     Text(ref.translationAbbr)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 3))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
 
                     Image(systemName: "chevron.right")
                         .font(.caption2)
@@ -209,11 +211,11 @@ struct CrossReferenceView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.quaternary)
             Text("Cross References")
-                .font(.title3.weight(.medium))
-                .foregroundStyle(.secondary)
+                .font(.title2)
+                .foregroundStyle(.tertiary)
             Text("Enter a verse reference above, or tap a verse\nin the reader to see its cross-references.")
                 .font(.callout)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.quaternary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -242,14 +244,18 @@ struct CrossReferenceView: View {
         if let current = selectedVerseId {
             navigationHistory.append(current)
         }
-        selectedVerseId = verseId
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedVerseId = verseId
+        }
         loadCrossReferences(for: verseId)
     }
 
     /// Go back in navigation history.
     private func navigateBack() {
         guard let previous = navigationHistory.popLast() else { return }
-        selectedVerseId = previous
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedVerseId = previous
+        }
         loadCrossReferences(for: previous)
     }
 
@@ -319,8 +325,10 @@ struct CrossReferenceView: View {
             }
 
             await MainActor.run {
-                tskRefs = displayRefs
-                isLoading = false
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    tskRefs = displayRefs
+                    isLoading = false
+                }
             }
         }
     }

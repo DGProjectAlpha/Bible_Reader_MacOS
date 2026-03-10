@@ -21,6 +21,13 @@ struct NotesView: View {
     @State private var editingNoteId: UUID?
     @State private var editingNoteContent: String = ""
 
+    // Cached book-order index for O(1) lookups during sort
+    private static let bookOrderIndex: [String: Int] = {
+        var map = [String: Int]()
+        for (i, book) in BibleBooks.all.enumerated() { map[book] = i }
+        return map
+    }()
+
     private var filteredNotes: [Note] {
         var result = store.notes
 
@@ -38,11 +45,12 @@ struct NotesView: View {
         case .dateOldest:
             result.sort { $0.updatedAt < $1.updatedAt }
         case .bookOrder:
+            let idx = Self.bookOrderIndex
             result.sort { lhs, rhs in
                 let lBook = bookName(from: lhs.verseId)
                 let rBook = bookName(from: rhs.verseId)
-                let lIndex = BibleBooks.all.firstIndex(of: lBook) ?? 999
-                let rIndex = BibleBooks.all.firstIndex(of: rBook) ?? 999
+                let lIndex = idx[lBook] ?? 999
+                let rIndex = idx[rBook] ?? 999
                 if lIndex != rIndex { return lIndex < rIndex }
                 let lChapter = chapterNumber(from: lhs.verseId)
                 let rChapter = chapterNumber(from: rhs.verseId)
@@ -109,14 +117,16 @@ struct NotesView: View {
                         }
                     }
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
+                    .padding(.vertical, 6)
                     .background(.quaternary.opacity(0.5))
                     .cornerRadius(6)
 
                     // Group by book toggle
-                    Button(action: { groupByBook.toggle() }) {
+                    Button(action: { withAnimation(.easeInOut(duration: 0.2)) { groupByBook.toggle() } }) {
                         Image(systemName: groupByBook ? "folder.fill" : "folder")
                             .font(.callout)
+                            .frame(width: 26, height: 26)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(groupByBook ? Color.accentColor : Color.secondary)
@@ -125,7 +135,7 @@ struct NotesView: View {
                     // Sort menu
                     Menu {
                         ForEach(NoteSortOrder.allCases, id: \.self) { order in
-                            Button(action: { sortOrder = order }) {
+                            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { sortOrder = order } }) {
                                 HStack {
                                     Text(order.rawValue)
                                     if sortOrder == order {
@@ -146,6 +156,8 @@ struct NotesView: View {
                     Button(action: { exportNotes() }) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.callout)
+                            .frame(width: 26, height: 26)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
@@ -155,6 +167,8 @@ struct NotesView: View {
                     Button(action: { showDeleteAllConfirmation = true }) {
                         Image(systemName: "trash")
                             .font(.callout)
+                            .frame(width: 26, height: 26)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
@@ -315,7 +329,9 @@ struct NotesView: View {
                 }
                 Divider()
                 Button("Delete Note", role: .destructive) {
-                    store.removeNote(note.id)
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        store.removeNote(note.id)
+                    }
                 }
             }
     }
@@ -415,7 +431,7 @@ struct NoteRow: View {
             HStack {
                 Image(systemName: "note.text")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color.accentColor)
                 Text(formatVerseId(note.verseId))
                     .font(.callout.weight(.medium))
             }
@@ -427,7 +443,7 @@ struct NoteRow: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 
     private func formatVerseId(_ id: String) -> String {
@@ -458,7 +474,11 @@ struct NoteContentEditor: View {
             TextEditor(text: $noteText)
                 .font(.body)
                 .frame(minHeight: 120)
-                .border(Color.secondary.opacity(0.3), width: 1)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             HStack {
                 Button("Cancel", action: onCancel)
                     .keyboardShortcut(.cancelAction)
@@ -468,6 +488,7 @@ struct NoteContentEditor: View {
             }
         }
         .padding(20)
-        .frame(width: 400, height: 280)
+        .frame(minWidth: 340, idealWidth: 400, minHeight: 240, idealHeight: 280)
+        .glassSheet()
     }
 }

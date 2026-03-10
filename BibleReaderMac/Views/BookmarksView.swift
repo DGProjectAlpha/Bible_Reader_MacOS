@@ -20,6 +20,13 @@ struct BookmarksView: View {
     @State private var groupByBook: Bool = false
     @State private var showDeleteAllConfirmation: Bool = false
 
+    // Cached book-order index for O(1) lookups during sort
+    private static let bookOrderIndex: [String: Int] = {
+        var map = [String: Int]()
+        for (i, book) in BibleBooks.all.enumerated() { map[book] = i }
+        return map
+    }()
+
     private var filteredBookmarks: [Bookmark] {
         var result = store.bookmarks
 
@@ -40,11 +47,12 @@ struct BookmarksView: View {
         case .dateOldest:
             result.sort { $0.createdAt < $1.createdAt }
         case .bookOrder:
+            let idx = Self.bookOrderIndex
             result.sort { lhs, rhs in
                 let lBook = bookName(from: lhs.verseId)
                 let rBook = bookName(from: rhs.verseId)
-                let lIndex = BibleBooks.all.firstIndex(of: lBook) ?? 999
-                let rIndex = BibleBooks.all.firstIndex(of: rBook) ?? 999
+                let lIndex = idx[lBook] ?? 999
+                let rIndex = idx[rBook] ?? 999
                 if lIndex != rIndex { return lIndex < rIndex }
                 let lChapter = chapterNumber(from: lhs.verseId)
                 let rChapter = chapterNumber(from: rhs.verseId)
@@ -111,14 +119,16 @@ struct BookmarksView: View {
                         }
                     }
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
+                    .padding(.vertical, 6)
                     .background(.quaternary.opacity(0.5))
                     .cornerRadius(6)
 
                     // Group by book toggle
-                    Button(action: { groupByBook.toggle() }) {
+                    Button(action: { withAnimation(.easeInOut(duration: 0.2)) { groupByBook.toggle() } }) {
                         Image(systemName: groupByBook ? "folder.fill" : "folder")
                             .font(.callout)
+                            .frame(width: 26, height: 26)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(groupByBook ? Color.accentColor : Color.secondary)
@@ -127,7 +137,7 @@ struct BookmarksView: View {
                     // Sort menu
                     Menu {
                         ForEach(BookmarkSortOrder.allCases, id: \.self) { order in
-                            Button(action: { sortOrder = order }) {
+                            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { sortOrder = order } }) {
                                 HStack {
                                     Text(order.rawValue)
                                     if sortOrder == order {
@@ -148,6 +158,8 @@ struct BookmarksView: View {
                     Button(action: { showDeleteAllConfirmation = true }) {
                         Image(systemName: "trash")
                             .font(.callout)
+                            .frame(width: 26, height: 26)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
@@ -300,7 +312,9 @@ struct BookmarksView: View {
                 }
                 Divider()
                 Button("Remove Bookmark", role: .destructive) {
-                    store.removeBookmark(bookmark.id)
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        store.removeBookmark(bookmark.id)
+                    }
                 }
             }
     }
@@ -400,7 +414,7 @@ struct BookmarkRow: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 
     private func formatVerseId(_ id: String) -> String {
@@ -424,7 +438,11 @@ struct BookmarkNoteEditor: View {
             TextEditor(text: $noteText)
                 .font(.body)
                 .frame(minHeight: 120)
-                .border(Color.secondary.opacity(0.3), width: 1)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             HStack {
                 Button("Cancel", action: onCancel)
                     .keyboardShortcut(.cancelAction)
@@ -434,7 +452,8 @@ struct BookmarkNoteEditor: View {
             }
         }
         .padding(20)
-        .frame(width: 400, height: 260)
+        .frame(minWidth: 340, idealWidth: 400, minHeight: 220, idealHeight: 260)
+        .glassSheet()
     }
 }
 
@@ -469,6 +488,6 @@ struct HistoryRow: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 }

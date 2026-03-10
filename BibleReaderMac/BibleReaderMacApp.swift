@@ -10,7 +10,7 @@ struct BibleReaderMacApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(bibleStore)
-                .frame(minWidth: 900, minHeight: 600)
+                .frame(minWidth: 800, minHeight: 500)
                 .onOpenURL { url in
                     guard url.pathExtension.lowercased() == "brbmod" else { return }
                     Task {

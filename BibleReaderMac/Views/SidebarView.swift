@@ -14,18 +14,18 @@ struct SidebarView: View {
             // Tab content
             tabContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .animation(.easeInOut(duration: 0.15), value: windowState.selectedSidebarTab)
 
             Divider()
 
             // Footer buttons
             sidebarFooter
         }
-        .navigationTitle("BibleReader")
         .sheet(isPresented: $showHistory) {
             HistoryView()
                 .environmentObject(store)
                 .environmentObject(windowState)
-                .frame(minWidth: 400, minHeight: 500)
+                .frame(minWidth: 360, idealWidth: 450, minHeight: 400, idealHeight: 500, maxHeight: 700)
         }
     }
 
@@ -150,10 +150,12 @@ struct SidebarView: View {
     // MARK: - Footer
 
     private var sidebarFooter: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             SettingsLink {
                 Image(systemName: "gearshape")
                     .font(.callout)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
             .help("Settings")
@@ -161,6 +163,8 @@ struct SidebarView: View {
             Button(action: { showHistory = true }) {
                 Image(systemName: "clock")
                     .font(.callout)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
             .help("Reading History")

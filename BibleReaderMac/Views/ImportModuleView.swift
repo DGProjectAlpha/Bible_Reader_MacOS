@@ -39,7 +39,7 @@ struct ImportModuleView: View {
             }
         }
         .padding(30)
-        .frame(width: 440)
+        .frame(minWidth: 380, idealWidth: 440)
         .glassSheet()
         .animation(.easeInOut(duration: 0.2), value: importHandler.showResult)
         .animation(.easeInOut(duration: 0.15), value: isDragTargeted)

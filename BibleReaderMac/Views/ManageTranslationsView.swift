@@ -22,6 +22,8 @@ struct ManageTranslationsView: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title3)
                         .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut(.escape, modifiers: [])
@@ -45,7 +47,7 @@ struct ManageTranslationsView: View {
             Divider()
             bottomBar
         }
-        .frame(width: 640, height: 480)
+        .frame(minWidth: 520, idealWidth: 640, minHeight: 380, idealHeight: 480)
         .glassSheet()
         .alert("Remove Translation?", isPresented: $showDeleteConfirm, presenting: pendingDeleteId) { id in
             Button("Remove", role: .destructive) {
@@ -194,7 +196,10 @@ struct ManageTranslationsView: View {
 
             Button(action: { windowState.addPane(translationId: store.loadedTranslations.first?.id) }) {
                 Image(systemName: "plus.rectangle.on.rectangle")
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.borderless)
             .disabled(windowState.panes.count >= 4 || store.loadedTranslations.isEmpty)
             .help("Add reader pane")
 
@@ -205,7 +210,10 @@ struct ManageTranslationsView: View {
                     }
                 }) {
                     Image(systemName: "minus.rectangle")
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.borderless)
                 .help("Remove last pane")
             }
 

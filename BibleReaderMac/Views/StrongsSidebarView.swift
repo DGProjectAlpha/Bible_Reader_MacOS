@@ -51,17 +51,19 @@ struct StrongsSidebarView: View {
 
                 Spacer()
 
-                Button(action: { withAnimation { isVisible = false } }) {
+                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isVisible = false } }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title3)
                         .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.borderless)
                 .help("Close concordance sidebar")
             }
             .padding(.horizontal, 12)
-            .padding(.top, 10)
-            .padding(.bottom, 6)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
 
             // Search/filter within tags
             if !resolvedTags.isEmpty {
@@ -109,10 +111,10 @@ struct StrongsSidebarView: View {
         guard !searchText.isEmpty else { return resolvedTags }
         let query = searchText.lowercased()
         return resolvedTags.filter { tag in
-            tag.word.lowercased().contains(query) ||
-            tag.strongsNumbers.joined().lowercased().contains(query) ||
-            tag.primaryEntry?.lemma.lowercased().contains(query) == true ||
-            tag.primaryEntry?.transliteration.lowercased().contains(query) == true
+            tag.word.localizedCaseInsensitiveContains(query) ||
+            tag.strongsNumbers.contains(where: { $0.localizedCaseInsensitiveContains(query) }) ||
+            tag.primaryEntry?.lemma.localizedCaseInsensitiveContains(query) == true ||
+            tag.primaryEntry?.transliteration.localizedCaseInsensitiveContains(query) == true
         }
     }
 
@@ -148,8 +150,10 @@ struct StrongsSidebarView: View {
                 filePath: translationFilePath
             )
             DispatchQueue.main.async {
-                resolvedTags = tags
-                isLoading = false
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    resolvedTags = tags
+                    isLoading = false
+                }
             }
         }
     }
@@ -200,6 +204,7 @@ struct StrongsWordRow: View {
         }
         .background(isExpanded ? Color.accentColor.opacity(0.06) : Color.clear)
         .background(isExpanded ? .ultraThinMaterial : .regularMaterial, in: Rectangle())
+        .animation(.easeInOut(duration: 0.2), value: isExpanded)
     }
 
     // MARK: - Expanded Detail
@@ -327,11 +332,11 @@ struct StrongsWordRow: View {
             HStack {
                 Text(entry.number)
                     .font(.caption.monospacedDigit().weight(.semibold))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
                     .background(strongsBadgeColor(entry.number))
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
 
                 Text(entry.lemma)
                     .font(.system(size: 16, design: .serif))
@@ -357,9 +362,14 @@ struct StrongsWordRow: View {
         number.hasPrefix("H") ? .indigo : .teal
     }
 
+    // Pre-compiled regex for HTML tag stripping — avoids recompilation per call
+    private static let htmlTagRegex = try! NSRegularExpression(pattern: "<[^>]+>")
+
     /// Strip HTML-like tags from Strong's definitions.
     private func cleanDefinition(_ raw: String) -> String {
-        raw.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        let range = NSRange(raw.startIndex..., in: raw)
+        let stripped = Self.htmlTagRegex.stringByReplacingMatches(in: raw, range: range, withTemplate: "")
+        return stripped
             .replacingOccurrences(of: "&amp;", with: "&")
             .replacingOccurrences(of: "&#x27;", with: "'")
             .trimmingCharacters(in: .whitespacesAndNewlines)

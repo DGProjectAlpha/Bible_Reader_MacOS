@@ -7,7 +7,6 @@ struct ContentView: View {
     @State private var showImportSheet = false
     @State private var showManageTranslations = false
     @State private var isDragTargeted = false
-    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @AppStorage("readerTheme") private var readerTheme: String = "auto"
 
     private var resolvedColorScheme: ColorScheme? {
@@ -43,24 +42,45 @@ struct ContentView: View {
     // MARK: - Extracted Sub-Views
 
     private var mainLayout: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView()
-                .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
-                .vibrancyBackground(material: .sidebar)
-        } detail: {
-            if windowState.showSearchPanel {
-                VSplitView {
-                    SearchView()
-                        .frame(minHeight: 200, idealHeight: 350)
+        ZStack(alignment: .leading) {
+            // Main content fills the entire width
+            Group {
+                if windowState.showSearchPanel {
+                    VSplitView {
+                        SearchView()
+                            .frame(minHeight: 200, idealHeight: 350)
+                        ReaderView()
+                            .vibrancyBackground(material: .contentBackground, blendingMode: .behindWindow)
+                            .frame(minHeight: 200)
+                    }
+                } else {
                     ReaderView()
                         .vibrancyBackground(material: .contentBackground, blendingMode: .behindWindow)
-                        .frame(minHeight: 200)
                 }
-            } else {
-                ReaderView()
-                    .vibrancyBackground(material: .contentBackground, blendingMode: .behindWindow)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .animation(.easeInOut(duration: 0.2), value: windowState.showSearchPanel)
+
+            // Dim overlay when sidebar is open
+            if windowState.showSidebar {
+                Color.black.opacity(0.15)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        windowState.toggleSidebar()
+                    }
+                    .transition(.opacity)
+            }
+
+            // Overlay sidebar
+            if windowState.showSidebar {
+                SidebarView()
+                    .frame(width: 280, maxHeight: .infinity)
+                    .vibrancyBackground(material: .sidebar)
+                    .shadow(color: .black.opacity(0.2), radius: 8, x: 2, y: 0)
+                    .transition(.move(edge: .leading))
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: windowState.showSidebar)
         .inspector(isPresented: $windowState.showInspector) {
             InspectorPanelView()
                 .inspectorColumnWidth(min: 300, ideal: 320, max: 450)
@@ -69,6 +89,14 @@ struct ContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            Button(action: { windowState.toggleSidebar() }) {
+                Label("Sidebar", systemImage: "sidebar.leading")
+            }
+            .help("Toggle Sidebar (⌘⇧S)")
+            .keyboardShortcut("s", modifiers: [.command, .shift])
+        }
+
         ToolbarItemGroup(placement: .primaryAction) {
             Button(action: { showImportSheet = true }) {
                 Label("Import", systemImage: "square.and.arrow.down")
@@ -252,6 +280,9 @@ private struct InspectorNotifications: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .switchSidebarTab)) { notification in
                 if let tab = notification.userInfo?["tab"] as? SidebarTab {
                     windowState.selectedSidebarTab = tab
+                    if !windowState.showSidebar {
+                        windowState.toggleSidebar()
+                    }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .toggleStrongsInspector)) { _ in
@@ -316,7 +347,7 @@ private struct ImportToastModifier: ViewModifier {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .onAppear {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                                withAnimation { importHandler.showResult = false }
+                                withAnimation(.spring(duration: 0.3)) { importHandler.showResult = false }
                             }
                         }
                 }
@@ -364,6 +395,7 @@ struct InspectorPanelView: View {
             // Tab content
             inspectorContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .animation(.easeInOut(duration: 0.15), value: windowState.inspectorTab)
         }
     }
 

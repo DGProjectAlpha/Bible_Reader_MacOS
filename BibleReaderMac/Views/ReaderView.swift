@@ -131,7 +131,7 @@ struct ReaderView: View {
             syncScrolling: $syncScrolling,
             coordinator: syncCoordinator
         )
-        .frame(minWidth: 250)
+        .frame(minWidth: 200)
     }
 
     // MARK: - Empty State
@@ -369,10 +369,12 @@ struct ReaderPaneView: View {
                 .help("Select book")
 
                 // Chapter nav
-                HStack(spacing: 2) {
+                HStack(spacing: 4) {
                     Button(action: prevChapter) {
                         Image(systemName: "chevron.left")
                             .font(.caption.weight(.semibold))
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
                     .disabled(pane.selectedChapter <= 1)
@@ -390,6 +392,8 @@ struct ReaderPaneView: View {
                     Button(action: nextChapter) {
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
                     .disabled(pane.selectedChapter >= pane.chapterCount)
@@ -399,11 +403,11 @@ struct ReaderPaneView: View {
                 Spacer()
 
                 // Font size controls
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Button(action: { fontSize = max(10, fontSize - 1) }) {
                         Image(systemName: "textformat.size.smaller")
-                            .font(.body)
-                            .frame(width: 28, height: 28)
+                            .font(.callout)
+                            .frame(width: 26, height: 26)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
@@ -416,8 +420,8 @@ struct ReaderPaneView: View {
 
                     Button(action: { fontSize = min(36, fontSize + 1) }) {
                         Image(systemName: "textformat.size.larger")
-                            .font(.body)
-                            .frame(width: 28, height: 28)
+                            .font(.callout)
+                            .frame(width: 26, height: 26)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
@@ -431,12 +435,14 @@ struct ReaderPaneView: View {
                         Image(systemName: "xmark")
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(.secondary)
+                            .frame(width: 22, height: 22)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
                     .help("Close pane")
                 }
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
             .padding(.vertical, 6)
 
             // Chapter title
@@ -673,6 +679,9 @@ struct ReaderPaneView: View {
                         Text("\(displayBookName) \(pane.selectedChapter - 1)")
                     }
                     .font(.callout)
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 8)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
             }
@@ -686,12 +695,15 @@ struct ReaderPaneView: View {
                         Image(systemName: "chevron.right")
                     }
                     .font(.callout)
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 8)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
             }
         }
         .padding(.vertical, 16)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 8)
     }
 
     // MARK: - Helpers
@@ -824,7 +836,7 @@ struct VerseRow: View {
                 }
             }
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, 4)
         .padding(.horizontal, 4)
         .background(
             RoundedRectangle(cornerRadius: 4)
@@ -847,7 +859,7 @@ struct VerseRow: View {
             if showActionButtons || isBookmarked {
                 Button(action: { onToggleBookmark?() }) {
                     Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundColor(isBookmarked ? .accentColor : .secondary.opacity(0.5))
                 }
                 .buttonStyle(.plain)
@@ -859,7 +871,7 @@ struct VerseRow: View {
             if showActionButtons || highlightColor != nil {
                 Button(action: { showHighlightPicker.toggle() }) {
                     Image(systemName: highlightColor != nil ? "paintbrush.fill" : "paintbrush")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundColor(highlightColor?.displayColor ?? .secondary.opacity(0.5))
                 }
                 .buttonStyle(.plain)
@@ -880,7 +892,7 @@ struct VerseRow: View {
             if showActionButtons || hasNote {
                 Button(action: { onNoteEdit?() }) {
                     Image(systemName: hasNote ? "note.text" : "note.text.badge.plus")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundColor(hasNote ? .orange : .secondary.opacity(0.5))
                 }
                 .buttonStyle(.plain)
@@ -926,13 +938,13 @@ struct VerseRow: View {
     private var taggedVerseText: some View {
         // Build a flow layout of clickable words
         WrappingHStack(alignment: .leading, spacing: 3) {
-            ForEach(Array(verse.wordTags.enumerated()), id: \.offset) { _, tag in
+            ForEach(verse.wordTags.indices, id: \.self) { i in
                 TaggedWordView(
-                    tag: tag,
+                    tag: verse.wordTags[i],
                     fontSize: fontSize,
                     fontFamily: fontFamily,
                     customTextColor: customTextColor,
-                    onTap: { onWordTap?(tag) }
+                    onTap: { onWordTap?(verse.wordTags[i]) }
                 )
             }
         }
@@ -1030,7 +1042,7 @@ struct HighlightColorPicker: View {
                 Button(action: { onSelect(color) }) {
                     Circle()
                         .fill(color.displayColor)
-                        .frame(width: 22, height: 22)
+                        .frame(width: 24, height: 24)
                         .overlay(
                             Circle()
                                 .strokeBorder(Color.primary.opacity(currentColor == color ? 0.6 : 0.2), lineWidth: currentColor == color ? 2 : 0.5)
@@ -1042,7 +1054,7 @@ struct HighlightColorPicker: View {
             }
 
             if currentColor != nil {
-                Divider().frame(height: 22)
+                Divider().frame(height: 24)
                 Button(action: { onSelect(nil) }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 16))
@@ -1083,6 +1095,7 @@ struct NoteEditorSheet: View {
                 Spacer()
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.escape, modifiers: [])
+                    .buttonStyle(.bordered)
                 Button("Save") {
                     onSave(noteText)
                     dismiss()
@@ -1115,7 +1128,7 @@ struct NoteEditorSheet: View {
                 }
             }
         }
-        .frame(minWidth: 400, maxWidth: 400, minHeight: 280)
+        .frame(minWidth: 340, idealWidth: 400, maxWidth: 500, minHeight: 280)
         .onAppear {
             noteText = initialText
         }
@@ -1129,14 +1142,22 @@ struct WrappingHStack: Layout {
     var alignment: HorizontalAlignment = .leading
     var spacing: CGFloat = 4
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = layout(proposal: proposal, subviews: subviews)
-        return result.size
+    struct CacheData {
+        var positions: [CGPoint] = []
+        var size: CGSize = .zero
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = layout(proposal: proposal, subviews: subviews)
-        for (index, position) in result.positions.enumerated() {
+    func makeCache(subviews: Subviews) -> CacheData {
+        CacheData()
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout CacheData) -> CGSize {
+        cache = computeLayout(proposal: proposal, subviews: subviews)
+        return cache.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout CacheData) {
+        for (index, position) in cache.positions.enumerated() {
             guard index < subviews.count else { break }
             subviews[index].place(
                 at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
@@ -1145,14 +1166,10 @@ struct WrappingHStack: Layout {
         }
     }
 
-    private struct LayoutResult {
-        var positions: [CGPoint]
-        var size: CGSize
-    }
-
-    private func layout(proposal: ProposedViewSize, subviews: Subviews) -> LayoutResult {
+    private func computeLayout(proposal: ProposedViewSize, subviews: Subviews) -> CacheData {
         let maxWidth = proposal.width ?? .infinity
         var positions: [CGPoint] = []
+        positions.reserveCapacity(subviews.count)
         var currentX: CGFloat = 0
         var currentY: CGFloat = 0
         var lineHeight: CGFloat = 0
@@ -1171,7 +1188,7 @@ struct WrappingHStack: Layout {
             maxX = max(maxX, currentX)
         }
 
-        return LayoutResult(
+        return CacheData(
             positions: positions,
             size: CGSize(width: maxX, height: currentY + lineHeight)
         )

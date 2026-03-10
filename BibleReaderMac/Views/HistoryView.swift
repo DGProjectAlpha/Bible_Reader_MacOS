@@ -58,6 +58,7 @@ struct HistoryView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .glassSheet()
     }
 
     // MARK: - Grouped by Day
@@ -68,11 +69,16 @@ struct HistoryView: View {
         let entries: [ReadingHistoryEntry]
     }
 
+    private static let groupDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        return f
+    }()
+
     private var groupedHistory: [HistoryGroup] {
         let calendar = Calendar.current
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
+        let formatter = Self.groupDateFormatter
 
         // readingHistory is already sorted DESC from SQLite, no need to reverse
         let reversed = store.readingHistory
