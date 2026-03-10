@@ -126,7 +126,7 @@ class ScrollSyncCoordinator: ObservableObject {
     /// Tracks which panes are currently suppressed from emitting scroll events
     /// (because they are responding to a sync, not user-initiated scroll).
     private var suppressedPanes: Set<UUID> = []
-    private var suppressionTimers: [UUID: DispatchWorkItem] = []
+    private var suppressionTimers: [UUID: DispatchWorkItem] = [:]
 
     struct NavigationEvent: Equatable {
         let book: String

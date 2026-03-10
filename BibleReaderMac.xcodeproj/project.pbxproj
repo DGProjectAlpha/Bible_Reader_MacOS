@@ -35,6 +35,7 @@
 		A1000026 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000026; };
 		A1000027 /* WindowState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000027; };
 		A1000028 /* NotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000028; };
+		A1000029 /* FileImportHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000029; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -66,6 +67,7 @@
 		B1000026 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		B1000027 /* WindowState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowState.swift; sourceTree = "<group>"; };
 		B1000028 /* NotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesView.swift; sourceTree = "<group>"; };
+		B1000029 /* FileImportHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileImportHandler.swift; sourceTree = "<group>"; };
 		B1000099 /* BibleReaderMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BibleReaderMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -152,6 +154,7 @@
 				B1000020 /* CrossReferenceService.swift */,
 				B1000022 /* VersificationService.swift */,
 				B1000023 /* UserDataService.swift */,
+				B1000029 /* FileImportHandler.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -267,6 +270,7 @@
 				A1000026 /* AppDelegate.swift in Sources */,
 				A1000027 /* WindowState.swift in Sources */,
 				A1000028 /* NotesView.swift in Sources */,
+				A1000029 /* FileImportHandler.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
