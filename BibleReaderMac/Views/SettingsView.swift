@@ -11,11 +11,18 @@ struct SettingsView: View {
             AppearanceSettingsTab()
                 .tabItem { Label("Appearance", systemImage: "paintbrush") }
 
+            ReadingSettingsTab()
+                .tabItem { Label("Reading", systemImage: "book") }
+
+            ProfileSettingsTab()
+                .environmentObject(store)
+                .tabItem { Label("Profiles", systemImage: "person.2") }
+
             GeneralSettingsTab()
                 .environmentObject(store)
                 .tabItem { Label("General", systemImage: "gear") }
         }
-        .frame(width: 500, height: 440)
+        .frame(width: 520, height: 480)
         .vibrancyBackground(material: .underWindowBackground)
     }
 }
@@ -44,6 +51,7 @@ struct DisplaySettingsTab: View {
                 }
 
                 HStack {
+                    Text("Size")
                     Slider(value: $fontSize, in: 10...36, step: 1)
                     Text("\(Int(fontSize))pt")
                         .monospacedDigit()
@@ -88,6 +96,18 @@ struct DisplaySettingsTab: View {
                 previewText
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 6).fill(previewBgColor))
+            }
+
+            Section {
+                Button("Reset Display to Defaults") {
+                    fontSize = 15
+                    fontFamily = "System"
+                    lineSpacing = 1.3
+                    wordSpacing = 0.0
+                    verseNumberStyle = "superscript"
+                    paragraphMode = false
+                }
+                .foregroundStyle(.secondary)
             }
         }
         .padding()
@@ -237,7 +257,7 @@ struct AppearanceSettingsTab: View {
                 }
 
                 if useCustomTextColor || useCustomBgColor {
-                    Button("Reset to Defaults") {
+                    Button("Reset Colors to Defaults") {
                         useCustomTextColor = false
                         useCustomBgColor = false
                         textColorHex = ""
@@ -252,6 +272,22 @@ struct AppearanceSettingsTab: View {
             Section("Elements") {
                 Toggle("Show Chapter Titles", isOn: $showChapterTitles)
             }
+
+            Section {
+                Button("Reset Appearance to Defaults") {
+                    readerTheme = "auto"
+                    accentColorName = "blue"
+                    verseHighlightOpacity = 0.12
+                    showChapterTitles = true
+                    useCustomTextColor = false
+                    useCustomBgColor = false
+                    textColorHex = ""
+                    backgroundColorHex = ""
+                    textColor = .primary
+                    bgColor = .clear
+                }
+                .foregroundStyle(.secondary)
+            }
         }
         .padding()
         .onAppear {
@@ -260,6 +296,192 @@ struct AppearanceSettingsTab: View {
             if let c = Color.fromHex(textColorHex) { textColor = c }
             if let c = Color.fromHex(backgroundColorHex) { bgColor = c }
         }
+    }
+}
+
+// MARK: - Reading Tab (Sync Scroll, Navigation behavior)
+
+struct ReadingSettingsTab: View {
+    @AppStorage("syncScrolling") private var syncScrolling: Bool = true
+    @AppStorage("restoreLastPosition") private var restoreLastPosition: Bool = true
+    @AppStorage("showChapterTitles") private var showChapterTitles: Bool = true
+    @AppStorage("verseNumberStyle") private var verseNumberStyle: String = "superscript"
+
+    var body: some View {
+        Form {
+            Section("Scroll & Navigation") {
+                Toggle("Sync scroll across panes", isOn: $syncScrolling)
+
+                Toggle("Restore last reading position on launch", isOn: $restoreLastPosition)
+            }
+
+            Section("Verse Display") {
+                Picker("Verse Number Style", selection: $verseNumberStyle) {
+                    Text("Superscript").tag("superscript")
+                    Text("Inline").tag("inline")
+                    Text("Margin").tag("margin")
+                }
+
+                Toggle("Show chapter titles in reader", isOn: $showChapterTitles)
+            }
+        }
+        .padding()
+    }
+}
+
+// MARK: - Profile Tab (matching Windows profile management)
+
+struct ProfileSettingsTab: View {
+    @EnvironmentObject var store: BibleStore
+    @AppStorage("activeProfile") private var activeProfile: String = "Default"
+    @AppStorage("profileList") private var profileListRaw: String = "Default"
+
+    @State private var showNewProfileSheet = false
+    @State private var newProfileName: String = ""
+    @State private var showDeleteConfirm = false
+    @State private var profileToDelete: String?
+
+    private var profiles: [String] {
+        profileListRaw.split(separator: "|").map(String.init)
+    }
+
+    private func saveProfiles(_ list: [String]) {
+        profileListRaw = list.joined(separator: "|")
+    }
+
+    var body: some View {
+        Form {
+            Section("Active Profile") {
+                Picker("Profile", selection: $activeProfile) {
+                    ForEach(profiles, id: \.self) { name in
+                        Text(name).tag(name)
+                    }
+                }
+                .onChange(of: activeProfile) { newProfile in
+                    store.switchProfile(to: newProfile)
+                }
+
+                Text("Each profile has its own bookmarks, highlights, notes, and reading history.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Manage Profiles") {
+                ForEach(profiles, id: \.self) { name in
+                    HStack {
+                        Image(systemName: name == activeProfile ? "person.circle.fill" : "person.circle")
+                            .foregroundStyle(name == activeProfile ? .accentColor : .secondary)
+                        Text(name)
+                            .fontWeight(name == activeProfile ? .semibold : .regular)
+                        Spacer()
+                        if name == activeProfile {
+                            Text("Active")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(.secondary.opacity(0.12)))
+                        }
+                        if name != "Default" {
+                            Button(role: .destructive) {
+                                profileToDelete = name
+                                showDeleteConfirm = true
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundStyle(.red.opacity(0.7))
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Delete profile")
+                        }
+                    }
+                }
+
+                Button(action: { showNewProfileSheet = true }) {
+                    Label("New Profile", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
+            }
+        }
+        .padding()
+        .sheet(isPresented: $showNewProfileSheet) {
+            newProfileSheet
+        }
+        .alert("Delete Profile", isPresented: $showDeleteConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                if let name = profileToDelete {
+                    deleteProfile(name)
+                }
+            }
+        } message: {
+            if let name = profileToDelete {
+                Text("Delete profile \"\(name)\"? This will permanently remove all bookmarks, highlights, notes, and reading history associated with this profile.")
+            }
+        }
+    }
+
+    private var newProfileSheet: some View {
+        VStack(spacing: 16) {
+            Text("New Profile")
+                .font(.headline)
+
+            TextField("Profile name", text: $newProfileName)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 260)
+                .onSubmit { createProfile() }
+
+            if profiles.contains(newProfileName.trimmingCharacters(in: .whitespaces)) {
+                Text("A profile with this name already exists.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            HStack(spacing: 12) {
+                Button("Cancel") {
+                    newProfileName = ""
+                    showNewProfileSheet = false
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button("Create") {
+                    createProfile()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(newProfileName.trimmingCharacters(in: .whitespaces).isEmpty ||
+                          profiles.contains(newProfileName.trimmingCharacters(in: .whitespaces)))
+            }
+        }
+        .padding(24)
+        .frame(width: 320)
+    }
+
+    private func createProfile() {
+        let name = newProfileName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty, !profiles.contains(name) else { return }
+        var list = profiles
+        list.append(name)
+        saveProfiles(list)
+        activeProfile = name
+        store.switchProfile(to: name)
+        newProfileName = ""
+        showNewProfileSheet = false
+    }
+
+    private func deleteProfile(_ name: String) {
+        guard name != "Default" else { return }
+        var list = profiles
+        list.removeAll { $0 == name }
+        if list.isEmpty { list = ["Default"] }
+        saveProfiles(list)
+
+        // If deleting the active profile, switch to Default
+        if activeProfile == name {
+            activeProfile = "Default"
+            store.switchProfile(to: "Default")
+        }
+
+        // Clean up profile data
+        store.deleteProfileData(name)
     }
 }
 
@@ -288,15 +510,14 @@ extension Color {
 
 struct GeneralSettingsTab: View {
     @EnvironmentObject var store: BibleStore
-    @AppStorage("restoreLastPosition") private var restoreLastPosition: Bool = true
     @AppStorage("defaultTranslation") private var defaultTranslation: String = ""
+    @State private var showClearHistoryConfirm = false
+    @State private var showClearAllDataConfirm = false
 
     var body: some View {
         Form {
-            Section("Startup") {
-                Toggle("Restore last reading position on launch", isOn: $restoreLastPosition)
-
-                Picker("Default Translation", selection: $defaultTranslation) {
+            Section("Default Translation") {
+                Picker("Translation", selection: $defaultTranslation) {
                     Text("Last Used").tag("")
                     ForEach(store.loadedTranslations) { t in
                         Text(t.abbreviation).tag(t.abbreviation)
@@ -311,11 +532,75 @@ struct GeneralSettingsTab: View {
                         .textSelection(.enabled)
                 }
 
-                Button("Reveal in Finder") {
-                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: BibleStore.modulesDirectory.path(percentEncoded: false))
+                HStack(spacing: 12) {
+                    Button("Reveal in Finder") {
+                        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: BibleStore.modulesDirectory.path(percentEncoded: false))
+                    }
+
+                    Button("Import Module...") {
+                        NotificationCenter.default.post(name: .importModule, object: nil)
+                    }
+                }
+            }
+
+            Section("Data Management") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Clear Reading History")
+                            .font(.callout)
+                        Text("Remove all reading history entries")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Clear History") {
+                        showClearHistoryConfirm = true
+                    }
+                }
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Clear All User Data")
+                            .font(.callout)
+                        Text("Remove all bookmarks, highlights, notes, and history for this profile")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Clear All", role: .destructive) {
+                        showClearAllDataConfirm = true
+                    }
+                    .foregroundStyle(.red)
+                }
+            }
+
+            Section("About") {
+                LabeledContent("Version") {
+                    Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
+                        .foregroundStyle(.secondary)
+                }
+                LabeledContent("Build") {
+                    Text(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
         .padding()
+        .alert("Clear Reading History", isPresented: $showClearHistoryConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Clear", role: .destructive) {
+                store.clearHistory()
+            }
+        } message: {
+            Text("This will permanently delete all reading history. This cannot be undone.")
+        }
+        .alert("Clear All User Data", isPresented: $showClearAllDataConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Clear All", role: .destructive) {
+                store.clearAllUserData()
+            }
+        } message: {
+            Text("This will permanently delete all bookmarks, highlights, notes, and reading history for the current profile. This cannot be undone.")
+        }
     }
 }

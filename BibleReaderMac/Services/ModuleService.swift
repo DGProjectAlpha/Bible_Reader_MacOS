@@ -303,6 +303,19 @@ final class ModuleConnection {
             )
         }
     }
+
+    // MARK: - Single Verse Lookup (for context display)
+
+    /// Load a single verse's text by book/chapter/verse number. Returns nil if not found.
+    func loadSingleVerse(book: String, chapter: Int, verse: Int) throws -> String? {
+        let rows = try query(
+            "SELECT text FROM verses WHERE book = ?1 AND chapter = ?2 AND verse = ?3 LIMIT 1",
+            bindings: [book, chapter, verse]
+        ) { stmt in
+            Self.text(stmt, 0)
+        }
+        return rows.first
+    }
 }
 
 // MARK: - ModuleConnectionPool (thread-safe connection cache)
@@ -395,5 +408,10 @@ enum ModuleService {
     static func loadWordTagsForChapter(from filePath: String, book: String, chapter: Int) throws -> [String: [WordTag]] {
         let conn = try ModuleConnectionPool.shared.connection(for: filePath)
         return try conn.loadWordTagsForChapter(book: book, chapter: chapter)
+    }
+
+    static func loadSingleVerse(from filePath: String, book: String, chapter: Int, verse: Int) throws -> String? {
+        let conn = try ModuleConnectionPool.shared.connection(for: filePath)
+        return try conn.loadSingleVerse(book: book, chapter: chapter, verse: verse)
     }
 }

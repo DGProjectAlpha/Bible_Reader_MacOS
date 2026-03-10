@@ -18,6 +18,9 @@ enum BibleBooks {
         "3 John", "Jude", "Revelation"
     ]
 
+    static let oldTestament: [String] = Array(all[0..<39])
+    static let newTestament: [String] = Array(all[39..<66])
+
     static let chapterCounts: [String: Int] = [
         "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
         "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24,

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Module Metadata
 
@@ -234,7 +235,23 @@ struct Highlight: Identifiable, Codable, Hashable {
 
 enum HighlightColor: String, Codable, Hashable, CaseIterable {
     case yellow, green, blue, pink, purple
+
+    var displayColor: Color {
+        switch self {
+        case .yellow: return Color.yellow
+        case .green: return Color.green
+        case .blue: return Color.blue
+        case .pink: return Color.pink
+        case .purple: return Color.purple
+        }
+    }
+
+    var label: String {
+        rawValue.capitalized
+    }
 }
+
+
 
 // MARK: - Search
 

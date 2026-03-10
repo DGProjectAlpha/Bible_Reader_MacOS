@@ -7,23 +7,55 @@ struct ContentView: View {
     @State private var showImportSheet = false
     @State private var showManageTranslations = false
     @State private var isDragTargeted = false
+    @AppStorage("readerTheme") private var readerTheme: String = "auto"
+
+    private var resolvedColorScheme: ColorScheme? {
+        switch readerTheme {
+        case "light", "sepia": return .light
+        case "dark": return .dark
+        default: return nil // system
+        }
+    }
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(selection: $windowState.selectedSidebarItem)
+            SidebarView()
                 .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
                 .vibrancyBackground(material: .sidebar)
         } detail: {
-            detailView
+            ReaderView()
                 .vibrancyBackground(material: .contentBackground, blendingMode: .behindWindow)
+        }
+        .inspector(isPresented: $windowState.showInspector) {
+            InspectorPanelView()
+                .inspectorColumnWidth(min: 240, ideal: 280, max: 400)
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                // Import button
                 Button(action: { showImportSheet = true }) {
                     Label("Import", systemImage: "square.and.arrow.down")
                 }
                 .help("Import .brbmod module")
                 .keyboardShortcut("i", modifiers: [.command])
+
+                Divider()
+
+                // Inspector toggle buttons
+                Button(action: { windowState.toggleInspector(tab: .strongs) }) {
+                    Label("Strong's", systemImage: "textformat.abc")
+                }
+                .help("Toggle Strong's Concordance")
+
+                Button(action: { windowState.toggleInspector(tab: .crossRefs) }) {
+                    Label("Cross-Refs", systemImage: "link")
+                }
+                .help("Toggle Cross-References")
+
+                Button(action: { windowState.showSearchInspector() }) {
+                    Label("Search", systemImage: "magnifyingglass")
+                }
+                .help("Search (⌘F)")
             }
         }
         .sheet(isPresented: $showImportSheet) {
@@ -35,7 +67,7 @@ struct ContentView: View {
         .navigationTitle(windowState.windowTitle)
         .environmentObject(windowState)
         .onAppear {
-            // Restore last reading position for the first pane of this window
+            // Restore last reading position for the first pane
             if let pane = windowState.panes.first {
                 store.restoreLastPosition(into: pane)
                 if let firstTranslation = store.loadedTranslations.first,
@@ -82,6 +114,37 @@ struct ContentView: View {
                 pane.selectedTranslationId = store.loadedTranslations.first?.id ?? UUID()
             }
         }
+        // Cross-references: show in inspector instead of navigating sidebar
+        .onReceive(NotificationCenter.default.publisher(for: .showCrossReferences)) { notification in
+            if let verseId = notification.userInfo?["verseId"] as? String {
+                windowState.showCrossRefsInspector(verseId: verseId)
+            }
+        }
+        // Search: show in inspector
+        .onReceive(NotificationCenter.default.publisher(for: .globalSearch)) { _ in
+            windowState.showSearchInspector()
+        }
+        // Sidebar tab switching via Cmd+1/2/3
+        .onReceive(NotificationCenter.default.publisher(for: .switchSidebarTab)) { notification in
+            if let tab = notification.userInfo?["tab"] as? SidebarTab {
+                windowState.selectedSidebarTab = tab
+            }
+        }
+        // Toggle inspector tabs via keyboard shortcuts
+        .onReceive(NotificationCenter.default.publisher(for: .toggleStrongsInspector)) { _ in
+            windowState.toggleInspector(tab: .strongs)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleCrossRefsInspector)) { _ in
+            windowState.toggleInspector(tab: .crossRefs)
+        }
+        // Legacy: navigateToReader no longer needed (reader always visible), but handle gracefully
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToReader)) { _ in
+            // No-op: reader is always visible now
+        }
+        // Settings
+        .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        }
         // App-wide drag-and-drop for .brbmod files
         .onDrop(of: [.fileURL], isTargeted: $isDragTargeted) { providers in
             importHandler.handleDrop(providers: providers, store: store)
@@ -105,50 +168,13 @@ struct ContentView: View {
             }
         }
         .animation(.spring(duration: 0.3), value: importHandler.showResult)
+        .preferredColorScheme(resolvedColorScheme)
         .onReceive(NotificationCenter.default.publisher(for: .importModuleFile)) { notification in
             if let url = notification.object as? URL {
                 Task {
                     _ = await importHandler.importFile(at: url, into: store)
                 }
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToReader)) { _ in
-            windowState.selectedSidebarItem = .reader
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .showCrossReferences)) { notification in
-            windowState.selectedSidebarItem = .crossRefs
-            // Forward the verse ID to CrossReferenceView via a second notification
-            if let verseId = notification.userInfo?["verseId"] as? String {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    NotificationCenter.default.post(
-                        name: .crossRefLookup,
-                        object: nil,
-                        userInfo: ["verseId": verseId]
-                    )
-                }
-            }
-        }
-    }
-
-    // MARK: - Detail Router
-
-    @ViewBuilder
-    private var detailView: some View {
-        switch windowState.selectedSidebarItem {
-        case .reader, .none:
-            ReaderView()
-        case .search:
-            SearchView()
-        case .strongs:
-            StrongsLookupView()
-        case .bookmarks:
-            BookmarksView()
-        case .history:
-            HistoryView()
-        case .notes:
-            PlaceholderView(title: "Notes", icon: "note.text")
-        case .crossRefs:
-            CrossReferenceView()
         }
     }
 
@@ -209,6 +235,88 @@ struct ContentView: View {
         .glassPanel(cornerRadius: 10, material: .popover)
         .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
         .padding(.bottom, 20)
+    }
+}
+
+// MARK: - Inspector Panel View
+
+struct InspectorPanelView: View {
+    @EnvironmentObject var store: BibleStore
+    @EnvironmentObject var windowState: WindowState
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Tab picker
+            Picker("", selection: $windowState.inspectorTab) {
+                ForEach(InspectorTab.allCases, id: \.self) { tab in
+                    Label(tab.label, systemImage: tab.icon)
+                        .tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            Divider()
+
+            // Tab content
+            inspectorContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private var inspectorContent: some View {
+        switch windowState.inspectorTab {
+        case .strongs:
+            if let verseId = windowState.inspectorStrongsVerseId,
+               let filePath = windowState.inspectorStrongsFilePath {
+                StrongsSidebarView(
+                    verseRef: windowState.inspectorStrongsDisplayRef ?? verseId,
+                    verseId: verseId,
+                    translationFilePath: filePath,
+                    isVisible: $windowState.showInspector
+                )
+            } else {
+                inspectorPlaceholder(
+                    icon: "textformat.abc",
+                    title: "Strong's Concordance",
+                    message: "Tap a verse to see Strong's numbers"
+                )
+            }
+
+        case .crossRefs:
+            if let verseId = windowState.inspectorCrossRefVerseId {
+                CrossReferenceView(initialVerseId: verseId)
+            } else {
+                inspectorPlaceholder(
+                    icon: "link",
+                    title: "Cross-References",
+                    message: "Right-click a verse and select Cross-References"
+                )
+            }
+
+        case .search:
+            SearchView()
+        }
+    }
+
+    private func inspectorPlaceholder(icon: String, title: String, message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 36))
+                .foregroundStyle(.quaternary)
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(.tertiary)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.quaternary)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

@@ -11,6 +11,9 @@ struct CrossReferenceView: View {
     @State private var manualRefInput: String = ""
     @State private var navigationHistory: [String] = []  // stack of verse IDs
 
+    /// Optional initial verse ID to load on appear (used when embedded in inspector)
+    var initialVerseId: String? = nil
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -19,6 +22,16 @@ struct CrossReferenceView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .vibrancyBackground(material: .contentBackground, blendingMode: .behindWindow)
+        .onAppear {
+            if let verseId = initialVerseId, selectedVerseId == nil {
+                navigateToRef(verseId)
+            }
+        }
+        .onChange(of: initialVerseId) { newId in
+            if let verseId = newId {
+                navigateToRef(verseId)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .crossRefLookup)) { notification in
             if let verseId = notification.userInfo?["verseId"] as? String {
                 navigateToRef(verseId)
@@ -349,10 +362,4 @@ struct CrossReferenceView: View {
         guard let resolvedBook = bookName else { return nil }
         return "\(resolvedBook):\(chapter):\(verse)"
     }
-}
-
-// MARK: - Notification for verse navigation
-
-extension Notification.Name {
-    static let navigateToVerse = Notification.Name("navigateToVerse")
 }

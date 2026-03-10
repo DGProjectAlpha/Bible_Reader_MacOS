@@ -27,6 +27,7 @@ class BibleStore: ObservableObject {
     @Published var loadedTranslations: [Translation] = []
     @Published var bookmarks: [Bookmark] = []
     @Published var notes: [Note] = []
+    @Published var highlights: [Highlight] = []
     @Published var readingHistory: [ReadingHistoryEntry] = []
     @Published var searchResults: [SearchResult] = []
 
@@ -42,6 +43,8 @@ class BibleStore: ObservableObject {
         moduleManager.scanModules()
         loadedTranslations = moduleManager.loadTranslations()
         bookmarks = userDataService.loadBookmarks()
+        highlights = userDataService.loadHighlights()
+        notes = userDataService.loadNotes()
         readingHistory = userDataService.loadHistory()
     }
 
@@ -93,6 +96,50 @@ class BibleStore: ObservableObject {
 
     func bookmarkFor(verseId: String, translationId: UUID) -> Bookmark? {
         bookmarks.first { $0.verseId == verseId && $0.translationId == translationId }
+    }
+
+    // MARK: - Highlights
+
+    func setHighlight(verseId: String, translationId: UUID, color: HighlightColor) {
+        // Remove existing highlight for this verse if any
+        highlights.removeAll { $0.verseId == verseId && $0.translationId == translationId }
+        let highlight = Highlight(verseId: verseId, translationId: translationId, color: color)
+        userDataService.insertHighlight(highlight)
+        highlights.append(highlight)
+    }
+
+    func removeHighlight(verseId: String, translationId: UUID) {
+        userDataService.deleteHighlight(verseId: verseId, translationId: translationId)
+        highlights.removeAll { $0.verseId == verseId && $0.translationId == translationId }
+    }
+
+    func highlightFor(verseId: String, translationId: UUID) -> Highlight? {
+        highlights.first { $0.verseId == verseId && $0.translationId == translationId }
+    }
+
+    // MARK: - Notes
+
+    func addNote(verseId: String, translationId: UUID, content: String) {
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        // Update existing note if present
+        if let idx = notes.firstIndex(where: { $0.verseId == verseId && $0.translationId == translationId }) {
+            notes[idx].content = content
+            notes[idx].updatedAt = Date()
+            userDataService.updateNote(id: notes[idx].id, content: content)
+        } else {
+            let note = Note(verseId: verseId, translationId: translationId, content: content)
+            userDataService.insertNote(note)
+            notes.insert(note, at: 0)
+        }
+    }
+
+    func removeNote(_ id: UUID) {
+        userDataService.deleteNote(id)
+        notes.removeAll { $0.id == id }
+    }
+
+    func noteFor(verseId: String, translationId: UUID) -> Note? {
+        notes.first { $0.verseId == verseId && $0.translationId == translationId }
     }
 
     // MARK: - Reading History
@@ -260,5 +307,35 @@ class BibleStore: ObservableObject {
     func moduleInfo(for translationId: UUID) -> CachedModuleInfo? {
         guard let translation = loadedTranslations.first(where: { $0.id == translationId }) else { return nil }
         return moduleManager.getCachedInfo(for: translation.filePath)
+    }
+
+    // MARK: - Profile Management
+
+    /// Switch to a different profile — reloads all profile-scoped data.
+    func switchProfile(to profileName: String) {
+        userDataService.setActiveProfile(profileName)
+        reloadUserData()
+    }
+
+    /// Delete all data for a given profile.
+    func deleteProfileData(_ profileName: String) {
+        userDataService.deleteProfileData(profileName)
+    }
+
+    /// Clear all user data (bookmarks, highlights, notes, history) for the current profile.
+    func clearAllUserData() {
+        userDataService.clearBookmarks()
+        userDataService.clearHighlights()
+        userDataService.clearNotes()
+        userDataService.clearHistory()
+        reloadUserData()
+    }
+
+    /// Reload all user data from the database into memory.
+    private func reloadUserData() {
+        bookmarks = userDataService.loadBookmarks()
+        highlights = userDataService.loadHighlights()
+        notes = userDataService.loadNotes()
+        readingHistory = userDataService.loadHistory()
     }
 }

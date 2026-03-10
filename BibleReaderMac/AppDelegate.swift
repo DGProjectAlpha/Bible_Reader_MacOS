@@ -76,11 +76,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func registerDefaults() {
         let defaults: [String: Any] = [
             "fontSize": 15.0,
-            "lineSpacing": 4.0,
+            "lineSpacing": 1.3,
             "wordSpacing": 0.0,
             "versesPerLine": false,
             "showVerseNumbers": true,
-            "windowRestoration": true
+            "windowRestoration": true,
+            "syncScrolling": true,
+            "restoreLastPosition": true,
+            "activeProfile": "Default",
+            "profileList": "Default",
+            "readerTheme": "auto",
+            "accentColorName": "blue",
+            "verseHighlightOpacity": 0.12,
+            "showChapterTitles": true,
+            "fontFamily": "System",
+            "verseNumberStyle": "superscript",
+            "paragraphMode": false
         ]
         UserDefaults.standard.register(defaults: defaults)
     }
