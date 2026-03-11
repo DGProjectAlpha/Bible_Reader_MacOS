@@ -206,16 +206,26 @@ final class ModuleConnection {
     func loadWordTags(verseId: String) throws -> [WordTag] {
         guard try tableExists("word_tags") else { return [] }
 
-        return try query(
+        let rows = try query(
             "SELECT word_index, word, strongs_number FROM word_tags WHERE verse_id = ?1 AND strongs_number IS NOT NULL ORDER BY word_index",
             bindings: [verseId]
         ) { stmt in
-            WordTag(
-                wordIndex: Self.int(stmt, 0),
-                word: Self.text(stmt, 1),
-                strongsNumbers: [Self.text(stmt, 2)]
-            )
+            (wordIndex: Self.int(stmt, 0), word: Self.text(stmt, 1), strongsNumber: Self.text(stmt, 2))
         }
+
+        // Merge multiple Strong's numbers for the same word_index (compound words)
+        var result: [WordTag] = []
+        for row in rows {
+            if let lastIdx = result.indices.last, result[lastIdx].wordIndex == row.wordIndex {
+                var existing = result[lastIdx]
+                var numbers = existing.strongsNumbers
+                numbers.append(row.strongsNumber)
+                result[lastIdx] = WordTag(wordIndex: existing.wordIndex, word: existing.word, strongsNumbers: numbers)
+            } else {
+                result.append(WordTag(wordIndex: row.wordIndex, word: row.word, strongsNumbers: [row.strongsNumber]))
+            }
+        }
+        return result
     }
 
     /// Batch word tags for all verses in a chapter.

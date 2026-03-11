@@ -127,8 +127,9 @@ struct ContentView: View {
     private func handleOnAppear() {
         if let pane = windowState.panes.first {
             store.restoreLastPosition(into: pane)
+            // If pane's translation ID doesn't match any loaded translation, assign the first one
             if let firstTranslation = store.loadedTranslations.first,
-               pane.selectedTranslationId == ReaderPane().selectedTranslationId {
+               !store.loadedTranslations.contains(where: { $0.id == pane.selectedTranslationId }) {
                 pane.selectedTranslationId = firstTranslation.id
             }
             store.loadVerses(for: pane)
@@ -410,7 +411,8 @@ struct InspectorPanelView: View {
                     verseRef: windowState.inspectorStrongsDisplayRef ?? verseId,
                     verseId: verseId,
                     translationFilePath: filePath,
-                    isVisible: $windowState.showInspector
+                    isVisible: $windowState.showInspector,
+                    initialWordIndex: windowState.inspectorStrongsWordIndex
                 )
             } else {
                 inspectorPlaceholder(

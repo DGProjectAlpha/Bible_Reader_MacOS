@@ -174,8 +174,9 @@ enum StrongsService {
         let isHebrew = number.hasPrefix("H")
         let filename = isHebrew ? "strongs-hebrew" : "strongs-greek"
 
-        guard let url = Bundle.main.url(forResource: filename, withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
+        let url: URL? = Bundle.main.url(forResource: filename, withExtension: "json")
+            ?? Bundle.main.url(forResource: filename, withExtension: "json", subdirectory: "BundledModules")
+        guard let url, let data = try? Data(contentsOf: url) else {
             return nil
         }
 

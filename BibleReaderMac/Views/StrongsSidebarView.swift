@@ -10,6 +10,7 @@ struct StrongsSidebarView: View {
     let verseId: String           // e.g. "Genesis:1:1"
     let translationFilePath: String
     @Binding var isVisible: Bool
+    var initialWordIndex: Int?    // auto-expand this word when loaded
 
     @State private var resolvedTags: [ResolvedWordTag] = []
     @State private var isLoading = false
@@ -34,6 +35,16 @@ struct StrongsSidebarView: View {
         .vibrancyBackground(material: .sidebar)
         .onAppear { loadStrongsData() }
         .onChange(of: verseId) { loadStrongsData() }
+        .onChange(of: initialWordIndex) {
+            // User tapped a different word in the same verse — just expand it
+            if let idx = initialWordIndex,
+               let match = resolvedTags.first(where: { $0.wordTag.wordIndex == idx }),
+               let num = match.strongsNumbers.first {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    expandedEntry = num
+                }
+            }
+        }
     }
 
     // MARK: - Header
@@ -143,6 +154,7 @@ struct StrongsSidebarView: View {
         isLoading = true
         expandedEntry = nil
         searchText = ""
+        let targetWordIndex = initialWordIndex
 
         DispatchQueue.global(qos: .userInitiated).async {
             let tags = StrongsService.entriesForVerse(
@@ -153,6 +165,12 @@ struct StrongsSidebarView: View {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     resolvedTags = tags
                     isLoading = false
+                    // Auto-expand the tapped word
+                    if let idx = targetWordIndex,
+                       let match = tags.first(where: { $0.wordTag.wordIndex == idx }),
+                       let num = match.strongsNumbers.first {
+                        expandedEntry = num
+                    }
                 }
             }
         }

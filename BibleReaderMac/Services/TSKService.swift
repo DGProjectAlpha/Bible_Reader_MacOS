@@ -12,7 +12,10 @@ enum TSKService {
     /// Load TSK data from the bundled JSON file. Safe to call multiple times.
     static func loadIfNeeded() {
         guard !loaded else { return }
-        guard let url = Bundle.main.url(forResource: "tskCrossRefs", withExtension: "json") else {
+        // Try top-level bundle first, then BundledModules subdirectory (folder reference)
+        let url = Bundle.main.url(forResource: "tskCrossRefs", withExtension: "json")
+            ?? Bundle.main.url(forResource: "tskCrossRefs", withExtension: "json", subdirectory: "BundledModules")
+        guard let url else {
             print("[TSK] tskCrossRefs.json not found in bundle")
             loaded = true
             return

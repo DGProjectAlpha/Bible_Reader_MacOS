@@ -59,6 +59,13 @@ enum SidebarItem: Hashable {
     case crossRefs
 }
 
+// MARK: - Split Direction
+
+enum SplitDirection {
+    case horizontal  // split right
+    case vertical    // split down
+}
+
 /// Per-window state — each window gets its own instance with independent
 /// panes, sidebar selection, and navigation. The shared BibleStore holds
 /// global data (translations, bookmarks, history).
@@ -80,6 +87,7 @@ class WindowState: ObservableObject {
     @Published var inspectorStrongsVerseId: String?
     @Published var inspectorStrongsFilePath: String?
     @Published var inspectorStrongsDisplayRef: String?
+    @Published var inspectorStrongsWordIndex: Int?  // auto-expand this word in sidebar
 
     // Cross-refs context passed from verse number click
     @Published var inspectorCrossRefVerseId: String?
@@ -108,10 +116,11 @@ class WindowState: ObservableObject {
 
     // MARK: - Inspector Helpers
 
-    func showStrongsInspector(verseId: String, displayRef: String, filePath: String) {
+    func showStrongsInspector(verseId: String, displayRef: String, filePath: String, wordIndex: Int? = nil) {
         inspectorStrongsVerseId = verseId
         inspectorStrongsDisplayRef = displayRef
         inspectorStrongsFilePath = filePath
+        inspectorStrongsWordIndex = wordIndex
         inspectorTab = .strongs
         showInspector = true
     }
@@ -154,6 +163,30 @@ class WindowState: ObservableObject {
             pane.selectedTranslationId = tId
         }
         panes.append(pane)
+        observePaneChanges()
+    }
+
+    /// Split a specific pane — inserts a new pane adjacent to the source pane.
+    /// The direction is stored for future layout use; currently the new pane
+    /// is inserted immediately after the source pane in the array.
+    func splitPane(_ sourcePaneId: UUID, direction: SplitDirection, translationId: UUID? = nil) {
+        guard panes.count < 8 else { return }
+        let newPane = ReaderPane()
+        // Copy the source pane's current book/chapter/translation to the new pane
+        if let source = panes.first(where: { $0.id == sourcePaneId }) {
+            newPane.selectedBook = source.selectedBook
+            newPane.selectedChapter = source.selectedChapter
+            newPane.selectedTranslationId = translationId ?? source.selectedTranslationId
+            newPane.versificationScheme = source.versificationScheme
+        } else if let tId = translationId {
+            newPane.selectedTranslationId = tId
+        }
+        // Insert right after the source pane
+        if let idx = panes.firstIndex(where: { $0.id == sourcePaneId }) {
+            panes.insert(newPane, at: idx + 1)
+        } else {
+            panes.append(newPane)
+        }
         observePaneChanges()
     }
 

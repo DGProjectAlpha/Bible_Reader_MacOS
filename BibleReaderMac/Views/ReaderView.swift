@@ -32,14 +32,7 @@ struct ReaderView: View {
                 }
                 .help(syncScrolling ? "Scroll syncing enabled" : "Scroll syncing disabled")
 
-                if windowState.panes.count < 8 {
-                    Button(action: {
-                        windowState.addPane(translationId: store.loadedTranslations.first?.id)
-                    }) {
-                        Label("Add Pane", systemImage: "plus.rectangle.on.rectangle")
-                    }
-                    .help("Add parallel translation pane")
-                }
+                // Per-pane split buttons are in the pane headers (like Windows version)
             }
         }
         // Handle cross-reference navigation: jump reader to a specific verse
@@ -255,6 +248,9 @@ struct ReaderPaneView: View {
     @State private var visibleVerseNumbers: Set<Int> = []
     @State private var noteEditingVerse: Verse?
     @State private var noteEditText: String = ""
+    /// When true, the onChange(of: selectedBook) handler skips resetting chapter to 1.
+    /// Used by prevChapter/nextChapter when crossing book boundaries.
+    @State private var suppressBookChangeReset = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -277,12 +273,18 @@ struct ReaderPaneView: View {
             loadCurrentChapter()
         }
         .onChange(of: pane.selectedBook) {
+            if suppressBookChangeReset {
+                suppressBookChangeReset = false
+                // Don't load yet — prevChapter() will set the chapter next,
+                // and onChange(of: selectedChapter) will trigger the load.
+                return
+            }
             pane.selectedChapter = 1
             loadCurrentChapter()
             if syncScrolling {
                 coordinator.reportNavigation(
                     book: pane.selectedBook,
-                    chapter: 1,
+                    chapter: pane.selectedChapter,
                     from: pane.id
                 )
             }
@@ -428,6 +430,34 @@ struct ReaderPaneView: View {
                     .help("Increase font size")
                 }
 
+                // Split pane buttons (per-pane, like Windows version)
+                if windowState.panes.count < 8 {
+                    Divider().frame(height: 20)
+                    Button(action: {
+                        windowState.splitPane(pane.id, direction: .horizontal)
+                    }) {
+                        Image(systemName: "rectangle.split.2x1")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 22, height: 22)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Split right")
+
+                    Button(action: {
+                        windowState.splitPane(pane.id, direction: .vertical)
+                    }) {
+                        Image(systemName: "rectangle.split.1x2")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 22, height: 22)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Split down")
+                }
+
                 // Close pane button
                 if !isSolo {
                     Divider().frame(height: 20)
@@ -514,7 +544,8 @@ struct ReaderPaneView: View {
                                     windowState.showStrongsInspector(
                                         verseId: verse.id,
                                         displayRef: displayRef,
-                                        filePath: translation.filePath
+                                        filePath: translation.filePath,
+                                        wordIndex: wordTag.wordIndex
                                     )
                                 }
                             )
@@ -743,9 +774,20 @@ struct ReaderPaneView: View {
             // Go to previous book's last chapter
             if let idx = BibleBooks.all.firstIndex(of: pane.selectedBook), idx > 0 {
                 let prevBook = BibleBooks.all[idx - 1]
-                pane.selectedBook = prevBook
-                pane.selectedChapter = pane.chapterCount
-                loadCurrentChapter()
+                let lastChapter = VersificationService.shared.chapterCount(
+                    book: prevBook,
+                    scheme: VersificationScheme.from(pane.versificationScheme)
+                )
+                if lastChapter == pane.selectedChapter {
+                    // Chapter value won't change, so onChange won't fire.
+                    // Update book directly and load manually.
+                    pane.selectedBook = prevBook
+                    loadCurrentChapter()
+                } else {
+                    suppressBookChangeReset = true
+                    pane.selectedBook = prevBook
+                    pane.selectedChapter = lastChapter
+                }
             }
         }
     }
@@ -754,12 +796,11 @@ struct ReaderPaneView: View {
         if pane.selectedChapter < pane.chapterCount {
             pane.selectedChapter += 1
         } else {
-            // Go to next book's first chapter
+            // Go to next book's first chapter — chapter 1 is the default in onChange,
+            // so no need to suppress the reset
             if let idx = BibleBooks.all.firstIndex(of: pane.selectedBook),
                idx < BibleBooks.all.count - 1 {
                 pane.selectedBook = BibleBooks.all[idx + 1]
-                pane.selectedChapter = 1
-                loadCurrentChapter()
             }
         }
     }
