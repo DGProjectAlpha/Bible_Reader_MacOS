@@ -160,30 +160,42 @@ enum StrongsService {
 
         guard !verseIds.isEmpty else { return [] }
 
-        // Batch load verse text
-        var results: [VerseReference] = []
+        // Parse verse IDs into components
+        struct ParsedRef {
+            let verseId: String
+            let book: String
+            let chapter: Int
+            let verse: Int
+        }
+        var parsed: [ParsedRef] = []
         for vid in verseIds {
             let parts = vid.split(separator: ":")
             guard parts.count >= 3,
                   let chapter = Int(parts[parts.count - 2]),
                   let verse = Int(parts[parts.count - 1]) else { continue }
             let book = parts.dropLast(2).joined(separator: ":")
-
-            let texts = (try? conn.query(
-                "SELECT text FROM verses WHERE book = ?1 AND chapter = ?2 AND verse = ?3 LIMIT 1",
-                bindings: [book, chapter, verse]
-            ) { stmt in
-                ModuleConnection.text(stmt, 0)
-            }) ?? []
-
-            results.append(VerseReference(
-                book: book,
-                chapter: chapter,
-                verse: verse,
-                text: texts.first ?? ""
-            ))
+            parsed.append(ParsedRef(verseId: vid, book: book, chapter: chapter, verse: verse))
         }
-        return results
+        guard !parsed.isEmpty else { return [] }
+
+        // Batch load all verse texts with a single IN query instead of N individual queries
+        let placeholders = parsed.enumerated().map { "?\($0.offset + 1)" }.joined(separator: ",")
+        let textRows = (try? conn.query(
+            "SELECT verse_id, text FROM verses WHERE verse_id IN (\(placeholders))",
+            bindings: parsed.map { $0.verseId }
+        ) { stmt in
+            (ModuleConnection.text(stmt, 0), ModuleConnection.text(stmt, 1))
+        }) ?? []
+        let textByVerseId = Dictionary(textRows, uniquingKeysWith: { first, _ in first })
+
+        return parsed.map { ref in
+            VerseReference(
+                book: ref.book,
+                chapter: ref.chapter,
+                verse: ref.verse,
+                text: textByVerseId[ref.verseId] ?? ""
+            )
+        }
     }
 
     // MARK: - Similar Entries (Reverse Index)
@@ -267,7 +279,8 @@ enum StrongsService {
         }
 
         let exact = candidates[bestIdx]
-        let similar = candidates.enumerated().compactMap { $0.offset != bestIdx ? $0.element : nil }
+        var similar = candidates
+        similar.remove(at: bestIdx)
         return (exact, similar)
     }
 

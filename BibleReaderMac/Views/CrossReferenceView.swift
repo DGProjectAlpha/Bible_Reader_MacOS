@@ -16,6 +16,7 @@ struct TSKDisplayRef: Identifiable {
 
 struct CrossReferenceView: View {
     @EnvironmentObject var store: BibleStore
+    @EnvironmentObject var windowState: WindowState
     @State private var tskRefs: [TSKDisplayRef] = []
     @State private var isLoading = false
     @State private var selectedVerseId: String?
@@ -71,6 +72,20 @@ struct CrossReferenceView: View {
                     .buttonStyle(.borderless)
                     .help("Go back to previous verse")
                 }
+
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        windowState.showInspector = false
+                    }
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.borderless)
+                .help("Close cross-references panel")
             }
 
             // Current verse display

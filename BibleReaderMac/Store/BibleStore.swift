@@ -91,8 +91,8 @@ class BibleStore: ObservableObject {
     // MARK: - Bookmarks
 
     func addBookmark(verseId: String, translationId: UUID, label: String? = nil) {
-        // Don't duplicate
-        guard !bookmarks.contains(where: { $0.verseId == verseId && $0.translationId == translationId }) else { return }
+        // Don't duplicate — O(1) via index Set
+        guard !isBookmarked(verseId: verseId, translationId: translationId) else { return }
         let bookmark = Bookmark(verseId: verseId, translationId: translationId, label: label)
         userDataService.insertBookmark(bookmark)
         bookmarks.insert(bookmark, at: 0)

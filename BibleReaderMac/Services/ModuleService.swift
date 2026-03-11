@@ -310,11 +310,15 @@ final class ModuleConnection {
         case .bible:
             break
         case .ot:
-            let otBooks = BibleBooks.oldTestament.map { "'\($0)'" }.joined(separator: ",")
-            sql += " AND book IN (\(otBooks))"
+            let otPlaceholders = BibleBooks.oldTestament.enumerated()
+                .map { "?\($0.offset + 2)" }.joined(separator: ",")
+            sql += " AND book IN (\(otPlaceholders))"
+            bindings += BibleBooks.oldTestament as [Any]
         case .nt:
-            let ntBooks = BibleBooks.newTestament.map { "'\($0)'" }.joined(separator: ",")
-            sql += " AND book IN (\(ntBooks))"
+            let ntPlaceholders = BibleBooks.newTestament.enumerated()
+                .map { "?\($0.offset + 2)" }.joined(separator: ",")
+            sql += " AND book IN (\(ntPlaceholders))"
+            bindings += BibleBooks.newTestament as [Any]
         case .book:
             if let book = currentBook {
                 sql += " AND book = ?2"

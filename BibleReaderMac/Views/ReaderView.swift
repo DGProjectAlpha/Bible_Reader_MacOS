@@ -94,8 +94,21 @@ struct ReaderView: View {
             guard let userInfo = notification.userInfo,
                   let book = userInfo["book"] as? String,
                   let chapter = userInfo["chapter"] as? Int,
-                  let verse = userInfo["verse"] as? Int,
-                  let pane = windowState.panes.first else { return }
+                  let verse = userInfo["verse"] as? Int else { return }
+
+            // Target: last active pane, or add a new pane if under limit, or fall back to first
+            let pane: ReaderPane
+            if let activeId = windowState.lastActivePaneId,
+               let activePane = windowState.panes.first(where: { $0.id == activeId }) {
+                pane = activePane
+            } else if windowState.panes.count < 8 {
+                windowState.addPane(translationId: windowState.panes.first?.selectedTranslationId)
+                guard let newPane = windowState.panes.last else { return }
+                pane = newPane
+            } else {
+                guard let firstPane = windowState.panes.first else { return }
+                pane = firstPane
+            }
 
             pane.selectedBook = book
             pane.selectedChapter = chapter
@@ -160,9 +173,9 @@ struct ReaderView: View {
         if let bottom = column.bottom {
             VSplitView {
                 paneView(column.top)
-                    .frame(minHeight: 100)
+                    .frame(minHeight: 100, idealHeight: .infinity, maxHeight: .infinity)
                 paneView(bottom)
-                    .frame(minHeight: 100)
+                    .frame(minHeight: 100, idealHeight: .infinity, maxHeight: .infinity)
             }
         } else {
             paneView(column.top)
@@ -250,7 +263,7 @@ struct ReaderView: View {
             syncScrolling: $syncScrolling,
             coordinator: syncCoordinator
         )
-        .frame(minWidth: 200)
+        .frame(minWidth: 200, idealWidth: .infinity, maxWidth: .infinity)
     }
 
     // MARK: - Empty State
@@ -714,6 +727,7 @@ struct ReaderPaneView: View {
                                 },
                                 onVerseNumberTap: {
                                     // Verse number click → show cross-refs in inspector
+                                    windowState.lastActivePaneId = pane.id
                                     windowState.showCrossRefsInspector(verseId: verse.id)
                                 },
                                 onWordTap: { wordTag in
@@ -721,6 +735,7 @@ struct ReaderPaneView: View {
                                     guard let wordTag = wordTag,
                                           let translation = currentTranslation else { return }
                                     let displayRef = "\(pane.selectedBook) \(pane.selectedChapter):\(verse.number)"
+                                    windowState.lastActivePaneId = pane.id
                                     windowState.showStrongsInspector(
                                         verseId: verse.id,
                                         displayRef: displayRef,
@@ -1087,8 +1102,8 @@ struct VerseRow: View {
                 .transition(.opacity)
             }
 
-            // Highlight button
-            if showActionButtons || highlightColor != nil {
+            // Highlight button — always rendered when picker is open to prevent popover dismissal
+            if showActionButtons || highlightColor != nil || showHighlightPicker {
                 Button(action: { showHighlightPicker.toggle() }) {
                     Image(systemName: highlightColor != nil ? "paintbrush.fill" : "paintbrush")
                         .font(.system(size: 12))
@@ -1120,7 +1135,7 @@ struct VerseRow: View {
                 .transition(.opacity)
             }
         }
-        .opacity(showActionButtons || isBookmarked || highlightColor != nil || hasNote ? 1 : 0)
+        .opacity(showActionButtons || isBookmarked || highlightColor != nil || hasNote || showHighlightPicker ? 1 : 0)
     }
 
     // MARK: - Verse Number Button

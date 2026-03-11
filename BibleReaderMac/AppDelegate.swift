@@ -19,8 +19,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Flush UserDefaults
-        UserDefaults.standard.synchronize()
         print("[AppDelegate] Application terminating — state saved")
     }
 
@@ -36,13 +34,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
-        // If no windows visible, create a new one via menu action
-        let visibleWindows = NSApplication.shared.windows.filter { $0.isVisible && !$0.isMiniaturized }
-        if visibleWindows.isEmpty {
-            // Bring any existing window forward, or the system will show the last one
-            if let window = NSApplication.shared.windows.first {
-                window.makeKeyAndOrderFront(nil)
-            }
+        // If no windows visible, bring the first window forward
+        if !NSApplication.shared.windows.contains(where: { $0.isVisible && !$0.isMiniaturized }),
+           let window = NSApplication.shared.windows.first {
+            window.makeKeyAndOrderFront(nil)
         }
     }
 

@@ -13,17 +13,21 @@ class UserDataService {
     /// The active profile name — all reads/writes are scoped to this.
     private(set) var activeProfile: String = "Default"
 
-    private var dataDirectory: URL {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("BibleReaderMac", isDirectory: true)
-        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }
+    /// Computed once at init; directory is created then, not on every access.
+    private let dataDirectory: URL
+
+    /// In-memory cache of the last inserted history entry — avoids a DB round-trip for dedup checks.
+    private var lastHistoryEntry: ReadingHistoryEntry?
 
     private var bookmarksURL: URL { dataDirectory.appendingPathComponent("bookmarks.json") }
     private var dbURL: URL { dataDirectory.appendingPathComponent("userdata.sqlite") }
 
     init() {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("BibleReaderMac", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        dataDirectory = dir
+
         // Restore active profile from UserDefaults
         activeProfile = UserDefaults.standard.string(forKey: "activeProfile") ?? "Default"
         openDatabase()
@@ -360,13 +364,9 @@ class UserDataService {
                 verseId: verseId,
                 translationId: UUID(uuidString: transIdStr) ?? UUID(),
                 content: content,
-                createdAt: createdAt
+                createdAt: createdAt,
+                updatedAt: updatedAt
             ))
-            // Fix updatedAt after init
-            if var last = results.last {
-                last.updatedAt = updatedAt
-                results[results.count - 1] = last
-            }
         }
         return results
     }
@@ -394,6 +394,7 @@ class UserDataService {
         sqlite3_bind_text(stmt, 7, activeProfile, -1, SQLITE_TRANSIENT)
 
         sqlite3_step(stmt)
+        lastHistoryEntry = entry
     }
 
     func loadHistory(limit: Int = 500) -> [ReadingHistoryEntry] {
@@ -429,7 +430,7 @@ class UserDataService {
 
     /// Get the most recent history entry (last viewed position).
     func lastViewedPosition() -> ReadingHistoryEntry? {
-        return loadHistory(limit: 1).first
+        return lastHistoryEntry ?? loadHistory(limit: 1).first
     }
 
     func clearHistory() {
@@ -440,6 +441,7 @@ class UserDataService {
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_text(stmt, 1, activeProfile, -1, SQLITE_TRANSIENT)
         sqlite3_step(stmt)
+        lastHistoryEntry = nil
     }
 
     /// Trim history to keep only the most recent N entries for the active profile.
@@ -467,6 +469,7 @@ class UserDataService {
     /// Switch active profile. All subsequent reads/writes will use this profile.
     func setActiveProfile(_ name: String) {
         activeProfile = name
+        lastHistoryEntry = nil
         UserDefaults.standard.set(name, forKey: "activeProfile")
     }
 

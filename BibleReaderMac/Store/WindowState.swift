@@ -96,6 +96,9 @@ class WindowState: ObservableObject {
     @Published var showSearchPanel: Bool = false
     @Published var searchQuery: String = ""
 
+    // Tracks which pane was most recently interacted with (for cross-ref / verse navigation target)
+    @Published var lastActivePaneId: UUID?
+
     private var titleCancellables = Set<AnyCancellable>()
 
     init() {

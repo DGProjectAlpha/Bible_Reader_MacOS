@@ -300,7 +300,7 @@ struct StrongsSidebarView: View {
                 Divider()
 
                 HStack(spacing: 6) {
-                    sectionLabel("Similar Numbers")
+                    sectionLabel("Other Words Translated \"\(focusedWord.isEmpty ? "the same" : focusedWord)\"")
                     Rectangle()
                         .frame(height: 1)
                         .foregroundStyle(.quaternary)
@@ -683,22 +683,24 @@ struct StrongsSidebarView: View {
         let fp = translationFilePath
         let num = focusedNumber
         DispatchQueue.global(qos: .userInitiated).async {
-            // Use Windows-style definition matching: find entries whose kjv_def
-            // shares words with the selected entry's kjv_def
-            let definitionMatches = StrongsService.findSimilarByDefinition(
-                number: num, filePath: fp, limit: 15
-            )
-            // Fall back to word-based search if definition matching yields nothing
-            if definitionMatches.isEmpty {
-                let result = StrongsService.searchSimilar(word: word, filePath: fp)
+            // Primary: word-based reverse-index search — finds other Strong's numbers
+            // that share the same English KJV word as the clicked word.
+            let wordResult = StrongsService.searchSimilar(word: word, filePath: fp)
+
+            if wordResult.exact != nil || !wordResult.similar.isEmpty {
+                // Word-based results available — use them
                 DispatchQueue.main.async {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        similarExact = result.exact
-                        similarEntries = result.similar
+                        similarExact = wordResult.exact
+                        similarEntries = wordResult.similar
                         isLoadingSimilar = false
                     }
                 }
             } else {
+                // Fall back to definition-based matching if no word-based results
+                let definitionMatches = StrongsService.findSimilarByDefinition(
+                    number: num, filePath: fp, limit: 15
+                )
                 DispatchQueue.main.async {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         similarExact = nil

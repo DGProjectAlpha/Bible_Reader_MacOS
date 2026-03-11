@@ -206,13 +206,13 @@ struct Note: Identifiable, Codable, Hashable {
     let createdAt: Date
     var updatedAt: Date
 
-    init(id: UUID = UUID(), verseId: String, translationId: UUID, content: String, createdAt: Date = Date()) {
+    init(id: UUID = UUID(), verseId: String, translationId: UUID, content: String, createdAt: Date = Date(), updatedAt: Date? = nil) {
         self.id = id
         self.verseId = verseId
         self.translationId = translationId
         self.content = content
         self.createdAt = createdAt
-        self.updatedAt = createdAt
+        self.updatedAt = updatedAt ?? createdAt
     }
 }
 
