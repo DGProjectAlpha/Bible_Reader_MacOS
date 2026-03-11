@@ -74,7 +74,8 @@ struct ContentView: View {
             // Overlay sidebar
             if windowState.showSidebar {
                 SidebarView()
-                    .frame(width: 280, maxHeight: .infinity)
+                    .frame(width: 280)
+                    .frame(maxHeight: .infinity)
                     .vibrancyBackground(material: .sidebar)
                     .shadow(color: .black.opacity(0.2), radius: 8, x: 2, y: 0)
                     .transition(.move(edge: .leading))
