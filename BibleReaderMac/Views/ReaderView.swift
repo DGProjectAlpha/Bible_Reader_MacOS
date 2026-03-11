@@ -263,11 +263,11 @@ struct ReaderView: View {
             Text("No Translations Loaded")
                 .font(.title2.weight(.medium))
                 .foregroundStyle(.secondary)
-            Text("Import a .brbmod module to start reading.")
+            Text("Import a module from Settings to start reading.")
                 .font(.callout)
                 .foregroundStyle(.tertiary)
-            Button("Import Module...") {
-                NotificationCenter.default.post(name: .importModule, object: nil)
+            Button("Open Settings...") {
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
             }
             .controlSize(.large)
             .buttonStyle(.borderedProminent)
@@ -406,7 +406,7 @@ struct ReaderPaneView: View {
     @AppStorage("wordSpacing") private var wordSpacing: Double = 0.0
     @AppStorage("verseNumberStyle") private var verseNumberStyle: String = "superscript"
     @AppStorage("paragraphMode") private var paragraphMode: Bool = false
-    @AppStorage("verseHighlightOpacity") private var verseHighlightOpacity: Double = 0.12
+    @AppStorage("verseHighlightOpacity") private var verseHighlightOpacity: Double = 0.3
     @AppStorage("showChapterTitles") private var showChapterTitles: Bool = true
     @AppStorage("readerTheme") private var readerTheme: String = "auto"
     @AppStorage("textColorHex") private var textColorHex: String = ""
@@ -996,7 +996,7 @@ struct VerseRow: View {
     var lineSpacingMultiplier: CGFloat = 1.3
     var wordSpacing: CGFloat = 0.0
     var verseNumberStyle: String = "superscript"
-    var highlightOpacity: Double = 0.12
+    var highlightOpacity: Double = 0.3
     var isHovered: Bool = false
     var isSelected: Bool = false
     var isBookmarked: Bool = false
@@ -1393,16 +1393,15 @@ struct HighlightColorPicker: View {
                 .help(color.label)
             }
 
-            if currentColor != nil {
-                Divider().frame(height: 24)
-                Button(action: { onSelect(nil) }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Remove highlight")
+            Divider().frame(height: 24)
+            Button(action: { onSelect(nil) }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(currentColor != nil ? .red.opacity(0.7) : .secondary.opacity(0.4))
             }
+            .buttonStyle(.plain)
+            .help("Remove highlight")
+            .disabled(currentColor == nil)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

@@ -129,14 +129,6 @@ struct SidebarView: View {
             }
 
             Button(action: {
-                NotificationCenter.default.post(name: .importModule, object: nil)
-            }) {
-                Label("Import Module...", systemImage: "plus.circle")
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(Color.accentColor)
-
-            Button(action: {
                 NotificationCenter.default.post(name: .manageTranslations, object: nil)
             }) {
                 Label("Manage...", systemImage: "gearshape")

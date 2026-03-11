@@ -42,7 +42,7 @@ struct ContentView: View {
     // MARK: - Extracted Sub-Views
 
     private var mainLayout: some View {
-        ZStack(alignment: .leading) {
+        ZStack {
             // Main content fills the entire width
             Group {
                 if windowState.showSearchPanel {
@@ -61,30 +61,51 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(.easeInOut(duration: 0.2), value: windowState.showSearchPanel)
 
-            // Dim overlay when sidebar is open
-            if windowState.showSidebar {
+            // Dim overlay when either sidebar is open
+            if windowState.showSidebar || windowState.showInspector {
                 Color.black.opacity(0.15)
                     .ignoresSafeArea()
                     .onTapGesture {
-                        windowState.toggleSidebar()
+                        if windowState.showSidebar {
+                            windowState.toggleSidebar()
+                        }
+                        if windowState.showInspector {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                windowState.showInspector = false
+                            }
+                        }
                     }
                     .transition(.opacity)
             }
 
-            // Overlay sidebar
+            // Left overlay sidebar
             if windowState.showSidebar {
-                SidebarView()
-                    .frame(width: 280)
-                    .frame(maxHeight: .infinity)
-                    .vibrancyBackground(material: .sidebar)
-                    .shadow(color: .black.opacity(0.2), radius: 8, x: 2, y: 0)
-                    .transition(.move(edge: .leading))
+                HStack(spacing: 0) {
+                    SidebarView()
+                        .frame(width: 280)
+                        .frame(maxHeight: .infinity)
+                        .vibrancyBackground(material: .sidebar)
+                        .shadow(color: .black.opacity(0.2), radius: 8, x: 2, y: 0)
+                    Spacer()
+                }
+                .transition(.move(edge: .leading))
+            }
+
+            // Right overlay panel (concordance, cross-refs)
+            if windowState.showInspector {
+                HStack(spacing: 0) {
+                    Spacer()
+                    InspectorPanelView()
+                        .frame(width: 320)
+                        .frame(maxHeight: .infinity)
+                        .vibrancyBackground(material: .sidebar)
+                        .shadow(color: .black.opacity(0.2), radius: 8, x: -2, y: 0)
+                }
+                .transition(.move(edge: .trailing))
             }
         }
-        .inspector(isPresented: $windowState.showInspector) {
-            InspectorPanelView()
-                .inspectorColumnWidth(min: 300, ideal: 320, max: 450)
-        }
+        .animation(.easeInOut(duration: 0.25), value: windowState.showSidebar)
+        .animation(.easeInOut(duration: 0.25), value: windowState.showInspector)
     }
 
     @ToolbarContentBuilder
@@ -98,23 +119,14 @@ struct ContentView: View {
         }
 
         ToolbarItemGroup(placement: .primaryAction) {
-            Button(action: { showImportSheet = true }) {
-                Label("Import", systemImage: "square.and.arrow.down")
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    windowState.showInspector.toggle()
+                }
+            }) {
+                Label("Inspector", systemImage: "sidebar.trailing")
             }
-            .help("Import .brbmod module")
-            .keyboardShortcut("i", modifiers: [.command])
-
-            Divider()
-
-            Button(action: { windowState.toggleInspector(tab: .strongs) }) {
-                Label("Strong's", systemImage: "textformat.abc")
-            }
-            .help("Toggle Strong's Concordance")
-
-            Button(action: { windowState.toggleInspector(tab: .crossRefs) }) {
-                Label("Cross-Refs", systemImage: "link")
-            }
-            .help("Toggle Cross-References")
+            .help("Toggle Inspector (Strong's & Cross-Refs)")
 
             Button(action: { windowState.toggleSearchPanel() }) {
                 Label("Search", systemImage: "magnifyingglass")
@@ -379,7 +391,7 @@ struct InspectorPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Tab picker
+            // Tab picker (text labels, matching left sidebar style)
             Picker("", selection: $windowState.inspectorTab) {
                 ForEach(InspectorTab.allCases, id: \.self) { tab in
                     Label(tab.label, systemImage: tab.icon)
@@ -388,7 +400,7 @@ struct InspectorPanelView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
             Divider()

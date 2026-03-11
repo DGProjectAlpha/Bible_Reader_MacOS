@@ -291,7 +291,23 @@ struct BookmarksView: View {
 
     @ViewBuilder
     private func bookmarkRow(_ bookmark: Bookmark) -> some View {
-        BookmarkRow(bookmark: bookmark)
+        HStack {
+            BookmarkRow(bookmark: bookmark)
+            Spacer()
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    store.removeBookmark(bookmark.id)
+                }
+            }) {
+                Image(systemName: "trash")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Delete bookmark")
+        }
             .contentShape(Rectangle())
             .onTapGesture {
                 navigateToBookmark(bookmark)

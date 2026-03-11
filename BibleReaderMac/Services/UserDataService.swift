@@ -63,7 +63,8 @@ class UserDataService {
             chapter INTEGER NOT NULL,
             verse INTEGER,
             translation_abbreviation TEXT NOT NULL,
-            timestamp REAL NOT NULL
+            timestamp REAL NOT NULL,
+            profile TEXT NOT NULL DEFAULT 'Default'
         );
         CREATE INDEX IF NOT EXISTS idx_history_timestamp ON reading_history(timestamp DESC);
         CREATE INDEX IF NOT EXISTS idx_history_book_chapter ON reading_history(book, chapter);
@@ -74,7 +75,8 @@ class UserDataService {
             label TEXT,
             note TEXT,
             created_at REAL NOT NULL,
-            updated_at REAL NOT NULL
+            updated_at REAL NOT NULL,
+            profile TEXT NOT NULL DEFAULT 'Default'
         );
         CREATE INDEX IF NOT EXISTS idx_bookmarks_verse ON bookmarks(verse_id, translation_id);
         CREATE INDEX IF NOT EXISTS idx_bookmarks_created ON bookmarks(created_at DESC);
@@ -83,18 +85,20 @@ class UserDataService {
             verse_id TEXT NOT NULL,
             translation_id TEXT NOT NULL,
             color TEXT NOT NULL,
-            created_at REAL NOT NULL
+            created_at REAL NOT NULL,
+            profile TEXT NOT NULL DEFAULT 'Default'
         );
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_highlights_verse ON highlights(verse_id, translation_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_highlights_verse ON highlights(verse_id, translation_id, profile);
         CREATE TABLE IF NOT EXISTS notes (
             id TEXT PRIMARY KEY,
             verse_id TEXT NOT NULL,
             translation_id TEXT NOT NULL,
             content TEXT NOT NULL,
             created_at REAL NOT NULL,
-            updated_at REAL NOT NULL
+            updated_at REAL NOT NULL,
+            profile TEXT NOT NULL DEFAULT 'Default'
         );
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_verse ON notes(verse_id, translation_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_verse ON notes(verse_id, translation_id, profile);
         CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes(updated_at DESC);
         """
         sqlite3_exec(db, sql, nil, nil, nil)

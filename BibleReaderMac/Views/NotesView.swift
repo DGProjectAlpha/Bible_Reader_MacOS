@@ -306,7 +306,23 @@ struct NotesView: View {
 
     @ViewBuilder
     private func noteRow(_ note: Note) -> some View {
-        NoteRow(note: note)
+        HStack {
+            NoteRow(note: note)
+            Spacer()
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    store.removeNote(note.id)
+                }
+            }) {
+                Image(systemName: "trash")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Delete note")
+        }
             .contentShape(Rectangle())
             .onTapGesture {
                 navigateToNote(note)

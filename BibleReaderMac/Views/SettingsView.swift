@@ -149,7 +149,7 @@ struct DisplaySettingsTab: View {
 struct AppearanceSettingsTab: View {
     @AppStorage("readerTheme") private var readerTheme: String = "auto"
     @AppStorage("accentColorName") private var accentColorName: String = "blue"
-    @AppStorage("verseHighlightOpacity") private var verseHighlightOpacity: Double = 0.12
+    @AppStorage("verseHighlightOpacity") private var verseHighlightOpacity: Double = 0.3
     @AppStorage("showChapterTitles") private var showChapterTitles: Bool = true
     @AppStorage("textColorHex") private var textColorHex: String = ""
     @AppStorage("backgroundColorHex") private var backgroundColorHex: String = ""
@@ -205,7 +205,7 @@ struct AppearanceSettingsTab: View {
                 HStack {
                     Text("Verse Highlight Intensity")
                     Spacer()
-                    Slider(value: $verseHighlightOpacity, in: 0.05...0.3, step: 0.01)
+                    Slider(value: $verseHighlightOpacity, in: 0.05...0.6, step: 0.01)
                         .frame(width: 160)
                 }
             }
@@ -278,7 +278,7 @@ struct AppearanceSettingsTab: View {
                 Button("Reset Appearance to Defaults") {
                     readerTheme = "auto"
                     accentColorName = "blue"
-                    verseHighlightOpacity = 0.12
+                    verseHighlightOpacity = 0.3
                     showChapterTitles = true
                     useCustomTextColor = false
                     useCustomBgColor = false

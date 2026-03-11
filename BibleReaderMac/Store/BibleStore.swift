@@ -99,6 +99,9 @@ class BibleStore: ObservableObject {
     }
 
     func removeBookmark(_ id: UUID) {
+        if let bm = bookmarks.first(where: { $0.id == id }) {
+            bookmarkIndex.remove(verseKey(bm.verseId, bm.translationId))
+        }
         userDataService.deleteBookmark(id)
         bookmarks.removeAll { $0.id == id }
     }
@@ -163,6 +166,7 @@ class BibleStore: ObservableObject {
     func removeNote(_ id: UUID) {
         userDataService.deleteNote(id)
         notes.removeAll { $0.id == id }
+        rebuildNoteIndex()
     }
 
     func noteFor(verseId: String, translationId: UUID) -> Note? {

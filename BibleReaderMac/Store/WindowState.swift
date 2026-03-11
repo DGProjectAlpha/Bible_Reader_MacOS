@@ -122,13 +122,17 @@ class WindowState: ObservableObject {
         inspectorStrongsFilePath = filePath
         inspectorStrongsWordIndex = wordIndex
         inspectorTab = .strongs
-        showInspector = true
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showInspector = true
+        }
     }
 
     func showCrossRefsInspector(verseId: String) {
         inspectorCrossRefVerseId = verseId
         inspectorTab = .crossRefs
-        showInspector = true
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showInspector = true
+        }
     }
 
     func showSearchInspector(query: String = "") {
@@ -149,11 +153,13 @@ class WindowState: ObservableObject {
     }
 
     func toggleInspector(tab: InspectorTab) {
-        if showInspector && inspectorTab == tab {
-            showInspector = false
-        } else {
-            inspectorTab = tab
-            showInspector = true
+        withAnimation(.easeInOut(duration: 0.25)) {
+            if showInspector && inspectorTab == tab {
+                showInspector = false
+            } else {
+                inspectorTab = tab
+                showInspector = true
+            }
         }
     }
 
