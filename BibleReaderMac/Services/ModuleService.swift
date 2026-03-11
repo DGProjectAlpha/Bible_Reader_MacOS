@@ -217,7 +217,7 @@ final class ModuleConnection {
         var result: [WordTag] = []
         for row in rows {
             if let lastIdx = result.indices.last, result[lastIdx].wordIndex == row.wordIndex {
-                var existing = result[lastIdx]
+                let existing = result[lastIdx]
                 var numbers = existing.strongsNumbers
                 numbers.append(row.strongsNumber)
                 result[lastIdx] = WordTag(wordIndex: existing.wordIndex, word: existing.word, strongsNumbers: numbers)
@@ -255,7 +255,7 @@ final class ModuleConnection {
             if let lastIdx = verseTags.indices.last,
                verseTags[lastIdx].wordIndex == row.wordIndex {
                 if let sn = row.strongsNumber, !sn.isEmpty {
-                    var existing = verseTags[lastIdx]
+                    let existing = verseTags[lastIdx]
                     var numbers = existing.strongsNumbers
                     numbers.append(sn)
                     verseTags[lastIdx] = WordTag(

@@ -296,12 +296,11 @@ struct CrossReferenceView: View {
 
         Task.detached {
             let rawRefs = TSKService.getRefs(for: verseId)
-            var displayRefs: [TSKDisplayRef] = []
 
             // Use first loaded translation for verse text
             let primaryTranslation = translations.first
 
-            for ref in rawRefs {
+            let displayRefs: [TSKDisplayRef] = rawRefs.map { ref in
                 var verseText = ""
                 var translationAbbr = ""
 
@@ -313,7 +312,7 @@ struct CrossReferenceView: View {
                     translationAbbr = primary.abbreviation
                 }
 
-                displayRefs.append(TSKDisplayRef(
+                return TSKDisplayRef(
                     book: ref.book,
                     chapter: ref.chapter,
                     verse: ref.verse,
@@ -321,7 +320,7 @@ struct CrossReferenceView: View {
                     label: ref.label,
                     verseText: verseText,
                     translationAbbr: translationAbbr
-                ))
+                )
             }
 
             await MainActor.run {

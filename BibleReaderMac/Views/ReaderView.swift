@@ -539,7 +539,8 @@ struct ReaderPaneView: View {
                                 },
                                 onWordTap: { wordTag in
                                     // Word click → show Strong's in inspector
-                                    guard let translation = currentTranslation else { return }
+                                    guard let wordTag = wordTag,
+                                          let translation = currentTranslation else { return }
                                     let displayRef = "\(pane.selectedBook) \(pane.selectedChapter):\(verse.number)"
                                     windowState.showStrongsInspector(
                                         verseId: verse.id,

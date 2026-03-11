@@ -617,7 +617,7 @@ struct SearchResultRow: View {
 
         guard !term.isEmpty else { return Text(text) }
 
-        // Collect all match ranges first, then build Text in one pass
+        // Collect all match ranges first, then build AttributedString in one pass
         var ranges: [Range<String.Index>] = []
         var searchStart = lower.startIndex
         while let range = lower.range(of: term, range: searchStart..<lower.endIndex) {
@@ -627,22 +627,15 @@ struct SearchResultRow: View {
 
         guard !ranges.isEmpty else { return Text(text) }
 
-        var built = Text("")
-        var cursor = text.startIndex
-
+        var attributed = AttributedString(text)
         for range in ranges {
-            if range.lowerBound > cursor {
-                built = built + Text(text[cursor..<range.lowerBound])
-            }
-            built = built + Text(text[range]).foregroundColor(.accentColor).bold()
-            cursor = range.upperBound
+            let attrStart = AttributedString.Index(range.lowerBound, within: attributed)!
+            let attrEnd = AttributedString.Index(range.upperBound, within: attributed)!
+            attributed[attrStart..<attrEnd].foregroundColor = .accentColor
+            attributed[attrStart..<attrEnd].font = .body.bold()
         }
 
-        if cursor < text.endIndex {
-            built = built + Text(text[cursor..<text.endIndex])
-        }
-
-        return built
+        return Text(attributed)
     }
 
     private func loadContextVerses() {
