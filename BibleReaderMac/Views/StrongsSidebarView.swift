@@ -672,21 +672,39 @@ struct StrongsSidebarView: View {
         similarVerseRefs = [:]
         similarVersesLoading = []
 
-        if let word = word, !word.isEmpty {
-            loadSimilarEntries(word: word)
-        }
+        // Always reload similar entries for the new focused entry.
+        // Definition-based matching doesn't require a word; word-based
+        // search is only used as a fallback.
+        loadSimilarEntries(word: word ?? "")
     }
 
     private func loadSimilarEntries(word: String) {
         isLoadingSimilar = true
         let fp = translationFilePath
+        let num = focusedNumber
         DispatchQueue.global(qos: .userInitiated).async {
-            let result = StrongsService.searchSimilar(word: word, filePath: fp)
-            DispatchQueue.main.async {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    similarExact = result.exact
-                    similarEntries = result.similar
-                    isLoadingSimilar = false
+            // Use Windows-style definition matching: find entries whose kjv_def
+            // shares words with the selected entry's kjv_def
+            let definitionMatches = StrongsService.findSimilarByDefinition(
+                number: num, filePath: fp, limit: 15
+            )
+            // Fall back to word-based search if definition matching yields nothing
+            if definitionMatches.isEmpty {
+                let result = StrongsService.searchSimilar(word: word, filePath: fp)
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        similarExact = result.exact
+                        similarEntries = result.similar
+                        isLoadingSimilar = false
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        similarExact = nil
+                        similarEntries = definitionMatches
+                        isLoadingSimilar = false
+                    }
                 }
             }
         }

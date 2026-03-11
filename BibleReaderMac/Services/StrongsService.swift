@@ -271,6 +271,75 @@ enum StrongsService {
         return (exact, similar)
     }
 
+    // MARK: - Similar by Definition (Windows-style)
+
+    /// Stop words excluded from definition matching.
+    private static let stopWords: Set<String> = [
+        "the", "and", "for", "that", "with", "from", "this", "which", "have",
+        "not", "but", "are", "was", "were", "been", "being", "has", "had",
+        "its", "also", "into", "more", "some", "such", "than", "them",
+        "then", "these", "they", "will", "would", "could", "should",
+        "can", "may", "might", "shall", "about", "after", "before",
+        "between", "through", "against", "under", "over", "above"
+    ]
+
+    /// Tokenize a definition string into normalized words for matching.
+    private static func tokenizeDefinition(_ text: String) -> Set<String> {
+        let cleaned = text.lowercased()
+            .replacingOccurrences(of: "[^a-z\\s-]", with: " ", options: .regularExpression)
+        let words = cleaned.split(separator: " ")
+            .map { $0.replacingOccurrences(of: "-", with: "") }
+            .filter { $0.count > 2 && !stopWords.contains($0) }
+        return Set(words)
+    }
+
+    /// Find similar Strong's entries by matching kjv_def words of the selected entry
+    /// against all other entries. This matches the Windows BibleReader algorithm:
+    /// tokenize the selected entry's kjv_def, find entries sharing definition words,
+    /// score by overlap count.
+    static func findSimilarByDefinition(number: String, filePath: String, limit: Int = 15) -> [StrongsEntry] {
+        // Look up the selected entry
+        guard let selectedEntry = lookup(number, in: filePath),
+              let kjvDef = selectedEntry.kjvDefinition, !kjvDef.isEmpty else {
+            return []
+        }
+
+        // Tokenize the selected entry's kjv_def
+        let selectedWords = tokenizeDefinition(kjvDef)
+        guard !selectedWords.isEmpty else { return [] }
+
+        // Build reverse index if needed
+        reverseIndexLock.lock()
+        if reverseIndex == nil {
+            reverseIndex = buildReverseIndex()
+        }
+        let idx = reverseIndex!
+        reverseIndexLock.unlock()
+
+        // Collect candidate numbers from all definition words
+        var candidateScores: [String: Int] = [:]
+        for word in selectedWords {
+            guard let nums = idx[word] else { continue }
+            for num in nums where num != number {
+                candidateScores[num, default: 0] += 1
+            }
+        }
+
+        guard !candidateScores.isEmpty else { return [] }
+
+        // Sort by overlap score descending, take top results
+        let topCandidates = candidateScores
+            .sorted { $0.value > $1.value }
+            .prefix(limit)
+            .map { $0.key }
+
+        // Resolve entries
+        let entries = batchLookup(topCandidates, in: filePath)
+
+        // Return in score order
+        return topCandidates.compactMap { entries[$0] }
+    }
+
     // MARK: - Module Database Query
 
     private static func queryModule(number: String, filePath: String) -> StrongsEntry? {
