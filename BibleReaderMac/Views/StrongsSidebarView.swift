@@ -144,10 +144,12 @@ struct StrongsSidebarView: View {
             }
 
             // Lemma (original Hebrew/Greek word)
-            Text(entry.lemma)
-                .font(.system(size: 32, design: .serif))
-                .foregroundStyle(.primary)
-                .environment(\.layoutDirection, entry.testament == .old ? .rightToLeft : .leftToRight)
+            if !entry.lemma.isEmpty {
+                Text(entry.lemma)
+                    .font(.system(size: 32, design: .serif))
+                    .foregroundStyle(.primary)
+                    .environment(\.layoutDirection, entry.testament == .old ? .rightToLeft : .leftToRight)
+            }
 
             // Transliteration + pronunciation
             HStack(spacing: 8) {
@@ -619,8 +621,18 @@ struct StrongsSidebarView: View {
 
     private func focusOnWord(atIndex idx: Int) {
         guard let match = resolvedTags.first(where: { $0.wordTag.wordIndex == idx }),
-              let entry = match.primaryEntry,
               let num = match.strongsNumbers.first else { return }
+
+        // Use resolved entry if available, otherwise create a minimal placeholder
+        let entry = match.primaryEntry ?? StrongsEntry(
+            number: num,
+            lemma: "",
+            transliteration: "",
+            pronunciation: nil,
+            derivation: nil,
+            strongsDefinition: nil,
+            kjvDefinition: nil
+        )
 
         focusedEntry = entry
         focusedWord = match.word
@@ -628,6 +640,20 @@ struct StrongsSidebarView: View {
         versesOpen = false
         verseRefs = nil
         expandedSimilarNum = nil
+
+        // If we only have a placeholder, try a direct lookup in background
+        if match.primaryEntry == nil {
+            let fp = translationFilePath
+            DispatchQueue.global(qos: .userInitiated).async {
+                if let resolved = StrongsService.lookup(num, in: fp) {
+                    DispatchQueue.main.async {
+                        if focusedNumber == num {
+                            focusedEntry = resolved
+                        }
+                    }
+                }
+            }
+        }
 
         // Load similar entries in background
         loadSimilarEntries(word: match.word)

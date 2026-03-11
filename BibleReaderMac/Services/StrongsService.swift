@@ -92,11 +92,21 @@ enum StrongsService {
         }
 
         let wordTags = (try? conn.loadWordTags(verseId: verseId)) ?? []
-        guard !wordTags.isEmpty else { return [] }
+        guard !wordTags.isEmpty else {
+            print("[StrongsService] No word tags found for verse: \(verseId)")
+            return []
+        }
 
         // Collect all unique Strong's numbers
         let allNumbers = Array(Set(wordTags.flatMap { $0.strongsNumbers }))
         let entries = batchLookup(allNumbers, in: filePath)
+
+        if entries.isEmpty && !allNumbers.isEmpty {
+            print("[StrongsService] WARNING: Found \(allNumbers.count) Strong's numbers but resolved 0 entries. Numbers: \(allNumbers.prefix(5))")
+            // Check if strongs table exists
+            let hasTable = (try? conn.tableExists("strongs")) ?? false
+            print("[StrongsService] Module has strongs table: \(hasTable), filePath: \(filePath)")
+        }
 
         return wordTags.map { tag in
             let resolvedEntries = tag.strongsNumbers.compactMap { entries[$0] }
@@ -112,6 +122,11 @@ enum StrongsService {
         reverseIndexLock.lock()
         reverseIndex = nil
         reverseIndexLock.unlock()
+        jsonLock.lock()
+        hebrewJSON = nil
+        greekJSON = nil
+        jsonLoaded = false
+        jsonLock.unlock()
     }
 
     // MARK: - Find Verses by Strong's Number
@@ -200,9 +215,7 @@ enum StrongsService {
 
         // Load bundled JSON
         for filename in ["strongs-hebrew", "strongs-greek"] {
-            let url = Bundle.main.url(forResource: filename, withExtension: "json")
-                ?? Bundle.main.url(forResource: filename, withExtension: "json", subdirectory: "BundledModules")
-            guard let url, let data = try? Data(contentsOf: url),
+            guard let url = findBundledJSON(filename), let data = try? Data(contentsOf: url),
                   let dict = try? JSONSerialization.jsonObject(with: data) as? [String: [String: Any]] else {
                 continue
             }
@@ -316,22 +329,60 @@ enum StrongsService {
 
     // MARK: - Bundled JSON Fallback
 
+    /// Cached parsed JSON dictionaries to avoid re-reading large files.
+    private static var hebrewJSON: [String: [String: Any]]?
+    private static var greekJSON: [String: [String: Any]]?
+    private static var jsonLoaded = false
+    private static let jsonLock = NSLock()
+
+    /// Locate a bundled JSON file by trying multiple paths.
+    private static func findBundledJSON(_ filename: String) -> URL? {
+        // Direct bundle lookup
+        if let url = Bundle.main.url(forResource: filename, withExtension: "json") {
+            return url
+        }
+        // Subdirectory lookup (folder reference)
+        if let url = Bundle.main.url(forResource: filename, withExtension: "json", subdirectory: "BundledModules") {
+            return url
+        }
+        // Manual path construction for folder references
+        if let resourceURL = Bundle.main.resourceURL {
+            let manual = resourceURL.appendingPathComponent("BundledModules/\(filename).json")
+            if FileManager.default.fileExists(atPath: manual.path) {
+                return manual
+            }
+        }
+        return nil
+    }
+
+    /// Load and cache both JSON dictionaries on first access.
+    private static func ensureJSONLoaded() {
+        jsonLock.lock()
+        defer { jsonLock.unlock() }
+        guard !jsonLoaded else { return }
+        jsonLoaded = true
+
+        for (filename, isHebrew) in [("strongs-hebrew", true), ("strongs-greek", false)] {
+            guard let url = findBundledJSON(filename),
+                  let data = try? Data(contentsOf: url),
+                  let dict = try? JSONSerialization.jsonObject(with: data) as? [String: [String: Any]] else {
+                continue
+            }
+            if isHebrew {
+                hebrewJSON = dict
+            } else {
+                greekJSON = dict
+            }
+        }
+    }
+
     /// Load a Strong's entry from bundled strongs-hebrew.json / strongs-greek.json.
     private static func loadFromBundledJSON(number: String) -> StrongsEntry? {
+        ensureJSONLoaded()
+
         let isHebrew = number.hasPrefix("H")
-        let filename = isHebrew ? "strongs-hebrew" : "strongs-greek"
-
-        let url: URL? = Bundle.main.url(forResource: filename, withExtension: "json")
-            ?? Bundle.main.url(forResource: filename, withExtension: "json", subdirectory: "BundledModules")
-        guard let url, let data = try? Data(contentsOf: url) else {
-            return nil
-        }
-
-        // Parse as dictionary keyed by Strong's number
-        guard let dict = try? JSONSerialization.jsonObject(with: data) as? [String: [String: Any]],
-              let entry = dict[number] else {
-            return nil
-        }
+        let dict = isHebrew ? hebrewJSON : greekJSON
+        guard let entry = dict?[number] else { return nil }
 
         return StrongsEntry(
             number: number,

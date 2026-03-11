@@ -261,18 +261,28 @@ final class ModuleManager {
 
     // MARK: - Bundled Modules
 
-    /// Copy bundled .brbmod files from the app bundle to the modules directory if not already present.
+    /// Copy bundled .brbmod files from the app bundle to the modules directory.
+    /// Replaces existing copies when the bundled version is newer or larger (e.g. strongs table added).
     private func seedBundledModules() {
         guard let bundledURL = Bundle.main.url(forResource: "BundledModules", withExtension: nil) else { return }
         guard let contents = try? fileManager.contentsOfDirectory(
             at: bundledURL,
-            includingPropertiesForKeys: nil,
+            includingPropertiesForKeys: [.fileSizeKey],
             options: [.skipsHiddenFiles]
         ) else { return }
 
         for fileURL in contents where fileURL.pathExtension.lowercased() == "brbmod" {
             let destination = modulesDirectory.appendingPathComponent(fileURL.lastPathComponent)
-            if fileManager.fileExists(atPath: destination.path) { continue }
+            if fileManager.fileExists(atPath: destination.path) {
+                // Replace if bundled version is larger (new tables added) or different size
+                let bundledSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+                let existingSize = (try? destination.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+                guard bundledSize != existingSize else { continue }
+                // Close any open connection and clear caches before replacing
+                ModuleConnectionPool.shared.close(filePath: destination.path)
+                StrongsService.clearCache()
+                try? fileManager.removeItem(at: destination)
+            }
             try? fileManager.copyItem(at: fileURL, to: destination)
         }
     }
