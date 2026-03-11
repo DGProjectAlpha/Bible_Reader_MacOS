@@ -3,6 +3,7 @@ import SwiftUI
 struct HistoryView: View {
     @EnvironmentObject var store: BibleStore
     @EnvironmentObject var windowState: WindowState
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,6 +20,13 @@ struct HistoryView: View {
                     .foregroundStyle(.secondary)
                     .buttonStyle(.borderless)
                 }
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .keyboardShortcut(.cancelAction)
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)

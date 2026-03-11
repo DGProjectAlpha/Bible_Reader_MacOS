@@ -109,6 +109,153 @@ enum StrongsService {
         cacheLock.lock()
         cache.removeAll()
         cacheLock.unlock()
+        reverseIndexLock.lock()
+        reverseIndex = nil
+        reverseIndexLock.unlock()
+    }
+
+    // MARK: - Find Verses by Strong's Number
+
+    /// A verse reference returned by findVersesByStrongs.
+    struct VerseReference: Identifiable {
+        let id = UUID()
+        let book: String
+        let chapter: Int
+        let verse: Int
+        let text: String
+
+        var displayRef: String { "\(book) \(chapter):\(verse)" }
+    }
+
+    /// Search the word_tags table for all verses containing a given Strong's number.
+    /// Uses the same filePath (KJV module) to look up verse text. Caps at 300 results.
+    static func findVersesByStrongs(_ number: String, filePath: String) -> [VerseReference] {
+        guard let conn = try? ModuleConnectionPool.shared.connection(for: filePath),
+              (try? conn.tableExists("word_tags")) == true else {
+            return []
+        }
+
+        // Get all distinct verse_ids that contain this Strong's number
+        let verseIds = (try? conn.query(
+            "SELECT DISTINCT verse_id FROM word_tags WHERE strongs_number = ?1 ORDER BY rowid LIMIT 300",
+            bindings: [number]
+        ) { stmt in
+            ModuleConnection.text(stmt, 0)
+        }) ?? []
+
+        guard !verseIds.isEmpty else { return [] }
+
+        // Batch load verse text
+        var results: [VerseReference] = []
+        for vid in verseIds {
+            let parts = vid.split(separator: ":")
+            guard parts.count >= 3,
+                  let chapter = Int(parts[parts.count - 2]),
+                  let verse = Int(parts[parts.count - 1]) else { continue }
+            let book = parts.dropLast(2).joined(separator: ":")
+
+            let texts = (try? conn.query(
+                "SELECT text FROM verses WHERE book = ?1 AND chapter = ?2 AND verse = ?3 LIMIT 1",
+                bindings: [book, chapter, verse]
+            ) { stmt in
+                ModuleConnection.text(stmt, 0)
+            }) ?? []
+
+            results.append(VerseReference(
+                book: book,
+                chapter: chapter,
+                verse: verse,
+                text: texts.first ?? ""
+            ))
+        }
+        return results
+    }
+
+    // MARK: - Similar Entries (Reverse Index)
+
+    private static var reverseIndex: [String: [String]]? = nil
+    private static let reverseIndexLock = NSLock()
+
+    /// Build a reverse index from normalized English words to Strong's numbers,
+    /// using the bundled JSON data (kjv_def and strongs_def fields).
+    private static func buildReverseIndex() -> [String: [String]] {
+        var index: [String: [String]] = [:]
+
+        func addEntries(_ dict: [String: [String: Any]]) {
+            for (num, entry) in dict {
+                let kjv = entry["kjv_def"] as? String ?? ""
+                let def = entry["strongs_def"] as? String ?? ""
+                let text = "\(kjv) \(def)".lowercased()
+                let words = Set(
+                    text.replacingOccurrences(of: "[^a-z\\s-]", with: " ", options: .regularExpression)
+                        .split(separator: " ")
+                        .map { $0.replacingOccurrences(of: "-", with: "") }
+                        .filter { $0.count > 2 }
+                )
+                for word in words {
+                    index[word, default: []].append(num)
+                }
+            }
+        }
+
+        // Load bundled JSON
+        for filename in ["strongs-hebrew", "strongs-greek"] {
+            let url = Bundle.main.url(forResource: filename, withExtension: "json")
+                ?? Bundle.main.url(forResource: filename, withExtension: "json", subdirectory: "BundledModules")
+            guard let url, let data = try? Data(contentsOf: url),
+                  let dict = try? JSONSerialization.jsonObject(with: data) as? [String: [String: Any]] else {
+                continue
+            }
+            addEntries(dict)
+        }
+
+        return index
+    }
+
+    /// Score how well an entry matches the clicked word.
+    /// 3: word is the first token in kjv_def; 2: exact word match; 1: appears somewhere.
+    private static func scoreEntry(_ entry: StrongsEntry, normalized: String) -> Int {
+        let kjv = (entry.kjvDefinition ?? "").lowercased()
+            .replacingOccurrences(of: "[^a-z\\s]", with: " ", options: .regularExpression)
+        let tokens = kjv.split(separator: " ").map(String.init)
+        if tokens.first == normalized { return 3 }
+        if tokens.contains(normalized) { return 2 }
+        return 1
+    }
+
+    /// Search for similar Strong's entries by English word (reverse-index lookup).
+    /// Returns (exact: best match, similar: other matches), like the Windows version.
+    static func searchSimilar(word: String, filePath: String, limit: Int = 10) -> (exact: StrongsEntry?, similar: [StrongsEntry]) {
+        let normalized = word.lowercased()
+            .replacingOccurrences(of: "[^a-z]", with: "", options: .regularExpression)
+        guard !normalized.isEmpty else { return (nil, []) }
+
+        reverseIndexLock.lock()
+        if reverseIndex == nil {
+            reverseIndex = buildReverseIndex()
+        }
+        let idx = reverseIndex!
+        reverseIndexLock.unlock()
+
+        guard let nums = idx[normalized] else { return (nil, []) }
+
+        // Look up entries
+        let candidates: [StrongsEntry] = nums.prefix(limit).compactMap { num in
+            lookup(num, in: filePath)
+        }
+        guard !candidates.isEmpty else { return (nil, []) }
+
+        // Find best match
+        var bestIdx = 0
+        var bestScore = scoreEntry(candidates[0], normalized: normalized)
+        for i in 1..<candidates.count {
+            let s = scoreEntry(candidates[i], normalized: normalized)
+            if s > bestScore { bestScore = s; bestIdx = i }
+        }
+
+        let exact = candidates[bestIdx]
+        let similar = candidates.enumerated().compactMap { $0.offset != bestIdx ? $0.element : nil }
+        return (exact, similar)
     }
 
     // MARK: - Module Database Query

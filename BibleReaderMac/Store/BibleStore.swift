@@ -12,6 +12,9 @@ class ReaderPane: ObservableObject, Identifiable {
     /// Versification scheme string from the currently selected translation (set by BibleStore).
     var versificationScheme: String = "kjv"
 
+    /// When this pane was created via a vertical split, this points to the pane it sits below.
+    var verticalBuddyId: UUID? = nil
+
     var chapterCount: Int {
         let scheme = VersificationScheme.from(versificationScheme)
         return VersificationService.shared.chapterCount(book: selectedBook, scheme: scheme)

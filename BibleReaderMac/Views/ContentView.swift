@@ -81,7 +81,6 @@ struct ContentView: View {
                     .transition(.move(edge: .leading))
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: windowState.showSidebar)
         .inspector(isPresented: $windowState.showInspector) {
             InspectorPanelView()
                 .inspectorColumnWidth(min: 300, ideal: 320, max: 450)

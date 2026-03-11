@@ -1,6 +1,60 @@
 import SwiftUI
 import Combine
 
+// MARK: - Flow Layout (wraps children to next line when horizontal space runs out)
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = computeRows(proposal: proposal, subviews: subviews)
+        var height: CGFloat = 0
+        var width: CGFloat = 0
+        for (i, row) in rows.enumerated() {
+            let rowHeight = row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+            height += rowHeight + (i > 0 ? spacing : 0)
+            let rowWidth = row.enumerated().reduce(CGFloat(0)) { sum, pair in
+                sum + pair.element.sizeThatFits(.unspecified).width + (pair.offset > 0 ? spacing : 0)
+            }
+            width = max(width, rowWidth)
+        }
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let rows = computeRows(proposal: ProposedViewSize(width: bounds.width, height: proposal.height), subviews: subviews)
+        var y = bounds.minY
+        for row in rows {
+            let rowHeight = row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+            var x = bounds.minX
+            for view in row {
+                let size = view.sizeThatFits(.unspecified)
+                view.place(at: CGPoint(x: x, y: y + (rowHeight - size.height) / 2), proposal: .unspecified)
+                x += size.width + spacing
+            }
+            y += rowHeight + spacing
+        }
+    }
+
+    private func computeRows(proposal: ProposedViewSize, subviews: Subviews) -> [[LayoutSubviews.Element]] {
+        let maxWidth = proposal.width ?? .infinity
+        var rows: [[LayoutSubviews.Element]] = [[]]
+        var currentWidth: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if !rows[rows.count - 1].isEmpty && currentWidth + spacing + size.width > maxWidth {
+                rows.append([view])
+                currentWidth = size.width
+            } else {
+                if !rows[rows.count - 1].isEmpty { currentWidth += spacing }
+                rows[rows.count - 1].append(view)
+                currentWidth += size.width
+            }
+        }
+        return rows
+    }
+}
+
 // MARK: - Reader View (top-level split container)
 
 struct ReaderView: View {
@@ -71,46 +125,118 @@ struct ReaderView: View {
 
     // MARK: - Split Pane Grid (static children — ForEach inside HSplitView causes hangs)
 
-    /// Lays out panes in a grid: up to 4 columns per row, 2 rows max (= 8 panes).
-    /// HSplitView/VSplitView require static children; ForEach causes macOS hangs.
-    @ViewBuilder
-    private func splitPaneGrid(_ panes: [ReaderPane]) -> some View {
-        let count = panes.count
-        if count <= 4 {
-            horizontalSplitRow(Array(panes))
-        } else {
-            let midpoint = (count + 1) / 2 // top row gets the extra pane if odd
-            VSplitView {
-                horizontalSplitRow(Array(panes.prefix(midpoint)))
-                    .frame(minHeight: 150)
-                horizontalSplitRow(Array(panes.suffix(from: midpoint)))
-                    .frame(minHeight: 150)
+    /// A column is either a single pane or a vertical pair (top + bottom in VSplitView).
+    private struct PaneColumn: Identifiable {
+        let id = UUID()
+        let top: ReaderPane
+        let bottom: ReaderPane?  // non-nil when vertical split
+    }
+
+    /// Builds columns from the panes array. Panes with a verticalBuddyId are grouped
+    /// below their buddy pane. Remaining panes become standalone columns.
+    private func buildColumns(_ panes: [ReaderPane]) -> [PaneColumn] {
+        // Collect vertical buddies: parentId → [child panes]
+        var verticalChildren: [UUID: ReaderPane] = [:]
+        var consumed = Set<UUID>()
+        for pane in panes {
+            if let buddyId = pane.verticalBuddyId {
+                verticalChildren[buddyId] = pane
+                consumed.insert(pane.id)
             }
+        }
+        // Build columns in order
+        var columns: [PaneColumn] = []
+        for pane in panes {
+            if consumed.contains(pane.id) { continue }
+            let bottom = verticalChildren[pane.id]
+            columns.append(PaneColumn(top: pane, bottom: bottom))
+        }
+        return columns
+    }
+
+    /// Renders a single column: standalone pane or VSplitView pair.
+    @ViewBuilder
+    private func columnView(_ column: PaneColumn) -> some View {
+        if let bottom = column.bottom {
+            VSplitView {
+                paneView(column.top)
+                    .frame(minHeight: 100)
+                paneView(bottom)
+                    .frame(minHeight: 100)
+            }
+        } else {
+            paneView(column.top)
         }
     }
 
+    /// Lays out columns horizontally. Supports up to 8 panes across columns.
+    /// HSplitView/VSplitView require static children; ForEach causes macOS hangs.
     @ViewBuilder
-    private func horizontalSplitRow(_ panes: [ReaderPane]) -> some View {
-        switch panes.count {
+    private func splitPaneGrid(_ panes: [ReaderPane]) -> some View {
+        let columns = buildColumns(panes)
+        horizontalSplitColumns(columns)
+    }
+
+    @ViewBuilder
+    private func horizontalSplitColumns(_ columns: [PaneColumn]) -> some View {
+        switch columns.count {
         case 1:
-            paneView(panes[0])
+            columnView(columns[0])
         case 2:
             HSplitView {
-                paneView(panes[0])
-                paneView(panes[1])
+                columnView(columns[0])
+                columnView(columns[1])
             }
         case 3:
             HSplitView {
-                paneView(panes[0])
-                paneView(panes[1])
-                paneView(panes[2])
+                columnView(columns[0])
+                columnView(columns[1])
+                columnView(columns[2])
             }
         case 4:
             HSplitView {
-                paneView(panes[0])
-                paneView(panes[1])
-                paneView(panes[2])
-                paneView(panes[3])
+                columnView(columns[0])
+                columnView(columns[1])
+                columnView(columns[2])
+                columnView(columns[3])
+            }
+        case 5:
+            HSplitView {
+                columnView(columns[0])
+                columnView(columns[1])
+                columnView(columns[2])
+                columnView(columns[3])
+                columnView(columns[4])
+            }
+        case 6:
+            HSplitView {
+                columnView(columns[0])
+                columnView(columns[1])
+                columnView(columns[2])
+                columnView(columns[3])
+                columnView(columns[4])
+                columnView(columns[5])
+            }
+        case 7:
+            HSplitView {
+                columnView(columns[0])
+                columnView(columns[1])
+                columnView(columns[2])
+                columnView(columns[3])
+                columnView(columns[4])
+                columnView(columns[5])
+                columnView(columns[6])
+            }
+        case 8:
+            HSplitView {
+                columnView(columns[0])
+                columnView(columns[1])
+                columnView(columns[2])
+                columnView(columns[3])
+                columnView(columns[4])
+                columnView(columns[5])
+                columnView(columns[6])
+                columnView(columns[7])
             }
         default:
             EmptyView()
@@ -157,10 +283,9 @@ struct ReaderView: View {
 /// Prevents feedback loops via source tracking and debouncing.
 @MainActor
 class ScrollSyncCoordinator: ObservableObject {
-    /// The verse number currently visible at the top of the source pane.
-    @Published var visibleVerse: Int = 1
-    /// The pane that initiated the current sync event.
-    @Published var sourcePane: UUID?
+    /// Last synced verse (non-Published — scroll sync bypasses SwiftUI observation).
+    private var lastSyncedVerse: Int = 1
+    private var lastSourcePane: UUID?
     /// Navigation sync: the book/chapter that was just navigated to.
     @Published var navigationEvent: NavigationEvent?
 
@@ -181,11 +306,22 @@ class ScrollSyncCoordinator: ObservableObject {
     }
 
     /// Called by a pane when the user scrolls, reporting the topmost visible verse.
+    /// Directly scrolls all other registered panes — no SwiftUI observation overhead.
     func reportVisibleVerse(_ verse: Int, from paneId: UUID) {
         guard !suppressedPanes.contains(paneId) else { return }
-        guard verse != visibleVerse || sourcePane != paneId else { return }
-        sourcePane = paneId
-        visibleVerse = verse
+        guard verse != lastSyncedVerse || lastSourcePane != paneId else { return }
+        lastSourcePane = paneId
+        lastSyncedVerse = verse
+
+        // Directly scroll every other pane's proxy
+        for (otherPaneId, proxy) in scrollProxies where otherPaneId != paneId {
+            suppressPane(otherPaneId, for: 0.3)
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                proxy.scrollTo("verse-\(otherPaneId)-\(verse)", anchor: .top)
+            }
+        }
     }
 
     /// Called by a pane when the user navigates to a different book/chapter.
@@ -206,7 +342,7 @@ class ScrollSyncCoordinator: ObservableObject {
     }
 
     /// Suppress a pane from emitting scroll events temporarily (while it scrolls in response to sync).
-    func suppressPane(_ paneId: UUID, for duration: TimeInterval = 0.5) {
+    func suppressPane(_ paneId: UUID, for duration: TimeInterval = 0.3) {
         suppressedPanes.insert(paneId)
         suppressionTimers[paneId]?.cancel()
         let work = DispatchWorkItem { [weak self] in
@@ -215,6 +351,42 @@ class ScrollSyncCoordinator: ObservableObject {
         }
         suppressionTimers[paneId] = work
         DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
+    }
+}
+
+// MARK: - Visible Verse Tracker (non-reactive to avoid triggering view updates)
+
+@MainActor
+class VisibleVerseTracker {
+    var verses: Set<Int> = []
+    private var debounceWork: DispatchWorkItem?
+
+    func insert(_ verse: Int) {
+        verses.insert(verse)
+    }
+
+    func remove(_ verse: Int) {
+        verses.remove(verse)
+    }
+
+    var topVerse: Int? {
+        verses.min()
+    }
+
+    func clear() {
+        verses.removeAll()
+        debounceWork?.cancel()
+    }
+
+    /// Debounced reporting — calls the handler at most once per interval.
+    func reportDebounced(interval: TimeInterval = 0.15, handler: @escaping (Int) -> Void) {
+        debounceWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let top = self?.topVerse else { return }
+            handler(top)
+        }
+        debounceWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + interval, execute: work)
     }
 }
 
@@ -245,7 +417,7 @@ struct ReaderPaneView: View {
     @State private var previousTranslationId: UUID?
     @State private var hoveredVerse: Int?
     @State private var selectedVerse: Int?
-    @State private var visibleVerseNumbers: Set<Int> = []
+    @State private var visibleVerseTracker = VisibleVerseTracker()
     @State private var noteEditingVerse: Verse?
     @State private var noteEditText: String = ""
     /// When true, the onChange(of: selectedBook) handler skips resetting chapter to 1.
@@ -266,7 +438,7 @@ struct ReaderPaneView: View {
         .onChange(of: pane.selectedTranslationId) { _, newId in
             // Convert verse position between versification schemes when switching translations
             if let oldId = previousTranslationId, oldId != newId {
-                let topVerse = visibleVerseNumbers.min() ?? 1
+                let topVerse = visibleVerseTracker.topVerse ?? 1
                 store.convertPanePosition(for: pane, from: oldId, to: newId, currentVerse: topVerse)
             }
             previousTranslationId = newId
@@ -297,16 +469,6 @@ struct ReaderPaneView: View {
                     chapter: pane.selectedChapter,
                     from: pane.id
                 )
-            }
-        }
-        // Respond to scroll sync from other panes
-        .onChange(of: coordinator.visibleVerse) { _, verse in
-            guard syncScrolling,
-                  let source = coordinator.sourcePane,
-                  source != pane.id else { return }
-            coordinator.suppressPane(pane.id)
-            withAnimation(.easeOut(duration: 0.2)) {
-                scrollProxy?.scrollTo(verseAnchor(verse), anchor: .top)
             }
         }
         // Respond to navigation sync from other panes
@@ -347,7 +509,7 @@ struct ReaderPaneView: View {
 
     private var paneHeader: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
+            FlowLayout(spacing: 8) {
                 // Translation picker
                 Picker("", selection: $pane.selectedTranslationId) {
                     ForEach(store.loadedTranslations) { t in
@@ -355,7 +517,7 @@ struct ReaderPaneView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(maxWidth: 100)
+                .fixedSize()
                 .help("Select translation")
 
                 Divider().frame(height: 20)
@@ -367,7 +529,7 @@ struct ReaderPaneView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(maxWidth: 160)
+                .fixedSize()
                 .help("Select book")
 
                 // Chapter nav
@@ -388,7 +550,7 @@ struct ReaderPaneView: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(maxWidth: 60)
+                    .fixedSize()
                     .help("Select chapter")
 
                     Button(action: nextChapter) {
@@ -401,8 +563,6 @@ struct ReaderPaneView: View {
                     .disabled(pane.selectedChapter >= pane.chapterCount)
                     .help("Next chapter")
                 }
-
-                Spacer()
 
                 // Font size controls
                 HStack(spacing: 4) {
@@ -495,16 +655,35 @@ struct ReaderPaneView: View {
         .glassHeader()
     }
 
+    // MARK: - Verse Metadata Cache
+
+    /// Pre-lookup bookmark/highlight/note status for all verses to avoid per-verse store queries during scroll.
+    private var verseMetadata: [String: (isBookmarked: Bool, highlightColor: HighlightColor?, hasNote: Bool)] {
+        let translationId = pane.selectedTranslationId
+        var meta: [String: (isBookmarked: Bool, highlightColor: HighlightColor?, hasNote: Bool)] = [:]
+        meta.reserveCapacity(pane.verses.count)
+        for verse in pane.verses {
+            meta[verse.id] = (
+                isBookmarked: store.isBookmarked(verseId: verse.id, translationId: translationId),
+                highlightColor: store.highlightFor(verseId: verse.id, translationId: translationId)?.color,
+                hasNote: store.noteFor(verseId: verse.id, translationId: translationId) != nil
+            )
+        }
+        return meta
+    }
+
     // MARK: - Verse Content
 
     private var verseContent: some View {
-        ScrollViewReader { proxy in
+        let metadata = verseMetadata
+        return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     if pane.verses.isEmpty {
                         noVersesView
                     } else {
                         ForEach(pane.verses) { verse in
+                            let meta = metadata[verse.id] ?? (isBookmarked: false, highlightColor: nil, hasNote: false)
                             VerseRow(
                                 verse: verse,
                                 fontSize: CGFloat(fontSize),
@@ -515,9 +694,9 @@ struct ReaderPaneView: View {
                                 highlightOpacity: verseHighlightOpacity,
                                 isHovered: hoveredVerse == verse.number,
                                 isSelected: selectedVerse == verse.number,
-                                isBookmarked: store.isBookmarked(verseId: verse.id, translationId: pane.selectedTranslationId),
-                                highlightColor: store.highlightFor(verseId: verse.id, translationId: pane.selectedTranslationId)?.color,
-                                hasNote: store.noteFor(verseId: verse.id, translationId: pane.selectedTranslationId) != nil,
+                                isBookmarked: meta.isBookmarked,
+                                highlightColor: meta.highlightColor,
+                                hasNote: meta.hasNote,
                                 customTextColor: resolvedTextColor,
                                 customBackgroundColor: resolvedBackgroundColor,
                                 onToggleBookmark: {
@@ -561,11 +740,11 @@ struct ReaderPaneView: View {
                                 verseContextMenu(for: verse)
                             }
                             .onAppear {
-                                visibleVerseNumbers.insert(verse.number)
+                                visibleVerseTracker.insert(verse.number)
                                 reportTopVisibleVerse()
                             }
                             .onDisappear {
-                                visibleVerseNumbers.remove(verse.number)
+                                visibleVerseTracker.remove(verse.number)
                             }
                         }
 
@@ -758,14 +937,15 @@ struct ReaderPaneView: View {
 
     private func loadCurrentChapter() {
         store.loadVerses(for: pane)
-        visibleVerseNumbers.removeAll()
+        visibleVerseTracker.clear()
     }
 
-    /// Report the lowest visible verse number to the coordinator for scroll sync.
+    /// Report the lowest visible verse number to the coordinator for scroll sync (debounced).
     private func reportTopVisibleVerse() {
-        guard syncScrolling, !visibleVerseNumbers.isEmpty else { return }
-        let topVerse = visibleVerseNumbers.min() ?? 1
-        coordinator.reportVisibleVerse(topVerse, from: pane.id)
+        guard syncScrolling else { return }
+        visibleVerseTracker.reportDebounced { [weak coordinator, paneId = pane.id] topVerse in
+            coordinator?.reportVisibleVerse(topVerse, from: paneId)
+        }
     }
 
     private func prevChapter() {
@@ -889,8 +1069,6 @@ struct VerseRow: View {
                 .strokeBorder(isSelected ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .animation(.easeInOut(duration: 0.15), value: showActionButtons)
-        .animation(.easeInOut(duration: 0.15), value: highlightColor)
     }
 
     // MARK: - Action Buttons Column
@@ -978,19 +1156,14 @@ struct VerseRow: View {
     // MARK: - Verse Text (Tagged — clickable words)
 
     private var taggedVerseText: some View {
-        // Build a flow layout of clickable words
-        WrappingHStack(alignment: .leading, spacing: 3) {
-            ForEach(verse.wordTags.indices, id: \.self) { i in
-                TaggedWordView(
-                    tag: verse.wordTags[i],
-                    fontSize: fontSize,
-                    fontFamily: fontFamily,
-                    customTextColor: customTextColor,
-                    onTap: { onWordTap?(verse.wordTags[i]) }
-                )
-            }
-        }
-        .lineSpacing(fontSize * (lineSpacingMultiplier - 1.0))
+        TaggedVerseTextView(
+            wordTags: verse.wordTags,
+            fontSize: fontSize,
+            fontFamily: fontFamily,
+            lineSpacingMultiplier: lineSpacingMultiplier,
+            customTextColor: customTextColor,
+            onWordTap: { onWordTap?($0) }
+        )
     }
 
     // MARK: - Styling
@@ -1019,56 +1192,180 @@ struct VerseRow: View {
     }
 }
 
-// MARK: - Tagged Word View
+// MARK: - Tagged Verse Text View (single NSView per verse for performance)
 
-struct TaggedWordView: View {
-    let tag: WordTag
+struct TaggedVerseTextView: NSViewRepresentable {
+    let wordTags: [WordTag]
     let fontSize: CGFloat
     let fontFamily: String
+    let lineSpacingMultiplier: CGFloat
     let customTextColor: Color?
-    let onTap: () -> Void
+    let onWordTap: (WordTag) -> Void
 
-    @State private var isWordHovered = false
-
-    private var hasStrongs: Bool {
-        !tag.strongsNumbers.isEmpty
-    }
-
-    var body: some View {
-        Text(tag.word)
-            .font(resolvedFont)
-            .foregroundColor(textColor)
-            .underline(isWordHovered && hasStrongs, color: .accentColor.opacity(0.4))
-            .onHover { hovering in
-                if hasStrongs {
-                    isWordHovered = hovering
-                    if hovering {
-                        NSCursor.pointingHand.push()
-                    } else {
-                        NSCursor.pop()
-                    }
-                }
+    func makeNSView(context: Context) -> TaggedVerseNSTextField {
+        let view = TaggedVerseNSTextField()
+        view.isEditable = false
+        view.isSelectable = true
+        view.drawsBackground = false
+        view.isBordered = false
+        view.isBezeled = false
+        view.maximumNumberOfLines = 0
+        view.lineBreakMode = .byWordWrapping
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        view.cell?.wraps = true
+        view.cell?.isScrollable = false
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.wordTapHandler = { [onWordTap] index in
+            if index < wordTags.count {
+                onWordTap(wordTags[index])
             }
-            .onTapGesture {
-                if hasStrongs {
-                    onTap()
-                }
-            }
-            .help(hasStrongs ? tag.strongsNumbers.joined(separator: ", ") : "")
-    }
-
-    private var textColor: Color {
-        if isWordHovered && hasStrongs {
-            return .accentColor
         }
-        return customTextColor ?? .primary
+        updateView(view)
+        return view
     }
 
-    private var resolvedFont: Font {
+    func updateNSView(_ view: TaggedVerseNSTextField, context: Context) {
+        view.wordTapHandler = { [onWordTap] index in
+            if index < wordTags.count {
+                onWordTap(wordTags[index])
+            }
+        }
+        updateView(view)
+    }
+
+    private func updateView(_ view: NSTextField) {
+        let nsFont: NSFont
         if fontFamily == "System" {
-            return .system(size: fontSize, design: .serif)
+            nsFont = NSFont.systemFont(ofSize: fontSize, weight: .regular)
+        } else {
+            nsFont = NSFont(name: fontFamily, size: fontSize) ?? NSFont.systemFont(ofSize: fontSize)
         }
-        return .custom(fontFamily, size: fontSize)
+
+        let baseColor: NSColor
+        if let c = customTextColor {
+            baseColor = NSColor(c)
+        } else {
+            baseColor = .labelColor
+        }
+
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineSpacing = fontSize * (lineSpacingMultiplier - 1.0)
+
+        let attributed = NSMutableAttributedString()
+        for (i, tag) in wordTags.enumerated() {
+            let hasStrongs = !tag.strongsNumbers.isEmpty
+            var attrs: [NSAttributedString.Key: Any] = [
+                .font: nsFont,
+                .foregroundColor: baseColor,
+                .paragraphStyle: paragraphStyle
+            ]
+            if hasStrongs {
+                attrs[.cursor] = NSCursor.pointingHand
+                attrs[.toolTip] = tag.strongsNumbers.joined(separator: ", ")
+                attrs[.link] = "word://\(i)"
+            }
+            attributed.append(NSAttributedString(string: tag.word, attributes: attrs))
+            if i < wordTags.count - 1 {
+                attributed.append(NSAttributedString(string: " ", attributes: [
+                    .font: nsFont,
+                    .foregroundColor: baseColor,
+                    .paragraphStyle: paragraphStyle
+                ]))
+            }
+        }
+        view.attributedStringValue = attributed
+    }
+}
+
+/// Custom NSTextField that intercepts link clicks to call word tap handler.
+class TaggedVerseNSTextField: NSTextField {
+    var wordTapHandler: ((Int) -> Void)?
+
+    // Persistent layout objects for hit testing — avoids recreating per click
+    private var hitTestStorage: NSTextStorage?
+    private var hitTestLayoutManager: NSLayoutManager?
+    private var hitTestContainer: NSTextContainer?
+
+    private func ensureHitTestLayout() {
+        if hitTestStorage == nil {
+            let storage = NSTextStorage()
+            let lm = NSLayoutManager()
+            let tc = NSTextContainer(containerSize: NSSize(width: bounds.width, height: .greatestFiniteMagnitude))
+            tc.lineFragmentPadding = 2.0
+            storage.addLayoutManager(lm)
+            lm.addTextContainer(tc)
+            hitTestStorage = storage
+            hitTestLayoutManager = lm
+            hitTestContainer = tc
+        }
+        hitTestContainer?.containerSize = NSSize(width: bounds.width, height: .greatestFiniteMagnitude)
+        hitTestStorage?.setAttributedString(attributedStringValue)
+        hitTestLayoutManager?.ensureLayout(for: hitTestContainer!)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+
+        ensureHitTestLayout()
+        guard let storage = hitTestStorage,
+              let lm = hitTestLayoutManager,
+              let tc = hitTestContainer else {
+            super.mouseDown(with: event)
+            return
+        }
+
+        let charIndex = lm.characterIndex(
+            for: NSPoint(x: point.x - 2.0, y: point.y),
+            in: tc,
+            fractionOfDistanceBetweenInsertionPoints: nil
+        )
+
+        if charIndex < storage.length {
+            let attrs = storage.attributes(at: charIndex, effectiveRange: nil)
+            if let link = attrs[.link] as? String, link.hasPrefix("word://") {
+                if let wordIndex = Int(link.dropFirst("word://".count)) {
+                    wordTapHandler?(wordIndex)
+                    return
+                }
+            }
+        }
+        super.mouseDown(with: event)
+    }
+
+    override var intrinsicContentSize: NSSize {
+        guard let cell = self.cell else { return super.intrinsicContentSize }
+        let width = superview?.bounds.width ?? bounds.width
+        if width <= 0 { return super.intrinsicContentSize }
+        let size = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: .greatestFiniteMagnitude))
+        return NSSize(width: NSView.noIntrinsicMetric, height: size.height)
+    }
+
+    override func layout() {
+        super.layout()
+        invalidateIntrinsicContentSize()
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        // Add pointing hand cursor over linked words
+        ensureHitTestLayout()
+        guard let storage = hitTestStorage,
+              let lm = hitTestLayoutManager,
+              let tc = hitTestContainer else { return }
+
+        storage.enumerateAttribute(.link, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
+            guard value != nil else { return }
+            let glyphRange = lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            lm.enumerateEnclosingRects(
+                forGlyphRange: glyphRange,
+                withinSelectedGlyphRange: NSRange(location: NSNotFound, length: 0),
+                in: tc
+            ) { rect, _ in
+                let adjusted = NSRect(x: rect.origin.x + 2.0, y: rect.origin.y, width: rect.width, height: rect.height)
+                self.addCursorRect(adjusted, cursor: .pointingHand)
+            }
+        }
     }
 }
 

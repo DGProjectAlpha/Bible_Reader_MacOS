@@ -155,7 +155,7 @@ struct CrossReferenceView: View {
 
     private func tskRefRow(_ ref: TSKDisplayRef) -> some View {
         Button(action: {
-            navigateToRef(ref.verseId)
+            navigateReaderTo(verseId: ref.verseId)
         }) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
@@ -174,7 +174,7 @@ struct CrossReferenceView: View {
                         .padding(.vertical, 2)
                         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
 
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "arrow.right.circle")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }

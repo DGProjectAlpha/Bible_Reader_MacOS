@@ -139,7 +139,9 @@ class WindowState: ObservableObject {
     }
 
     func toggleSidebar() {
-        showSidebar.toggle()
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showSidebar.toggle()
+        }
     }
 
     func toggleSearchPanel() {
@@ -181,6 +183,10 @@ class WindowState: ObservableObject {
         } else if let tId = translationId {
             newPane.selectedTranslationId = tId
         }
+        // For vertical splits, mark the new pane as a vertical buddy of the source
+        if direction == .vertical {
+            newPane.verticalBuddyId = sourcePaneId
+        }
         // Insert right after the source pane
         if let idx = panes.firstIndex(where: { $0.id == sourcePaneId }) {
             panes.insert(newPane, at: idx + 1)
@@ -192,6 +198,10 @@ class WindowState: ObservableObject {
 
     func removePane(_ id: UUID) {
         guard panes.count > 1 else { return }
+        // If closing a parent pane, detach its vertical buddy so it becomes standalone
+        for pane in panes where pane.verticalBuddyId == id {
+            pane.verticalBuddyId = nil
+        }
         panes.removeAll { $0.id == id }
         observePaneChanges()
     }
