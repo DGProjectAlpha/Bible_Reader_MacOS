@@ -33,9 +33,10 @@ struct StrongsSidebarView: View {
     @State private var isLoadingSimilar = false
     @State private var expandedSimilarNum: String?
 
-    // Other words in verse (secondary list)
-    @State private var showOtherWords = false
-    @State private var expandedOtherEntry: String?
+    // Per-similar-entry verse data
+    @State private var similarVersesOpen: Set<String> = []
+    @State private var similarVerseRefs: [String: [StrongsService.VerseReference]] = [:]
+    @State private var similarVersesLoading: Set<String> = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -109,9 +110,6 @@ struct StrongsSidebarView: View {
 
                     // Similar numbers
                     similarSection
-
-                    // Other words in this verse
-                    otherWordsSection
                 }
             }
         }
@@ -121,37 +119,33 @@ struct StrongsSidebarView: View {
 
     private func entryDetailSection(_ entry: StrongsEntry) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Strong's number badge + word from verse
-            HStack(spacing: 8) {
+            // Strong's number prominently at top
+            HStack(alignment: .center, spacing: 10) {
                 Text(entry.number)
-                    .font(.caption.monospacedDigit().weight(.bold))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
+                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
                     .background(strongsBadgeColor(entry.number))
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                if !focusedWord.isEmpty {
-                    Text("\"" + focusedWord + "\"")
-                        .font(.system(size: 13, weight: .medium))
+                VStack(alignment: .leading, spacing: 2) {
+                    if !focusedWord.isEmpty {
+                        Text(focusedWord)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.primary)
+                    }
+                    Text(entry.testament == .old ? "Hebrew" : "Greek")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer()
-
-                // Testament indicator
-                HStack(spacing: 3) {
-                    Image(systemName: entry.testament == .old ? "textformat.abc" : "textformat.abc.dottedunderline")
-                        .font(.caption2)
-                    Text(entry.testament == .old ? "Hebrew" : "Greek")
-                        .font(.caption2)
-                }
-                .foregroundStyle(.tertiary)
             }
 
-            // Lemma (original word)
+            // Lemma (original Hebrew/Greek word)
             Text(entry.lemma)
-                .font(.system(size: 28, design: .serif))
+                .font(.system(size: 32, design: .serif))
                 .foregroundStyle(.primary)
                 .environment(\.layoutDirection, entry.testament == .old ? .rightToLeft : .leftToRight)
 
@@ -277,24 +271,9 @@ struct StrongsSidebarView: View {
                         }
                         LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(refs) { ref in
-                                Button(action: { navigateToVerse(book: ref.book, chapter: ref.chapter, verse: ref.verse) }) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(ref.displayRef)
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(.blue)
-                                        if !ref.text.isEmpty {
-                                            Text(ref.text)
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(2)
-                                        }
-                                    }
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 4)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .contentShape(Rectangle())
+                                VerseRefButton(ref: ref) {
+                                    navigateToVerse(book: ref.book, chapter: ref.chapter, verse: ref.verse)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -362,6 +341,13 @@ struct StrongsSidebarView: View {
                         .foregroundStyle(isExact ? .blue : .orange)
                         .clipShape(RoundedRectangle(cornerRadius: 3))
 
+                    if isExact {
+                        Text("Best Match")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.blue)
+                            .textCase(.uppercase)
+                    }
+
                     Text(entry.lemma)
                         .font(.system(size: 14, design: .serif))
                         .lineLimit(1)
@@ -389,11 +375,31 @@ struct StrongsSidebarView: View {
                 compactEntryDetail(entry)
             }
         }
-        .background(isExpanded ? Color.accentColor.opacity(0.04) : Color.clear)
+        .background(isExpanded ? Color.accentColor.opacity(0.06) : Color.clear)
     }
 
     private func compactEntryDetail(_ entry: StrongsEntry) -> some View {
         VStack(alignment: .leading, spacing: 6) {
+            // Lemma
+            Text(entry.lemma)
+                .font(.system(size: 22, design: .serif))
+                .foregroundStyle(.primary)
+                .environment(\.layoutDirection, entry.testament == .old ? .rightToLeft : .leftToRight)
+
+            // Transliteration + pronunciation
+            HStack(spacing: 6) {
+                if !entry.transliteration.isEmpty {
+                    Text(entry.transliteration)
+                        .font(.caption.italic())
+                        .foregroundStyle(.primary)
+                }
+                if let pron = entry.pronunciation, !pron.isEmpty {
+                    Text("(\(pron))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             if let def = entry.strongsDefinition, !def.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
                     sectionLabel("Definition")
@@ -413,14 +419,47 @@ struct StrongsSidebarView: View {
                 }
             }
             if let kjv = entry.kjvDefinition, !kjv.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
-                    sectionLabel("KJV Usage")
-                    Text(kjv)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 4) {
+                        sectionLabel("KJV Usage")
+                        let total = totalUsageCount(kjv)
+                        if let total {
+                            Text("(\(total) occurrences)")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+
+                    let items = parseKjvUsage(kjv)
+                    if !items.isEmpty {
+                        FlowLayoutCompact {
+                            ForEach(items.indices, id: \.self) { i in
+                                HStack(spacing: 2) {
+                                    Text(items[i].word)
+                                        .font(.caption2)
+                                    if let count = items[i].count {
+                                        Text("×\(count)")
+                                            .font(.caption2.monospacedDigit())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.secondary.opacity(0.1))
+                                .clipShape(Capsule())
+                            }
+                        }
+                    } else {
+                        Text(kjv)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
+
+            // Expandable verses for this similar entry
+            similarVersesButton(for: entry)
 
             // Button to switch focus to this entry
             Button(action: {
@@ -439,91 +478,91 @@ struct StrongsSidebarView: View {
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
-    // MARK: - Other Words in Verse
-
-    private var otherWordsSection: some View {
-        Group {
-            if resolvedTags.count > 1 {
-                VStack(alignment: .leading, spacing: 0) {
-                    Divider()
-
-                    Button(action: { withAnimation { showOtherWords.toggle() } }) {
-                        HStack {
-                            sectionLabel("Other Words in Verse")
-                            Spacer()
-                            Text("\(resolvedTags.count) words")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                            Image(systemName: showOtherWords ? "chevron.up" : "chevron.down")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-
-                    if showOtherWords {
-                        LazyVStack(spacing: 1) {
-                            ForEach(resolvedTags) { resolved in
-                                if resolved.strongsNumbers.first != focusedNumber {
-                                    otherWordRow(resolved)
-                                }
-                            }
-                        }
-                        .padding(.bottom, 8)
-                    }
-                }
-            }
-        }
-    }
-
-    private func otherWordRow(_ resolved: ResolvedWordTag) -> some View {
-        let num = resolved.strongsNumbers.first ?? ""
-        let isExpanded = expandedOtherEntry == num
-        return VStack(alignment: .leading, spacing: 0) {
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    // Switch focus to this word
-                    if let entry = resolved.primaryEntry {
-                        switchFocus(to: entry, word: resolved.word)
-                    }
-                }
-            }) {
-                HStack(spacing: 6) {
-                    Text(resolved.word)
-                        .font(.system(size: 13, weight: .medium, design: .serif))
+    private func similarVersesButton(for entry: StrongsEntry) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: { toggleSimilarVerses(for: entry.number) }) {
+                HStack(spacing: 4) {
+                    Text("Verses Using This Word")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
                     Spacer()
-                    ForEach(resolved.strongsNumbers, id: \.self) { n in
-                        Text(n)
-                            .font(.caption2.monospacedDigit().weight(.semibold))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(strongsBadgeColor(n))
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    if similarVersesLoading.contains(entry.number) {
+                        ProgressView()
+                            .scaleEffect(0.5)
                     }
+                    Image(systemName: similarVersesOpen.contains(entry.number) ? "chevron.up" : "chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 5)
+                .padding(.vertical, 4)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
+            if similarVersesOpen.contains(entry.number), let refs = similarVerseRefs[entry.number] {
+                if refs.isEmpty {
+                    Text("No verses found")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .padding(.bottom, 4)
+                } else {
+                    if refs.count >= 300 {
+                        Text("Showing first 300 results")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .padding(.bottom, 2)
+                    }
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(refs) { ref in
+                            VerseRefButton(ref: ref) {
+                                navigateToVerse(book: ref.book, chapter: ref.chapter, verse: ref.verse)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
-    // MARK: - Word List Fallback (no word clicked)
-
-    private var wordListFallback: some View {
-        ScrollView {
-            LazyVStack(spacing: 1) {
-                ForEach(resolvedTags) { resolved in
-                    otherWordRow(resolved)
+    private func toggleSimilarVerses(for number: String) {
+        if !similarVersesOpen.contains(number) && similarVerseRefs[number] == nil {
+            similarVersesLoading.insert(number)
+            let fp = translationFilePath
+            DispatchQueue.global(qos: .userInitiated).async {
+                let refs = StrongsService.findVersesByStrongs(number, filePath: fp)
+                DispatchQueue.main.async {
+                    similarVerseRefs[number] = refs
+                    similarVersesLoading.remove(number)
+                    similarVersesOpen.insert(number)
                 }
             }
-            .padding(.vertical, 4)
+        } else {
+            if similarVersesOpen.contains(number) {
+                similarVersesOpen.remove(number)
+            } else {
+                similarVersesOpen.insert(number)
+            }
         }
+    }
+
+    // MARK: - Click a Word Prompt (no word focused yet)
+
+    private var wordListFallback: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "hand.tap")
+                .font(.system(size: 36))
+                .foregroundStyle(.quaternary)
+            Text("Tap a Word")
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.secondary)
+            Text("Click any word in the verse to see its Strong's concordance entry.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Empty State
@@ -555,7 +594,9 @@ struct StrongsSidebarView: View {
         similarEntries = []
         similarExact = nil
         expandedSimilarNum = nil
-        showOtherWords = false
+        similarVersesOpen = []
+        similarVerseRefs = [:]
+        similarVersesLoading = []
         let targetWordIndex = initialWordIndex
 
         DispatchQueue.global(qos: .userInitiated).async {
@@ -601,6 +642,9 @@ struct StrongsSidebarView: View {
         expandedSimilarNum = nil
         similarEntries = []
         similarExact = nil
+        similarVersesOpen = []
+        similarVerseRefs = [:]
+        similarVersesLoading = []
 
         if let word = word, !word.isEmpty {
             loadSimilarEntries(word: word)
@@ -713,6 +757,40 @@ struct StrongsSidebarView: View {
             found = true
         }
         return found ? total : nil
+    }
+}
+
+// MARK: - Verse Reference Button with Hover
+
+private struct VerseRefButton: View {
+    let ref: StrongsService.VerseReference
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(ref.displayRef)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.blue)
+                if !ref.text.isEmpty {
+                    Text(ref.text)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.blue.opacity(isHovered ? 0.08 : 0))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
 }
 

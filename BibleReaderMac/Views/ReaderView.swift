@@ -1263,7 +1263,7 @@ struct TaggedVerseTextView: NSViewRepresentable {
             if hasStrongs {
                 attrs[.cursor] = NSCursor.pointingHand
                 attrs[.toolTip] = tag.strongsNumbers.joined(separator: ", ")
-                attrs[.link] = "word://\(i)"
+                attrs[TaggedVerseNSTextField.wordIndexKey] = i
             }
             attributed.append(NSAttributedString(string: tag.word, attributes: attrs))
             if i < wordTags.count - 1 {
@@ -1280,6 +1280,9 @@ struct TaggedVerseTextView: NSViewRepresentable {
 
 /// Custom NSTextField that intercepts link clicks to call word tap handler.
 class TaggedVerseNSTextField: NSTextField {
+    /// Custom attribute key for word index (avoids .link which forces blue text)
+    static let wordIndexKey = NSAttributedString.Key("wordIndex")
+
     var wordTapHandler: ((Int) -> Void)?
 
     // Persistent layout objects for hit testing — avoids recreating per click
@@ -1323,11 +1326,9 @@ class TaggedVerseNSTextField: NSTextField {
 
         if charIndex < storage.length {
             let attrs = storage.attributes(at: charIndex, effectiveRange: nil)
-            if let link = attrs[.link] as? String, link.hasPrefix("word://") {
-                if let wordIndex = Int(link.dropFirst("word://".count)) {
-                    wordTapHandler?(wordIndex)
-                    return
-                }
+            if let wordIndex = attrs[TaggedVerseNSTextField.wordIndexKey] as? Int {
+                wordTapHandler?(wordIndex)
+                return
             }
         }
         super.mouseDown(with: event)
