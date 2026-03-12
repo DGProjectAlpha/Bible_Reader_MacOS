@@ -112,9 +112,9 @@ struct ContentView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
             Button(action: { windowState.toggleSidebar() }) {
-                Label("Sidebar", systemImage: "sidebar.leading")
+                Label(L("toolbar.sidebar"), systemImage: "sidebar.leading")
             }
-            .help("Toggle Sidebar (⌘⇧S)")
+            .help(L("toolbar.toggle_sidebar"))
             .keyboardShortcut("s", modifiers: [.command, .shift])
         }
 
@@ -124,27 +124,26 @@ struct ContentView: View {
                     windowState.showInspector.toggle()
                 }
             }) {
-                Label("Inspector", systemImage: "sidebar.trailing")
+                Label(L("toolbar.inspector"), systemImage: "sidebar.trailing")
             }
-            .help("Toggle Inspector (Strong's & Cross-Refs)")
+            .help(L("toolbar.toggle_inspector"))
 
             Button(action: { windowState.toggleSearchPanel() }) {
-                Label("Search", systemImage: "magnifyingglass")
+                Label(L("toolbar.search"), systemImage: "magnifyingglass")
             }
-            .help("Search (⌘F)")
+            .help(L("toolbar.search_help"))
         }
     }
 
     private func handleOnAppear() {
-        if let pane = windowState.panes.first {
-            store.restoreLastPosition(into: pane)
-            // If pane's translation ID doesn't match any loaded translation, assign the first one
-            if let firstTranslation = store.loadedTranslations.first,
-               !store.loadedTranslations.contains(where: { $0.id == pane.selectedTranslationId }) {
-                pane.selectedTranslationId = firstTranslation.id
-            }
-            store.loadVerses(for: pane)
-        }
+        guard let firstTranslationId = store.firstTranslationId() else { return }
+
+        // Restore last position from UserDefaults
+        let lastBook = UserDefaults.standard.string(forKey: "lastBook") ?? "Genesis"
+        let lastChapter = UserDefaults.standard.integer(forKey: "lastChapter")
+        let chapter = lastChapter > 0 ? lastChapter : 1
+
+        windowState.createInitialPane(translationId: firstTranslationId, book: lastBook, chapter: chapter)
         windowState.updateTitle()
     }
 
@@ -152,21 +151,26 @@ struct ContentView: View {
 
     private func navigateChapter(delta: Int) {
         guard let pane = windowState.panes.first else { return }
-        let newChapter = pane.selectedChapter + delta
-        if newChapter >= 1 && newChapter <= pane.chapterCount {
-            pane.selectedChapter = newChapter
-            store.loadVerses(for: pane)
-        }
+        let newChapter = pane.chapter + delta
+        guard newChapter >= 1 && newChapter <= pane.chapterCount else { return }
+        windowState.navigate(paneId: pane.id, chapter: newChapter)
+        guard let updated = windowState.panes.first else { return }
+        let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
+        let scheme = store.versificationScheme(for: updated.translationId)
+        windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
     }
 
     private func navigateBook(delta: Int) {
         guard let pane = windowState.panes.first else { return }
-        guard let idx = BibleBooks.all.firstIndex(of: pane.selectedBook) else { return }
+        guard let idx = BibleBooks.all.firstIndex(of: pane.book) else { return }
         let newIdx = idx + delta
         guard newIdx >= 0 && newIdx < BibleBooks.all.count else { return }
-        pane.selectedBook = BibleBooks.all[newIdx]
-        pane.selectedChapter = 1
-        store.loadVerses(for: pane)
+        let newBook = BibleBooks.all[newIdx]
+        windowState.navigate(paneId: pane.id, book: newBook, chapter: 1)
+        guard let updated = windowState.panes.first else { return }
+        let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
+        let scheme = store.versificationScheme(for: updated.translationId)
+        windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
     }
 
     // MARK: - Drop Overlay
@@ -180,7 +184,7 @@ struct ContentView: View {
                 Image(systemName: "arrow.down.doc.fill")
                     .font(.system(size: 48))
                     .foregroundStyle(.white)
-                Text("Drop to Import Module")
+                Text(L("drop.import_module"))
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(.white)
             }
@@ -233,15 +237,14 @@ private struct SheetNotifications: ViewModifier {
                 showManageTranslations = true
             }
             .onReceive(NotificationCenter.default.publisher(for: .addTranslationPane)) { _ in
-                let tId = store.loadedTranslations.first?.id
-                windowState.addPane(translationId: tId)
+                guard let tId = store.firstTranslationId() else { return }
+                let pane = windowState.panes.first
+                windowState.addPane(translationId: tId, book: pane?.book ?? "Genesis", chapter: pane?.chapter ?? 1)
             }
             .onReceive(NotificationCenter.default.publisher(for: .bookmarkCurrentVerse)) { _ in
                 guard let pane = windowState.panes.first else { return }
-                let verseId = "\(pane.selectedBook):\(pane.selectedChapter):1"
-                if let translation = store.loadedTranslations.first(where: { $0.id == pane.selectedTranslationId }) {
-                    store.addBookmark(verseId: verseId, translationId: translation.id)
-                }
+                let verseId = "\(pane.book):\(pane.chapter):1"
+                store.addBookmark(verseId: verseId, translationId: pane.translationId)
             }
     }
 }
@@ -278,8 +281,9 @@ private struct InspectorNotifications: ViewModifier {
         content
             .onReceive(NotificationCenter.default.publisher(for: .translationRemoved)) { notification in
                 guard let removedId = notification.userInfo?["translationId"] as? UUID else { return }
-                for pane in windowState.panes where pane.selectedTranslationId == removedId {
-                    pane.selectedTranslationId = store.loadedTranslations.first?.id ?? UUID()
+                guard let firstAvailable = store.loadedTranslations.first?.id else { return }
+                for pane in windowState.panes where pane.translationId == removedId {
+                    windowState.navigate(paneId: pane.id, translationId: firstAvailable)
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .showCrossReferences)) { notification in
@@ -315,7 +319,7 @@ private struct MiscNotifications: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onReceive(NotificationCenter.default.publisher(for: .navigateToReader)) { _ in }
-.onReceive(NotificationCenter.default.publisher(for: .importModuleFile)) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .importModuleFile)) { notification in
                 if let url = notification.object as? URL {
                     Task {
                         _ = await importHandler.importFile(at: url, into: store)
@@ -428,8 +432,8 @@ struct InspectorPanelView: View {
             } else {
                 inspectorPlaceholder(
                     icon: "textformat.abc",
-                    title: "Strong's Concordance",
-                    message: "Tap a verse to see Strong's numbers"
+                    title: L("inspector.strongs_title"),
+                    message: L("inspector.strongs_empty")
                 )
             }
 
@@ -439,8 +443,8 @@ struct InspectorPanelView: View {
             } else {
                 inspectorPlaceholder(
                     icon: "link",
-                    title: "Cross-References",
-                    message: "Right-click a verse and select Cross-References"
+                    title: L("inspector.crossref_title"),
+                    message: L("inspector.crossref_empty")
                 )
             }
 

@@ -2,122 +2,146 @@ import Foundation
 import SwiftUI
 import Combine
 
-// MARK: - Sidebar Tab (left panel)
+// MARK: - Sidebar Tab
 
 enum SidebarTab: String, CaseIterable, Hashable {
-    case bookmarks
-    case notes
-    case modules
+    case bookmarks, notes, modules
 
     var label: String {
         switch self {
-        case .bookmarks: return "Bookmarks"
-        case .notes: return "Notes"
-        case .modules: return "Modules"
+        case .bookmarks: return L("tab.bookmarks")
+        case .notes:     return L("tab.notes")
+        case .modules:   return L("tab.modules")
         }
     }
 
     var icon: String {
         switch self {
         case .bookmarks: return "bookmark.fill"
-        case .notes: return "note.text"
-        case .modules: return "books.vertical"
+        case .notes:     return "note.text"
+        case .modules:   return "books.vertical"
         }
     }
 }
 
-// MARK: - Inspector Tab (right panel)
+// MARK: - Inspector Tab
 
 enum InspectorTab: String, CaseIterable, Hashable {
-    case strongs
-    case crossRefs
+    case strongs, crossRefs
 
     var label: String {
         switch self {
-        case .strongs: return "Strong's"
-        case .crossRefs: return "Cross-Refs"
+        case .strongs:   return L("tab.strongs")
+        case .crossRefs: return L("tab.crossrefs")
         }
     }
 
     var icon: String {
         switch self {
-        case .strongs: return "textformat.abc"
+        case .strongs:   return "textformat.abc"
         case .crossRefs: return "link"
         }
     }
 }
 
-// MARK: - Legacy SidebarItem (kept for notification compatibility during migration)
+// MARK: - Legacy SidebarItem
 
 enum SidebarItem: Hashable {
-    case reader
-    case search
-    case strongs
-    case bookmarks
-    case history
-    case notes
-    case crossRefs
+    case reader, search, strongs, bookmarks, history, notes, crossRefs
 }
 
 // MARK: - Split Direction
 
 enum SplitDirection {
-    case horizontal  // split right
-    case vertical    // split down
+    case horizontal
+    case vertical
 }
 
-/// Per-window state — each window gets its own instance with independent
-/// panes, sidebar selection, and navigation. The shared BibleStore holds
-/// global data (translations, bookmarks, history).
+// MARK: - WindowState
+
 @MainActor
 class WindowState: ObservableObject {
-    @Published var panes: [ReaderPane] = [ReaderPane()]
+    @Published var panes: [ReaderPane] = []
     @Published var windowTitle: String = "BibleReader"
 
-    // Sidebar state
+    // Sidebar
     @Published var showSidebar: Bool = false
     @Published var selectedSidebarTab: SidebarTab = .bookmarks
-    @Published var selectedSidebarItem: SidebarItem? = .reader // legacy, kept for compat
+    @Published var selectedSidebarItem: SidebarItem? = .reader
 
-    // Inspector state
+    // Inspector
     @Published var showInspector: Bool = false
     @Published var inspectorTab: InspectorTab = .strongs
-
-    // Strong's context passed from verse word click
     @Published var inspectorStrongsVerseId: String?
     @Published var inspectorStrongsFilePath: String?
     @Published var inspectorStrongsDisplayRef: String?
-    @Published var inspectorStrongsWordIndex: Int?  // auto-expand this word in sidebar
-
-    // Cross-refs context passed from verse number click
+    @Published var inspectorStrongsWordIndex: Int?
     @Published var inspectorCrossRefVerseId: String?
 
-    // Search state
+    // Search
     @Published var showSearchPanel: Bool = false
     @Published var searchQuery: String = ""
 
-    // Tracks which pane was most recently interacted with (for cross-ref / verse navigation target)
+    // Last active pane for cross-ref navigation targeting
     @Published var lastActivePaneId: UUID?
 
-    private var titleCancellables = Set<AnyCancellable>()
-
     init() {
-        observePaneChanges()
+        // Panes are added externally once translations are loaded (see ContentView.handleOnAppear)
     }
 
-    /// Initialize with a specific book/chapter (e.g. from a history entry or cross-ref link)
-    convenience init(book: String, chapter: Int, translationId: UUID? = nil) {
-        self.init()
-        guard let pane = panes.first else { return }
-        pane.selectedBook = book
-        pane.selectedChapter = chapter
-        if let tId = translationId {
-            pane.selectedTranslationId = tId
-        }
+    // MARK: - Pane creation
+
+    /// Create the first pane with a valid translation ID. Called from ContentView after store loads.
+    func createInitialPane(translationId: UUID, book: String = "Genesis", chapter: Int = 1) {
+        let pane = ReaderPane(translationId: translationId, book: book, chapter: chapter)
+        panes = [pane]
         updateTitle()
     }
 
-    // MARK: - Inspector Helpers
+    // MARK: - Pane mutation (always via these methods to keep @Published firing)
+
+    func navigate(paneId: UUID, book: String? = nil, chapter: Int? = nil, translationId: UUID? = nil) {
+        guard let idx = panes.firstIndex(where: { $0.id == paneId }) else { return }
+        if let book = book  { panes[idx].book = book }
+        if let ch = chapter { panes[idx].chapter = ch }
+        if let tId = translationId { panes[idx].translationId = tId }
+        updateTitle()
+    }
+
+    func setVerses(paneId: UUID, verses: [Verse], versificationScheme: String) {
+        guard let idx = panes.firstIndex(where: { $0.id == paneId }) else { return }
+        panes[idx].verses = verses
+        panes[idx].versificationScheme = versificationScheme
+    }
+
+    // MARK: - Pane management
+
+    func addPane(translationId: UUID, book: String = "Genesis", chapter: Int = 1) {
+        let pane = ReaderPane(translationId: translationId, book: book, chapter: chapter)
+        panes.append(pane)
+    }
+
+    func splitPane(_ sourcePaneId: UUID, direction: SplitDirection) {
+        guard panes.count < 8,
+              let idx = panes.firstIndex(where: { $0.id == sourcePaneId }) else { return }
+        let source = panes[idx]
+        var newPane = ReaderPane(translationId: source.translationId, book: source.book, chapter: source.chapter)
+        newPane.versificationScheme = source.versificationScheme
+        if direction == .vertical {
+            newPane.verticalBuddyId = sourcePaneId
+        }
+        panes.insert(newPane, at: idx + 1)
+    }
+
+    func removePane(_ id: UUID) {
+        guard panes.count > 1 else { return }
+        for idx in panes.indices where panes[idx].verticalBuddyId == id {
+            panes[idx].verticalBuddyId = nil
+        }
+        panes.removeAll { $0.id == id }
+    }
+
+    // MARK: - Inspector
 
     func showStrongsInspector(verseId: String, displayRef: String, filePath: String, wordIndex: Int? = nil) {
         inspectorStrongsVerseId = verseId
@@ -125,30 +149,22 @@ class WindowState: ObservableObject {
         inspectorStrongsFilePath = filePath
         inspectorStrongsWordIndex = wordIndex
         inspectorTab = .strongs
-        withAnimation(.easeInOut(duration: 0.25)) {
-            showInspector = true
-        }
+        withAnimation(.easeInOut(duration: 0.25)) { showInspector = true }
     }
 
     func showCrossRefsInspector(verseId: String) {
         inspectorCrossRefVerseId = verseId
         inspectorTab = .crossRefs
-        withAnimation(.easeInOut(duration: 0.25)) {
-            showInspector = true
-        }
+        withAnimation(.easeInOut(duration: 0.25)) { showInspector = true }
     }
 
     func showSearchInspector(query: String = "") {
-        if !query.isEmpty {
-            searchQuery = query
-        }
+        if !query.isEmpty { searchQuery = query }
         showSearchPanel = true
     }
 
     func toggleSidebar() {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            showSidebar.toggle()
-        }
+        withAnimation(.easeInOut(duration: 0.25)) { showSidebar.toggle() }
     }
 
     func toggleSearchPanel() {
@@ -166,76 +182,13 @@ class WindowState: ObservableObject {
         }
     }
 
-    // MARK: - Pane Management
-
-    func addPane(translationId: UUID? = nil) {
-        let pane = ReaderPane()
-        if let tId = translationId {
-            pane.selectedTranslationId = tId
-        }
-        panes.append(pane)
-        observePaneChanges()
-    }
-
-    /// Split a specific pane — inserts a new pane adjacent to the source pane.
-    /// The direction is stored for future layout use; currently the new pane
-    /// is inserted immediately after the source pane in the array.
-    func splitPane(_ sourcePaneId: UUID, direction: SplitDirection, translationId: UUID? = nil) {
-        guard panes.count < 8 else { return }
-        let newPane = ReaderPane()
-        // Copy the source pane's current book/chapter/translation to the new pane
-        if let source = panes.first(where: { $0.id == sourcePaneId }) {
-            newPane.selectedBook = source.selectedBook
-            newPane.selectedChapter = source.selectedChapter
-            newPane.selectedTranslationId = translationId ?? source.selectedTranslationId
-            newPane.versificationScheme = source.versificationScheme
-        } else if let tId = translationId {
-            newPane.selectedTranslationId = tId
-        }
-        // For vertical splits, mark the new pane as a vertical buddy of the source
-        if direction == .vertical {
-            newPane.verticalBuddyId = sourcePaneId
-        }
-        // Insert right after the source pane
-        if let idx = panes.firstIndex(where: { $0.id == sourcePaneId }) {
-            panes.insert(newPane, at: idx + 1)
-        } else {
-            panes.append(newPane)
-        }
-        observePaneChanges()
-    }
-
-    func removePane(_ id: UUID) {
-        guard panes.count > 1 else { return }
-        // If closing a parent pane, detach its vertical buddy so it becomes standalone
-        for pane in panes where pane.verticalBuddyId == id {
-            pane.verticalBuddyId = nil
-        }
-        panes.removeAll { $0.id == id }
-        observePaneChanges()
-    }
-
-    // MARK: - Window Title
-
-    private func observePaneChanges() {
-        titleCancellables.removeAll()
-        // Observe the first pane's book/chapter for the window title
-        guard let pane = panes.first else { return }
-        pane.$selectedBook
-            .combineLatest(pane.$selectedChapter)
-            .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
-            .sink { [weak self] _, _ in
-                self?.updateTitle()
-            }
-            .store(in: &titleCancellables)
-        updateTitle()
-    }
+    // MARK: - Title
 
     func updateTitle() {
         guard let pane = panes.first else {
             windowTitle = "BibleReader"
             return
         }
-        windowTitle = "\(pane.selectedBook) \(pane.selectedChapter) — BibleReader"
+        windowTitle = "\(pane.book) \(pane.chapter) — BibleReader"
     }
 }

@@ -6,21 +6,21 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             DisplaySettingsTab()
-                .tabItem { Label("Display", systemImage: "textformat") }
+                .tabItem { Label(L("settings.tab.display"), systemImage: "textformat") }
 
             AppearanceSettingsTab()
-                .tabItem { Label("Appearance", systemImage: "paintbrush") }
+                .tabItem { Label(L("settings.tab.appearance"), systemImage: "paintbrush") }
 
             ReadingSettingsTab()
-                .tabItem { Label("Reading", systemImage: "book") }
+                .tabItem { Label(L("settings.tab.reading"), systemImage: "book") }
 
             ProfileSettingsTab()
                 .environmentObject(store)
-                .tabItem { Label("Profiles", systemImage: "person.2") }
+                .tabItem { Label(L("settings.tab.profiles"), systemImage: "person.2") }
 
             GeneralSettingsTab()
                 .environmentObject(store)
-                .tabItem { Label("General", systemImage: "gear") }
+                .tabItem { Label(L("settings.tab.general"), systemImage: "gear") }
         }
         .frame(minWidth: 480, idealWidth: 520, minHeight: 400, idealHeight: 480)
         .vibrancyBackground(material: .underWindowBackground)
@@ -43,24 +43,24 @@ struct DisplaySettingsTab: View {
 
     var body: some View {
         Form {
-            Section("Font") {
-                Picker("Family", selection: $fontFamily) {
+            Section(L("settings.font")) {
+                Picker(L("settings.font_family"), selection: $fontFamily) {
                     ForEach(fontOptions, id: \.self) { name in
                         Text(name).tag(name)
                     }
                 }
 
                 HStack {
-                    Text("Size")
+                    Text(L("settings.font_size"))
                     Slider(value: $fontSize, in: 10...36, step: 1)
-                    Text("\(Int(fontSize))pt")
+                    Text("\(Int(fontSize))\(L("settings.font_size_pt"))")
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                         .frame(width: 40, alignment: .trailing)
                 }
 
                 HStack {
-                    Text("Line Spacing")
+                    Text(L("settings.line_spacing"))
                     Spacer()
                     Slider(value: $lineSpacing, in: 1.0...2.5, step: 0.1)
                         .frame(width: 180)
@@ -71,7 +71,7 @@ struct DisplaySettingsTab: View {
                 }
 
                 HStack {
-                    Text("Word Spacing")
+                    Text(L("settings.word_spacing"))
                     Spacer()
                     Slider(value: $wordSpacing, in: -2.0...8.0, step: 0.5)
                         .frame(width: 180)
@@ -82,24 +82,24 @@ struct DisplaySettingsTab: View {
                 }
             }
 
-            Section("Layout") {
-                Picker("Verse Numbers", selection: $verseNumberStyle) {
-                    Text("Superscript").tag("superscript")
-                    Text("Inline").tag("inline")
-                    Text("Margin").tag("margin")
+            Section(L("settings.layout")) {
+                Picker(L("settings.verse_numbers"), selection: $verseNumberStyle) {
+                    Text(L("settings.superscript")).tag("superscript")
+                    Text(L("settings.inline")).tag("inline")
+                    Text(L("settings.margin")).tag("margin")
                 }
 
-                Toggle("Paragraph Mode (no line breaks between verses)", isOn: $paragraphMode)
+                Toggle(L("settings.paragraph_mode"), isOn: $paragraphMode)
             }
 
-            Section("Preview") {
+            Section(L("settings.preview")) {
                 previewText
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 6).fill(previewBgColor))
             }
 
             Section {
-                Button("Reset Display to Defaults") {
+                Button(L("settings.reset_display")) {
                     fontSize = 15
                     fontFamily = "System"
                     lineSpacing = 1.3
@@ -159,35 +159,37 @@ struct AppearanceSettingsTab: View {
     @State private var useCustomTextColor: Bool = false
     @State private var useCustomBgColor: Bool = false
 
-    private let themeOptions = [
-        ("auto", "System Default"),
-        ("light", "Light"),
-        ("dark", "Dark"),
-        ("sepia", "Sepia")
-    ]
+    private var themeOptions: [(String, String)] {
+        [
+            ("auto",  L("settings.theme_auto")),
+            ("light", L("settings.theme_light")),
+            ("dark",  L("settings.theme_dark")),
+            ("sepia", L("settings.theme_sepia"))
+        ]
+    }
 
     private let accentOptions = [
-        ("blue", Color.blue),
+        ("blue",   Color.blue),
         ("purple", Color.purple),
         ("indigo", Color.indigo),
-        ("brown", Color.brown),
-        ("red", Color.red),
-        ("green", Color.green)
+        ("brown",  Color.brown),
+        ("red",    Color.red),
+        ("green",  Color.green)
     ]
 
     var body: some View {
         Form {
-            Section("Theme") {
-                Picker("Appearance", selection: $readerTheme) {
+            Section(L("settings.theme")) {
+                Picker(L("settings.appearance"), selection: $readerTheme) {
                     ForEach(themeOptions, id: \.0) { value, label in
                         Text(label).tag(value)
                     }
                 }
             }
 
-            Section("Colors") {
+            Section(L("settings.colors")) {
                 HStack {
-                    Text("Accent Color")
+                    Text(L("settings.accent_color"))
                     Spacer()
                     ForEach(accentOptions, id: \.0) { name, color in
                         Circle()
@@ -203,16 +205,16 @@ struct AppearanceSettingsTab: View {
                 }
 
                 HStack {
-                    Text("Verse Highlight Intensity")
+                    Text(L("settings.highlight_intensity"))
                     Spacer()
                     Slider(value: $verseHighlightOpacity, in: 0.05...0.6, step: 0.01)
                         .frame(width: 160)
                 }
             }
 
-            Section("Custom Colors") {
+            Section(L("settings.custom_colors")) {
                 HStack {
-                    Toggle("Text Color", isOn: $useCustomTextColor)
+                    Toggle(L("settings.text_color"), isOn: $useCustomTextColor)
                         .onChange(of: useCustomTextColor) { _, enabled in
                             if !enabled {
                                 textColorHex = ""
@@ -235,7 +237,7 @@ struct AppearanceSettingsTab: View {
                 }
 
                 HStack {
-                    Toggle("Background Color", isOn: $useCustomBgColor)
+                    Toggle(L("settings.background_color"), isOn: $useCustomBgColor)
                         .onChange(of: useCustomBgColor) { _, enabled in
                             if !enabled {
                                 backgroundColorHex = ""
@@ -258,7 +260,7 @@ struct AppearanceSettingsTab: View {
                 }
 
                 if useCustomTextColor || useCustomBgColor {
-                    Button("Reset Colors to Defaults") {
+                    Button(L("settings.reset_colors")) {
                         useCustomTextColor = false
                         useCustomBgColor = false
                         textColorHex = ""
@@ -270,12 +272,12 @@ struct AppearanceSettingsTab: View {
                 }
             }
 
-            Section("Elements") {
-                Toggle("Show Chapter Titles", isOn: $showChapterTitles)
+            Section(L("settings.elements")) {
+                Toggle(L("settings.show_chapter_titles"), isOn: $showChapterTitles)
             }
 
             Section {
-                Button("Reset Appearance to Defaults") {
+                Button(L("settings.reset_appearance")) {
                     readerTheme = "auto"
                     accentColorName = "blue"
                     verseHighlightOpacity = 0.3
@@ -300,7 +302,7 @@ struct AppearanceSettingsTab: View {
     }
 }
 
-// MARK: - Reading Tab (Sync Scroll, Navigation behavior)
+// MARK: - Reading Tab
 
 struct ReadingSettingsTab: View {
     @AppStorage("syncScrolling") private var syncScrolling: Bool = true
@@ -310,27 +312,26 @@ struct ReadingSettingsTab: View {
 
     var body: some View {
         Form {
-            Section("Scroll & Navigation") {
-                Toggle("Sync scroll across panes", isOn: $syncScrolling)
-
-                Toggle("Restore last reading position on launch", isOn: $restoreLastPosition)
+            Section(L("settings.scroll_navigation")) {
+                Toggle(L("settings.sync_scroll"), isOn: $syncScrolling)
+                Toggle(L("settings.restore_position"), isOn: $restoreLastPosition)
             }
 
-            Section("Verse Display") {
-                Picker("Verse Number Style", selection: $verseNumberStyle) {
-                    Text("Superscript").tag("superscript")
-                    Text("Inline").tag("inline")
-                    Text("Margin").tag("margin")
+            Section(L("settings.verse_display")) {
+                Picker(L("settings.verse_number_style"), selection: $verseNumberStyle) {
+                    Text(L("settings.superscript")).tag("superscript")
+                    Text(L("settings.inline")).tag("inline")
+                    Text(L("settings.margin")).tag("margin")
                 }
 
-                Toggle("Show chapter titles in reader", isOn: $showChapterTitles)
+                Toggle(L("settings.show_chapter_titles_reader"), isOn: $showChapterTitles)
             }
         }
         .padding()
     }
 }
 
-// MARK: - Profile Tab (matching Windows profile management)
+// MARK: - Profile Tab
 
 struct ProfileSettingsTab: View {
     @EnvironmentObject var store: BibleStore
@@ -352,8 +353,8 @@ struct ProfileSettingsTab: View {
 
     var body: some View {
         Form {
-            Section("Active Profile") {
-                Picker("Profile", selection: $activeProfile) {
+            Section(L("settings.active_profile")) {
+                Picker(L("settings.profile"), selection: $activeProfile) {
                     ForEach(profiles, id: \.self) { name in
                         Text(name).tag(name)
                     }
@@ -362,12 +363,12 @@ struct ProfileSettingsTab: View {
                     store.switchProfile(to: newProfile)
                 }
 
-                Text("Each profile has its own bookmarks, highlights, notes, and reading history.")
+                Text(L("settings.profile_description"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Manage Profiles") {
+            Section(L("settings.manage_profiles")) {
                 ForEach(profiles, id: \.self) { name in
                     HStack {
                         Image(systemName: name == activeProfile ? "person.circle.fill" : "person.circle")
@@ -376,7 +377,7 @@ struct ProfileSettingsTab: View {
                             .fontWeight(name == activeProfile ? .semibold : .regular)
                         Spacer()
                         if name == activeProfile {
-                            Text("Active")
+                            Text(L("settings.active"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, 6)
@@ -392,13 +393,13 @@ struct ProfileSettingsTab: View {
                                     .foregroundStyle(.red.opacity(0.7))
                             }
                             .buttonStyle(.borderless)
-                            .help("Delete profile")
+                            .help(L("settings.delete_profile"))
                         }
                     }
                 }
 
                 Button(action: { showNewProfileSheet = true }) {
-                    Label("New Profile", systemImage: "plus.circle")
+                    Label(L("settings.new_profile"), systemImage: "plus.circle")
                 }
                 .buttonStyle(.borderless)
             }
@@ -407,44 +408,44 @@ struct ProfileSettingsTab: View {
         .sheet(isPresented: $showNewProfileSheet) {
             newProfileSheet
         }
-        .alert("Delete Profile", isPresented: $showDeleteConfirm) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
+        .alert(L("settings.delete_profile_title"), isPresented: $showDeleteConfirm) {
+            Button(L("cancel"), role: .cancel) { }
+            Button(L("delete"), role: .destructive) {
                 if let name = profileToDelete {
                     deleteProfile(name)
                 }
             }
         } message: {
             if let name = profileToDelete {
-                Text("Delete profile \"\(name)\"? This will permanently remove all bookmarks, highlights, notes, and reading history associated with this profile.")
+                Text("\(L("settings.delete_profile_title")) \"\(name)\"? \(L("settings.profile_description"))")
             }
         }
     }
 
     private var newProfileSheet: some View {
         VStack(spacing: 16) {
-            Text("New Profile")
+            Text(L("settings.new_profile"))
                 .font(.headline)
 
-            TextField("Profile name", text: $newProfileName)
+            TextField(L("settings.profile_name"), text: $newProfileName)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 260)
                 .onSubmit { createProfile() }
 
             if profiles.contains(newProfileName.trimmingCharacters(in: .whitespaces)) {
-                Text("A profile with this name already exists.")
+                Text(L("settings.profile_exists"))
                     .font(.caption)
                     .foregroundStyle(.red)
             }
 
             HStack(spacing: 12) {
-                Button("Cancel") {
+                Button(L("cancel")) {
                     newProfileName = ""
                     showNewProfileSheet = false
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button("Create") {
+                Button(L("create")) {
                     createProfile()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -475,13 +476,11 @@ struct ProfileSettingsTab: View {
         if list.isEmpty { list = ["Default"] }
         saveProfiles(list)
 
-        // If deleting the active profile, switch to Default
         if activeProfile == name {
             activeProfile = "Default"
             store.switchProfile(to: "Default")
         }
 
-        // Clean up profile data
         store.deleteProfileData(name)
     }
 }
@@ -517,91 +516,102 @@ struct GeneralSettingsTab: View {
 
     var body: some View {
         Form {
-            Section("Default Translation") {
-                Picker("Translation", selection: $defaultTranslation) {
-                    Text("Last Used").tag("")
+            Section(L("settings.language")) {
+                Picker(L("settings.language"), selection: Binding(
+                    get: { LocalizationService.shared.language },
+                    set: { LocalizationService.shared.language = $0 }
+                )) {
+                    Text(L("settings.language_english")).tag("en")
+                    Text(L("settings.language_russian")).tag("ru")
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section(L("settings.default_translation")) {
+                Picker(L("settings.translation"), selection: $defaultTranslation) {
+                    Text(L("settings.last_used")).tag("")
                     ForEach(store.loadedTranslations) { t in
                         Text(t.abbreviation).tag(t.abbreviation)
                     }
                 }
             }
 
-            Section("Modules") {
-                LabeledContent("Module Directory") {
+            Section(L("settings.modules")) {
+                LabeledContent(L("settings.module_directory")) {
                     Text(BibleStore.modulesDirectory.path(percentEncoded: false))
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
 
                 HStack(spacing: 12) {
-                    Button("Reveal in Finder") {
+                    Button(L("settings.reveal_finder")) {
                         NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: BibleStore.modulesDirectory.path(percentEncoded: false))
                     }
 
-                    Button("Import Module...") {
+                    Button(L("settings.import_module")) {
                         NotificationCenter.default.post(name: .importModule, object: nil)
                     }
                 }
             }
 
-            Section("Data Management") {
+            Section(L("settings.data_management")) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Clear Reading History")
+                        Text(L("settings.clear_history"))
                             .font(.callout)
-                        Text("Remove all reading history entries")
+                        Text(L("settings.clear_history_desc"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("Clear History") {
+                    Button(L("settings.clear_history")) {
                         showClearHistoryConfirm = true
                     }
                 }
 
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Clear All User Data")
+                        Text(L("settings.clear_all_data"))
                             .font(.callout)
-                        Text("Remove all bookmarks, highlights, notes, and history for this profile")
+                        Text(L("settings.clear_all_data_desc"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("Clear All", role: .destructive) {
+                    Button(L("clear_all"), role: .destructive) {
                         showClearAllDataConfirm = true
                     }
                     .foregroundStyle(.red)
                 }
             }
 
-            Section("About") {
-                LabeledContent("Version") {
+            Section(L("settings.about")) {
+                LabeledContent(L("settings.version")) {
                     Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
                         .foregroundStyle(.secondary)
                 }
-                LabeledContent("Build") {
+                LabeledContent(L("settings.build")) {
                     Text(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")
                         .foregroundStyle(.secondary)
                 }
             }
         }
         .padding()
-        .alert("Clear Reading History", isPresented: $showClearHistoryConfirm) {
-            Button("Cancel", role: .cancel) { }
-            Button("Clear", role: .destructive) {
+        .alert(L("alert.clear_history_title"), isPresented: $showClearHistoryConfirm) {
+            Button(L("cancel"), role: .cancel) { }
+            Button(L("clear"), role: .destructive) {
                 store.clearHistory()
             }
         } message: {
-            Text("This will permanently delete all reading history. This cannot be undone.")
+            Text(L("alert.clear_history_msg"))
         }
-        .alert("Clear All User Data", isPresented: $showClearAllDataConfirm) {
-            Button("Cancel", role: .cancel) { }
-            Button("Clear All", role: .destructive) {
+        .alert(L("alert.clear_all_title"), isPresented: $showClearAllDataConfirm) {
+            Button(L("cancel"), role: .cancel) { }
+            Button(L("clear_all"), role: .destructive) {
                 store.clearAllUserData()
             }
         } message: {
-            Text("This will permanently delete all bookmarks, highlights, notes, and reading history for the current profile. This cannot be undone.")
+            Text(L("alert.clear_all_msg"))
         }
     }
 }

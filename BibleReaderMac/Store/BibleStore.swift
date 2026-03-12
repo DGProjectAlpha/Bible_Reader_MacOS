@@ -2,28 +2,34 @@ import Foundation
 import SwiftUI
 import Combine
 
-class ReaderPane: ObservableObject, Identifiable {
+// MARK: - ReaderPane (plain value type — no ObservableObject, no @Published)
+
+struct ReaderPane: Identifiable {
     let id: UUID
-    @Published var selectedTranslationId: UUID = UUID()
-    @Published var selectedBook: String = "Genesis"
-    @Published var selectedChapter: Int = 1
-    @Published var verses: [Verse] = []
-
-    /// Versification scheme string from the currently selected translation (set by BibleStore).
-    var versificationScheme: String = "kjv"
-
-    /// When this pane was created via a vertical split, this points to the pane it sits below.
-    var verticalBuddyId: UUID? = nil
+    var translationId: UUID
+    var book: String
+    var chapter: Int
+    var verses: [Verse]
+    var versificationScheme: String
+    var verticalBuddyId: UUID?
 
     var chapterCount: Int {
         let scheme = VersificationScheme.from(versificationScheme)
-        return VersificationService.shared.chapterCount(book: selectedBook, scheme: scheme)
+        return VersificationService.shared.chapterCount(book: book, scheme: scheme)
     }
 
-    init(id: UUID = UUID()) {
+    init(id: UUID = UUID(), translationId: UUID, book: String = "Genesis", chapter: Int = 1) {
         self.id = id
+        self.translationId = translationId
+        self.book = book
+        self.chapter = chapter
+        self.verses = []
+        self.versificationScheme = "kjv"
+        self.verticalBuddyId = nil
     }
 }
+
+// MARK: - BibleStore
 
 @MainActor
 class BibleStore: ObservableObject {
@@ -34,9 +40,9 @@ class BibleStore: ObservableObject {
     @Published var readingHistory: [ReadingHistoryEntry] = []
     @Published var searchResults: [SearchResult] = []
 
-    // O(1) lookup indices — rebuilt when arrays change
-    private var bookmarkIndex: Set<String> = []          // "verseId|translationId"
-    private var bookmarkByVerse: [String: Bookmark] = [:] // same key → Bookmark
+    // O(1) lookup indices
+    private var bookmarkIndex: Set<String> = []
+    private var bookmarkByVerse: [String: Bookmark] = [:]
     private var highlightByVerse: [String: Highlight] = [:]
     private var noteByVerse: [String: Note] = [:]
 
@@ -62,36 +68,65 @@ class BibleStore: ObservableObject {
     }
 
     init() {
-        // Scan disk for modules — picks up manually-added files and validates everything
         moduleManager.scanModules()
         loadedTranslations = moduleManager.loadTranslations()
         bookmarks = userDataService.loadBookmarks()
         highlights = userDataService.loadHighlights()
         notes = userDataService.loadNotes()
         readingHistory = userDataService.loadHistory()
-        // Ensure lookup indices are built (didSet may not fire reliably in init)
         rebuildBookmarkIndex()
         rebuildHighlightIndex()
         rebuildNoteIndex()
     }
 
-    /// Restore a pane to the last viewed book/chapter/translation.
-    func restoreLastPosition(into pane: ReaderPane) {
-        guard let last = userDataService.lastViewedPosition() else { return }
+    // MARK: - Translation helpers
 
-        // Match the translation by abbreviation
-        if let translation = loadedTranslations.first(where: { $0.abbreviation == last.translationAbbreviation }) {
-            pane.selectedTranslationId = translation.id
+    func firstTranslationId() -> UUID? {
+        loadedTranslations.first?.id
+    }
+
+    func translation(for id: UUID) -> Translation? {
+        loadedTranslations.first { $0.id == id }
+    }
+
+    // MARK: - Verse Loading
+
+    /// Load verses for a given translation/book/chapter. Returns the loaded verses.
+    func loadVerses(translationId: UUID, book: String, chapter: Int) -> [Verse] {
+        guard let translation = translation(for: translationId) else { return [] }
+        do {
+            var verses = try ModuleService.loadVerses(
+                from: translation.filePath,
+                book: book,
+                chapter: chapter
+            )
+            if translation.metadata.format == .tagged {
+                let tagsByVerse = try ModuleService.loadWordTagsForChapter(
+                    from: translation.filePath,
+                    book: book,
+                    chapter: chapter
+                )
+                if !tagsByVerse.isEmpty {
+                    verses = verses.map { verse in
+                        if let tags = tagsByVerse[verse.id], !tags.isEmpty {
+                            return Verse(book: verse.book, chapter: verse.chapter,
+                                        number: verse.number, text: verse.text, wordTags: tags)
+                        }
+                        return verse
+                    }
+                }
+            }
+            recordHistory(book: book, chapter: chapter, translationAbbreviation: translation.abbreviation)
+            return verses
+        } catch {
+            print("Failed to load verses: \(error)")
+            return []
         }
-
-        pane.selectedBook = last.book
-        pane.selectedChapter = last.chapter
     }
 
     // MARK: - Bookmarks
 
     func addBookmark(verseId: String, translationId: UUID, label: String? = nil) {
-        // Don't duplicate — O(1) via index Set
         guard !isBookmarked(verseId: verseId, translationId: translationId) else { return }
         let bookmark = Bookmark(verseId: verseId, translationId: translationId, label: label)
         userDataService.insertBookmark(bookmark)
@@ -120,7 +155,6 @@ class BibleStore: ObservableObject {
 
     func updateBookmarkLabel(id: UUID, label: String?) {
         userDataService.updateBookmarkLabel(id, label: label)
-        // Reload from DB since label is let
         bookmarks = userDataService.loadBookmarks()
     }
 
@@ -131,7 +165,6 @@ class BibleStore: ObservableObject {
     // MARK: - Highlights
 
     func setHighlight(verseId: String, translationId: UUID, color: HighlightColor) {
-        // Remove existing highlight for this verse if any
         highlights.removeAll { $0.verseId == verseId && $0.translationId == translationId }
         let highlight = Highlight(verseId: verseId, translationId: translationId, color: color)
         userDataService.insertHighlight(highlight)
@@ -151,7 +184,6 @@ class BibleStore: ObservableObject {
 
     func addNote(verseId: String, translationId: UUID, content: String) {
         guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        // Update existing note if present
         if let idx = notes.firstIndex(where: { $0.verseId == verseId && $0.translationId == translationId }) {
             notes[idx].content = content
             notes[idx].updatedAt = Date()
@@ -176,14 +208,12 @@ class BibleStore: ObservableObject {
     // MARK: - Reading History
 
     func recordHistory(book: String, chapter: Int, verse: Int? = nil, translationAbbreviation: String) {
-        // Deduplicate consecutive identical entries
         if userDataService.lastEntryMatches(book: book, chapter: chapter, verse: verse, translationAbbreviation: translationAbbreviation) {
             return
         }
         let entry = ReadingHistoryEntry(book: book, chapter: chapter, verse: verse, translationAbbreviation: translationAbbreviation)
         userDataService.insertHistoryEntry(entry)
         userDataService.trimHistory(keepLast: 500)
-        // Refresh in-memory list
         readingHistory = userDataService.loadHistory()
     }
 
@@ -191,6 +221,8 @@ class BibleStore: ObservableObject {
         userDataService.clearHistory()
         readingHistory.removeAll()
     }
+
+    // MARK: - Module Management
 
     func importModule(from url: URL) async throws {
         let translation = try moduleManager.importModule(from: url)
@@ -201,127 +233,82 @@ class BibleStore: ObservableObject {
         guard let translation = loadedTranslations.first(where: { $0.id == id }) else { return }
         moduleManager.removeModule(filePath: translation.filePath)
         loadedTranslations.removeAll { $0.id == id }
-        // Notify windows to update any panes that pointed at this translation
         NotificationCenter.default.post(name: .translationRemoved, object: nil, userInfo: ["translationId": id])
     }
 
-    /// Reorder translations via drag/drop or list move.
     func reorderTranslations(from source: IndexSet, to destination: Int) {
         loadedTranslations.move(fromOffsets: source, toOffset: destination)
     }
 
-    /// Re-scan disk for any new or removed modules.
     func refreshModules() {
         moduleManager.scanModules()
         loadedTranslations = moduleManager.loadTranslations()
     }
 
-    /// Check if a module abbreviation is already installed.
     func isModuleInstalled(abbreviation: String) -> Bool {
         moduleManager.isInstalled(abbreviation: abbreviation)
     }
 
-    /// Validate a module file before importing.
     func validateModule(at url: URL) -> ModuleValidationResult {
         moduleManager.validate(fileURL: url)
     }
 
-    /// Load verses for a pane, updating its published verses array.
-    /// For tagged modules, also batch-loads word tags so Strong's numbers are clickable.
-    func loadVerses(for pane: ReaderPane) {
-        guard let translation = loadedTranslations.first(where: { $0.id == pane.selectedTranslationId }) else {
-            pane.verses = []
-            return
-        }
-        // Keep pane's versification scheme in sync with the selected translation
-        pane.versificationScheme = translation.versificationScheme
-        do {
-            var verses = try ModuleService.loadVerses(
-                from: translation.filePath,
-                book: pane.selectedBook,
-                chapter: pane.selectedChapter
-            )
-
-            // For tagged modules, merge word tags into verses for clickable Strong's display
-            if translation.metadata.format == .tagged {
-                let tagsByVerse = try ModuleService.loadWordTagsForChapter(
-                    from: translation.filePath,
-                    book: pane.selectedBook,
-                    chapter: pane.selectedChapter
-                )
-                if !tagsByVerse.isEmpty {
-                    verses = verses.map { verse in
-                        if let tags = tagsByVerse[verse.id], !tags.isEmpty {
-                            return Verse(
-                                book: verse.book,
-                                chapter: verse.chapter,
-                                number: verse.number,
-                                text: verse.text,
-                                wordTags: tags
-                            )
-                        }
-                        return verse
-                    }
-                }
-            }
-
-            pane.verses = verses
-            // Record reading history
-            recordHistory(book: pane.selectedBook, chapter: pane.selectedChapter, translationAbbreviation: translation.abbreviation)
-        } catch {
-            print("Failed to load verses: \(error.localizedDescription)")
-            pane.verses = []
-        }
+    func moduleInfo(for translationId: UUID) -> CachedModuleInfo? {
+        guard let translation = loadedTranslations.first(where: { $0.id == translationId }) else { return nil }
+        return moduleManager.getCachedInfo(for: translation.filePath)
     }
 
-    /// Convert a pane's current book/chapter/verse position from one translation's
-    /// versification scheme to another when the user switches translations.
-    /// Returns true if the position was adjusted.
-    @discardableResult
-    func convertPanePosition(for pane: ReaderPane, from oldTranslationId: UUID, to newTranslationId: UUID, currentVerse: Int? = nil) -> Bool {
-        guard let oldTranslation = loadedTranslations.first(where: { $0.id == oldTranslationId }),
-              let newTranslation = loadedTranslations.first(where: { $0.id == newTranslationId }) else {
-            return false
-        }
-
-        let sourceScheme = VersificationScheme.from(oldTranslation.versificationScheme)
-        let targetScheme = VersificationScheme.from(newTranslation.versificationScheme)
-
-        // Same scheme — no conversion needed
-        guard sourceScheme != targetScheme else { return false }
-
-        let versification = VersificationService.shared
-        let verse = currentVerse ?? 1
-
-        // Convert current position
-        let converted = versification.convert(
-            book: pane.selectedBook,
-            chapter: pane.selectedChapter,
-            verse: verse,
-            from: sourceScheme,
-            to: targetScheme
-        )
-
-        var changed = false
-
-        // Update book if it changed (e.g., "1 Kingdoms" ↔ "1 Samuel")
-        if converted.book != pane.selectedBook {
-            pane.selectedBook = converted.book
-            changed = true
-        }
-
-        // Clamp chapter to valid range for the target scheme
-        let maxChapter = versification.chapterCount(book: converted.book, scheme: targetScheme)
-        let newChapter = min(converted.chapter, max(1, maxChapter))
-        if newChapter != pane.selectedChapter {
-            pane.selectedChapter = newChapter
-            changed = true
-        }
-
-        return changed
+    func listBooks(translationId: UUID) -> [(book: String, chapterCount: Int)] {
+        guard let translation = loadedTranslations.first(where: { $0.id == translationId }) else { return [] }
+        return (try? ModuleService.listBooks(from: translation.filePath)) ?? []
     }
 
-    /// Search across a specific translation.
+    // MARK: - Profile Management
+
+    func switchProfile(to profileName: String) {
+        userDataService.setActiveProfile(profileName)
+        reloadUserData()
+    }
+
+    func deleteProfileData(_ profileName: String) {
+        userDataService.deleteProfileData(profileName)
+    }
+
+    func clearAllUserData() {
+        userDataService.clearBookmarks()
+        userDataService.clearHighlights()
+        userDataService.clearNotes()
+        userDataService.clearHistory()
+        reloadUserData()
+    }
+
+    private func reloadUserData() {
+        bookmarks = userDataService.loadBookmarks()
+        highlights = userDataService.loadHighlights()
+        notes = userDataService.loadNotes()
+        readingHistory = userDataService.loadHistory()
+    }
+
+    // MARK: - Versification
+
+    func versificationScheme(for translationId: UUID) -> String {
+        translation(for: translationId)?.versificationScheme ?? "kjv"
+    }
+
+    func convertPosition(book: String, chapter: Int, verse: Int,
+                         from oldTranslationId: UUID, to newTranslationId: UUID) -> (book: String, chapter: Int) {
+        guard let oldT = translation(for: oldTranslationId),
+              let newT = translation(for: newTranslationId) else { return (book, chapter) }
+        let src = VersificationScheme.from(oldT.versificationScheme)
+        let dst = VersificationScheme.from(newT.versificationScheme)
+        guard src != dst else { return (book, chapter) }
+        let converted = VersificationService.shared.convert(book: book, chapter: chapter, verse: verse, from: src, to: dst)
+        let maxCh = VersificationService.shared.chapterCount(book: converted.book, scheme: dst)
+        return (converted.book, min(converted.chapter, max(1, maxCh)))
+    }
+
+    // MARK: - Search
+
     func search(query: String, translationId: UUID, scope: SearchScope = .bible, currentBook: String? = nil, currentChapter: Int? = nil) {
         guard let translation = loadedTranslations.first(where: { $0.id == translationId }) else {
             searchResults = []
@@ -345,54 +332,8 @@ class BibleStore: ObservableObject {
                 )
             }
         } catch {
-            print("Search failed: \(error.localizedDescription)")
+            print("Search failed: \(error)")
             searchResults = []
         }
-    }
-
-    /// Get list of books from the actual module database.
-    func listBooks(translationId: UUID) -> [(book: String, chapterCount: Int)] {
-        guard let translation = loadedTranslations.first(where: { $0.id == translationId }) else {
-            return []
-        }
-        return (try? ModuleService.listBooks(from: translation.filePath)) ?? []
-    }
-
-    // MARK: - Module Info
-
-    /// Get detailed cached info for a loaded translation.
-    func moduleInfo(for translationId: UUID) -> CachedModuleInfo? {
-        guard let translation = loadedTranslations.first(where: { $0.id == translationId }) else { return nil }
-        return moduleManager.getCachedInfo(for: translation.filePath)
-    }
-
-    // MARK: - Profile Management
-
-    /// Switch to a different profile — reloads all profile-scoped data.
-    func switchProfile(to profileName: String) {
-        userDataService.setActiveProfile(profileName)
-        reloadUserData()
-    }
-
-    /// Delete all data for a given profile.
-    func deleteProfileData(_ profileName: String) {
-        userDataService.deleteProfileData(profileName)
-    }
-
-    /// Clear all user data (bookmarks, highlights, notes, history) for the current profile.
-    func clearAllUserData() {
-        userDataService.clearBookmarks()
-        userDataService.clearHighlights()
-        userDataService.clearNotes()
-        userDataService.clearHistory()
-        reloadUserData()
-    }
-
-    /// Reload all user data from the database into memory.
-    private func reloadUserData() {
-        bookmarks = userDataService.loadBookmarks()
-        highlights = userDataService.loadHighlights()
-        notes = userDataService.loadNotes()
-        readingHistory = userDataService.loadHistory()
     }
 }
