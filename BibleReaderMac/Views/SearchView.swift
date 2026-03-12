@@ -1,146 +1,268 @@
 import SwiftUI
 
-// MARK: - Search View
+// MARK: - Search Toolbar Item
+//
+// A compact search field that lives entirely in the window toolbar.
+// - When collapsed: shows a magnifying glass button that can be tapped to expand
+// - When expanded: the field grows to the left; results drop down as a popover
+// - In full-screen mode the popover is naturally bounded by the screen edge
 
-struct SearchView: View {
+struct SearchToolbarItem: View {
     @EnvironmentObject var store: BibleStore
     @EnvironmentObject var windowState: WindowState
+
     @State private var searchText = ""
     @State private var scope: SearchScope = .bible
     @State private var isSearching = false
     @State private var results: [SearchResult] = []
-    @State private var selectedModuleIds: Set<UUID> = []  // empty = all modules
+    @State private var selectedModuleIds: Set<UUID> = []
     @State private var showModuleFilter = false
     @State private var hasSearched = false
     @State private var resultsCapped = false
-    // Verse lookup
     @State private var showVerseLookup = false
     @State private var lookupText = ""
+    @State private var debounceTask: Task<Void, Never>?
+    @State private var showResults = false
+    @FocusState private var isFieldFocused: Bool
+
+    private var isExpanded: Bool { windowState.showSearchPanel }
 
     private var allModuleIds: Set<UUID> {
         Set(store.loadedTranslations.map(\.id))
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            searchBar
-            Divider()
-            if hasSearched {
-                resultsList
+        HStack(spacing: 0) {
+            if isExpanded {
+                // Expanded search field
+                HStack(spacing: 8) {
+                    Image(systemName: isSearching ? "clock" : "magnifyingglass")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.45))
+                        .animation(.easeInOut(duration: 0.15), value: isSearching)
+                        .frame(width: 16)
+
+                    TextField(L("search.placeholder"), text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.primary)
+                        .focused($isFieldFocused)
+                        .frame(width: 220)
+                        .onSubmit { performSearch() }
+
+                    if !searchText.isEmpty {
+                        Button(action: clearSearch) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.primary.opacity(0.3))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Divider().frame(height: 16).opacity(0.5)
+
+                    // Scope indicator
+                    Menu {
+                        ForEach(SearchScope.allCases, id: \.self) { s in
+                            Button(action: { scope = s; if hasSearched { performSearch() } }) {
+                                HStack {
+                                    Text(s.rawValue)
+                                    if scope == s {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: scopeIcon)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(scope == .bible ? .primary.opacity(0.45) : Color.accentColor)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help(L("search.scope"))
+
+                    Button(action: { showModuleFilter.toggle() }) {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(selectedModuleIds.count < store.loadedTranslations.count ? Color.accentColor : .primary.opacity(0.45))
+                    }
+                    .buttonStyle(.plain)
+                    .help(L("search.filter_help"))
+                    .popover(isPresented: $showModuleFilter) { moduleFilterPopover }
+
+                    Divider().frame(height: 16).opacity(0.5)
+
+                    Button(action: collapse) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.primary.opacity(0.45))
+                            .frame(width: 18, height: 18)
+                            .background(.primary.opacity(0.08), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(L("search.close_help"))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(.primary.opacity(0.06))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(.primary.opacity(0.12), lineWidth: 0.75)
+                        }
+                }
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .trailing).combined(with: .opacity)
+                ))
+                .popover(isPresented: $showResults, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                    resultsPopover
+                }
+            } else {
+                // Collapsed: just a magnifying glass button
+                Button(action: expand) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .help(L("toolbar.search_help"))
+                .transition(.asymmetric(
+                    insertion: .opacity,
+                    removal: .opacity
+                ))
             }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isExpanded)
         .onAppear {
             selectedModuleIds = allModuleIds
-            // If windowState has a pending search query, use it
             if !windowState.searchQuery.isEmpty {
                 searchText = windowState.searchQuery
                 windowState.searchQuery = ""
+                expand()
                 performSearch()
             }
         }
-        .onChange(of: windowState.searchQuery) { oldValue, newValue in
+        .onChange(of: windowState.searchQuery) { _, newValue in
             if !newValue.isEmpty {
                 searchText = newValue
                 windowState.searchQuery = ""
+                if !isExpanded { expand() }
                 performSearch()
             }
         }
+        .onChange(of: windowState.showSearchPanel) { _, shown in
+            if !shown { collapse() }
+        }
+        .onChange(of: searchText) { _, newValue in
+            debounceTask?.cancel()
+            let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty {
+                withAnimation(.easeOut(duration: 0.18)) {
+                    results = []
+                    hasSearched = false
+                    resultsCapped = false
+                    showResults = false
+                }
+                return
+            }
+            debounceTask = Task {
+                try? await Task.sleep(nanoseconds: 280_000_000)
+                guard !Task.isCancelled else { return }
+                await MainActor.run { performSearch() }
+            }
+        }
+        .onChange(of: scope) { _, _ in
+            if hasSearched { performSearch() }
+        }
     }
 
-    // MARK: - Search Bar
+    // MARK: - Results Popover
 
-    private var searchBar: some View {
-        VStack(spacing: 8) {
+    private var resultsPopover: some View {
+        VStack(spacing: 0) {
+            // Count row
             HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Search word or phrase...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .onSubmit { performSearch() }
-
-                if !searchText.isEmpty {
-                    Button(action: {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            searchText = ""
-                            results = []
-                            hasSearched = false
-                            resultsCapped = false
-                        }
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
+                if isSearching {
+                    ProgressView().controlSize(.mini)
+                    Text(L("search.searching"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(resultCountLabel)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    if resultsCapped {
+                        Text(L("search.capped"))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
                     }
-                    .buttonStyle(.plain)
                 }
+                Spacer()
 
-                // Verse lookup button
+                // Go-to-verse button
                 Button(action: { showVerseLookup.toggle() }) {
                     Image(systemName: "number")
-                        .font(.callout)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.45))
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help("Go to verse reference")
-                .popover(isPresented: $showVerseLookup) {
-                    verseLookupPopover
-                }
-
-                Button("Search") { performSearch() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .disabled(searchText.trimmingCharacters(in: .whitespaces).isEmpty || isSearching)
-
-                Divider().frame(height: 16)
-
-                Button(action: { windowState.showSearchPanel = false }) {
-                    Image(systemName: "xmark")
-                        .font(.callout)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help("Close search")
+                .buttonStyle(.plain)
+                .help(L("search.go_to_verse_help"))
+                .popover(isPresented: $showVerseLookup) { verseLookupPopover }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 14)
             .padding(.vertical, 8)
 
-            HStack(spacing: 12) {
-                // Scope picker
-                Picker("Scope", selection: $scope) {
-                    ForEach(SearchScope.allCases, id: \.self) { s in
-                        Text(s.rawValue).tag(s)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+            Divider()
 
-                // Module filter button
-                Button(action: { showModuleFilter.toggle() }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                        Text(moduleFilterLabel)
-                            .font(.caption)
+            if !isSearching && results.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.quaternary)
+                    Text(L("search.no_results"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(results) { result in
+                            SearchResultRow(
+                                result: result,
+                                searchText: searchText,
+                                store: store,
+                                onNavigate: { navigateToResult(result) },
+                                onSyncAll: { syncAllPanes(to: result) },
+                                onOpenParallel: { openInParallel(result) }
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture { navigateAndClose(result) }
+                            if result.id != results.last?.id {
+                                Divider().padding(.leading, 14)
+                            }
+                        }
                     }
+                    .padding(.vertical, 4)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .popover(isPresented: $showModuleFilter) {
-                    moduleFilterPopover
-                }
+                .frame(maxHeight: 460)
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 8)
         }
-        .glassHeader()
+        .frame(width: 420)
     }
 
-    private var moduleFilterLabel: String {
-        if selectedModuleIds.count == store.loadedTranslations.count {
-            return "All"
-        } else if selectedModuleIds.count == 1, let id = selectedModuleIds.first,
-                  let t = store.loadedTranslations.first(where: { $0.id == id }) {
-            return t.abbreviation
-        } else {
-            return "\(selectedModuleIds.count) selected"
+    private var resultCountLabel: String {
+        if resultsCapped { return L("search.many_results") }
+        return "\(results.count) result\(results.count == 1 ? "" : "s")"
+    }
+
+    private var scopeIcon: String {
+        switch scope {
+        case .bible: return "book"
+        case .ot: return "o.circle"
+        case .nt: return "n.circle"
+        case .book: return "bookmark"
+        case .chapter: return "number"
         }
     }
 
@@ -148,17 +270,15 @@ struct SearchView: View {
 
     private var verseLookupPopover: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Go to Reference").font(.headline)
-            Text("e.g. John 3:16, Gen 1, Rev 21:1")
+            Text(L("search.go_to_ref_title")).font(.headline)
+            Text(L("search.ref_placeholder"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
-
             HStack {
-                TextField("Book Chapter:Verse", text: $lookupText)
+                TextField(L("search.ref_format"), text: $lookupText)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { performVerseLookup() }
-
-                Button("Go") { performVerseLookup() }
+                Button(L("go")) { performVerseLookup() }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .disabled(lookupText.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -173,16 +293,13 @@ struct SearchView: View {
     private var moduleFilterPopover: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("Search in").font(.headline)
+                Text(L("search.scope")).font(.headline)
                 Spacer()
-                Button("All") {
-                    selectedModuleIds = allModuleIds
-                }
-                .buttonStyle(.borderless)
-                .font(.caption)
+                Button(L("search.scope_all")) { selectedModuleIds = allModuleIds }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
             }
             .padding(.bottom, 4)
-
             ForEach(store.loadedTranslations) { t in
                 Toggle(isOn: Binding(
                     get: { selectedModuleIds.contains(t.id) },
@@ -203,75 +320,34 @@ struct SearchView: View {
         .frame(minWidth: 220, maxWidth: 360)
     }
 
-    // MARK: - Results
+    // MARK: - Expand / Collapse
 
-    private var resultsList: some View {
-        Group {
-            if isSearching {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Searching...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-            } else if results.isEmpty {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.quaternary)
-                    Text("No results found — try a different search term or scope")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-            } else {
-                VStack(spacing: 0) {
-                    // Result count header
-                    HStack {
-                        Text(resultCountLabel)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if resultsCapped {
-                            Text("(capped)")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                        Spacer()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .glassToolbar()
-
-                    Divider()
-
-                    List(results) { result in
-                        SearchResultRow(
-                            result: result,
-                            searchText: searchText,
-                            store: store,
-                            onNavigate: { navigateToResult(result) },
-                            onSyncAll: { syncAllPanes(to: result) },
-                            onOpenParallel: { openInParallel(result) }
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            navigateToResult(result)
-                        }
-                    }
-                    .listStyle(.inset)
-                }
-            }
+    private func expand() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            windowState.showSearchPanel = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            isFieldFocused = true
         }
     }
 
-    private var resultCountLabel: String {
-        if resultsCapped {
-            return "500+ results"
+    private func collapse() {
+        isFieldFocused = false
+        showResults = false
+        // Don't clear searchText so re-opening shows last query
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            windowState.showSearchPanel = false
         }
-        return "\(results.count) result\(results.count == 1 ? "" : "s")"
+    }
+
+    private func clearSearch() {
+        withAnimation(.easeOut(duration: 0.18)) {
+            searchText = ""
+            results = []
+            hasSearched = false
+            resultsCapped = false
+            showResults = false
+        }
     }
 
     // MARK: - Actions
@@ -284,18 +360,16 @@ struct SearchView: View {
         hasSearched = true
         results = []
         resultsCapped = false
+        showResults = true
 
-        let currentBook = windowState.panes.first?.selectedBook
-        let currentChapter = windowState.panes.first?.selectedChapter
+        let currentBook = windowState.panes.first?.book
+        let currentChapter = windowState.panes.first?.chapter
         let capturedModuleIds = selectedModuleIds
         let capturedScope = scope
-        let capturedTranslations = store.loadedTranslations.filter { t in
-            capturedModuleIds.contains(t.id)
-        }
+        let capturedTranslations = store.loadedTranslations.filter { capturedModuleIds.contains($0.id) }
 
         Task.detached {
             var collected: [SearchResult] = []
-
             for translation in capturedTranslations {
                 do {
                     let hits = try ModuleService.search(
@@ -320,14 +394,10 @@ struct SearchView: View {
                     print("Search failed for \(translation.abbreviation): \(error)")
                 }
             }
-
-            // Check if any individual translation hit the 500 cap
             let capped = collected.count >= 500
-            let finalResults = collected
-
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    results = finalResults
+                    results = collected
                     resultsCapped = capped
                     isSearching = false
                 }
@@ -337,54 +407,47 @@ struct SearchView: View {
 
     private func navigateToResult(_ result: SearchResult) {
         guard let pane = windowState.panes.first else { return }
-
-        if let translation = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation }) {
-            pane.selectedTranslationId = translation.id
-        }
-        pane.selectedBook = result.book
-        pane.selectedChapter = result.chapter
-        store.loadVerses(for: pane)
-
-        // Scroll to the specific verse
+        let translationId = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation })?.id ?? pane.translationId
+        windowState.navigate(paneId: pane.id, book: result.book, chapter: result.chapter, translationId: translationId)
+        guard let updated = windowState.panes.first else { return }
+        let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
+        let scheme = store.versificationScheme(for: updated.translationId)
+        windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            NotificationCenter.default.post(
-                name: .navigateToVerse,
-                object: nil,
-                userInfo: ["book": result.book, "chapter": result.chapter, "verse": result.verse]
-            )
+            NotificationCenter.default.post(name: .navigateToVerse, object: nil,
+                userInfo: ["book": result.book, "chapter": result.chapter, "verse": result.verse])
         }
+    }
+
+    private func navigateAndClose(_ result: SearchResult) {
+        navigateToResult(result)
+        collapse()
     }
 
     private func syncAllPanes(to result: SearchResult) {
         for pane in windowState.panes {
-            if let translation = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation }) {
-                pane.selectedTranslationId = translation.id
-            }
-            pane.selectedBook = result.book
-            pane.selectedChapter = result.chapter
-            store.loadVerses(for: pane)
+            let translationId = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation })?.id ?? pane.translationId
+            windowState.navigate(paneId: pane.id, book: result.book, chapter: result.chapter, translationId: translationId)
+            guard let updated = windowState.panes.first(where: { $0.id == pane.id }) else { continue }
+            let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
+            let scheme = store.versificationScheme(for: updated.translationId)
+            windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
         }
-
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            NotificationCenter.default.post(
-                name: .navigateToVerse,
-                object: nil,
-                userInfo: ["book": result.book, "chapter": result.chapter, "verse": result.verse]
-            )
+            NotificationCenter.default.post(name: .navigateToVerse, object: nil,
+                userInfo: ["book": result.book, "chapter": result.chapter, "verse": result.verse])
         }
+        collapse()
     }
 
     private func openInParallel(_ result: SearchResult) {
-        let translation = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation })
-        windowState.addPane(translationId: translation?.id)
-
+        let translationId = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation })?.id
+            ?? store.firstTranslationId() ?? UUID()
+        windowState.addPane(translationId: translationId, book: result.book, chapter: result.chapter)
         guard let newPane = windowState.panes.last else { return }
-        if let t = translation {
-            newPane.selectedTranslationId = t.id
-        }
-        newPane.selectedBook = result.book
-        newPane.selectedChapter = result.chapter
-        store.loadVerses(for: newPane)
+        let verses = store.loadVerses(translationId: newPane.translationId, book: newPane.book, chapter: newPane.chapter)
+        let scheme = store.versificationScheme(for: newPane.translationId)
+        windowState.setVerses(paneId: newPane.id, verses: verses, versificationScheme: scheme)
     }
 
     // MARK: - Verse Lookup
@@ -392,83 +455,55 @@ struct SearchView: View {
     private func performVerseLookup() {
         let input = lookupText.trimmingCharacters(in: .whitespaces)
         guard !input.isEmpty else { return }
-
         let parsed = parseVerseReference(input)
         guard let book = parsed.book else { return }
-
         guard let pane = windowState.panes.first else { return }
-
-        // Find matching translation (use current pane's translation)
-        pane.selectedBook = book
-        pane.selectedChapter = parsed.chapter
-        store.loadVerses(for: pane)
-
+        windowState.navigate(paneId: pane.id, book: book, chapter: parsed.chapter)
+        guard let updated = windowState.panes.first else { return }
+        let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
+        let scheme = store.versificationScheme(for: updated.translationId)
+        windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
         if let verse = parsed.verse {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                NotificationCenter.default.post(
-                    name: .navigateToVerse,
-                    object: nil,
-                    userInfo: ["book": book, "chapter": parsed.chapter, "verse": verse]
-                )
+                NotificationCenter.default.post(name: .navigateToVerse, object: nil,
+                    userInfo: ["book": book, "chapter": parsed.chapter, "verse": verse])
             }
         }
-
         showVerseLookup = false
         lookupText = ""
+        collapse()
     }
 
-    /// Parse a verse reference string like "John 3:16", "Gen 1", "1 Cor 13:4", "Revelation 21"
     private func parseVerseReference(_ input: String) -> (book: String?, chapter: Int, verse: Int?) {
         let trimmed = input.trimmingCharacters(in: .whitespaces)
-
-        // Try to split off the last numeric portion (chapter:verse or just chapter)
-        // Pattern: everything before the last space-separated number group is the book name
         var bookPart = ""
         var numericPart = ""
-
-        // Find where the numeric portion starts (from the end)
         let components = trimmed.components(separatedBy: " ").filter { !$0.isEmpty }
         guard !components.isEmpty else { return (nil, 1, nil) }
-
-        // The numeric part is the last component that starts with a digit
-        if let lastComponent = components.last, let firstChar = lastComponent.first, firstChar.isNumber || lastComponent.contains(":") {
+        if let lastComponent = components.last,
+           let firstChar = lastComponent.first,
+           firstChar.isNumber || lastComponent.contains(":") {
             numericPart = lastComponent
             bookPart = components.dropLast().joined(separator: " ")
         } else {
-            // No numeric part found, treat entire input as book name
             bookPart = trimmed
         }
-
-        // Parse chapter:verse from numeric part
         var chapter = 1
         var verse: Int? = nil
-
         if numericPart.contains(":") {
             let parts = numericPart.split(separator: ":")
             chapter = Int(parts[0]) ?? 1
-            if parts.count > 1 {
-                verse = Int(parts[1])
-            }
+            if parts.count > 1 { verse = Int(parts[1]) }
         } else if let ch = Int(numericPart) {
             chapter = ch
         }
-
-        // Match book name
-        let matchedBook = matchBookName(bookPart)
-        return (matchedBook, chapter, verse)
+        return (matchBookName(bookPart), chapter, verse)
     }
 
-    /// Fuzzy match a book name input against canonical book names
     private func matchBookName(_ input: String) -> String? {
         let lower = input.lowercased().trimmingCharacters(in: .whitespaces)
         guard !lower.isEmpty else { return nil }
-
-        // Exact match first
-        if let exact = BibleBooks.all.first(where: { $0.lowercased() == lower }) {
-            return exact
-        }
-
-        // Common abbreviations
+        if let exact = BibleBooks.all.first(where: { $0.lowercased() == lower }) { return exact }
         let abbreviations: [String: String] = [
             "gen": "Genesis", "ex": "Exodus", "exo": "Exodus", "lev": "Leviticus",
             "num": "Numbers", "deut": "Deuteronomy", "deu": "Deuteronomy",
@@ -509,16 +544,8 @@ struct SearchView: View {
             "3 jn": "3 John", "3jn": "3 John", "3 jo": "3 John",
             "jude": "Jude", "rev": "Revelation", "apo": "Revelation"
         ]
-
-        if let abbr = abbreviations[lower] {
-            return abbr
-        }
-
-        // Prefix match
-        if let prefix = BibleBooks.all.first(where: { $0.lowercased().hasPrefix(lower) }) {
-            return prefix
-        }
-
+        if let abbr = abbreviations[lower] { return abbr }
+        if let prefix = BibleBooks.all.first(where: { $0.lowercased().hasPrefix(lower) }) { return prefix }
         return nil
     }
 }
@@ -552,7 +579,6 @@ struct SearchResultRow: View {
 
                 Spacer()
 
-                // Action buttons on hover
                 if isHovered {
                     HStack(spacing: 4) {
                         Button(action: onSyncAll) {
@@ -561,7 +587,7 @@ struct SearchResultRow: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.mini)
-                        .help("Sync all panes to this verse")
+                        .help(L("search.sync_panes"))
 
                         Button(action: onOpenParallel) {
                             Image(systemName: "plus.rectangle.on.rectangle")
@@ -569,12 +595,11 @@ struct SearchResultRow: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.mini)
-                        .help("Open in new parallel pane")
+                        .help(L("search.open_parallel"))
                     }
                 }
             }
 
-            // Previous verse context
             if let prev = prevVerseText {
                 Text("\(result.verse - 1). \(prev)")
                     .font(.caption)
@@ -583,13 +608,11 @@ struct SearchResultRow: View {
                     .italic()
             }
 
-            // Matched verse with highlighting
             highlightedText
                 .font(.callout)
                 .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            // Next verse context
             if let next = nextVerseText {
                 Text("\(result.verse + 1). \(next)")
                     .font(.caption)
@@ -598,35 +621,29 @@ struct SearchResultRow: View {
                     .italic()
             }
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(isHovered ? Color.primary.opacity(0.05) : .clear)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
-            }
+            isHovered = hovering
+            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
-        .task {
-            loadContextVerses()
-        }
+        .task { loadContextVerses() }
     }
 
-    /// Renders the verse text with the search term highlighted.
     private var highlightedText: Text {
         let text = result.text
         let lower = text.lowercased()
         let term = searchText.lowercased()
-
         guard !term.isEmpty else { return Text(text) }
-
-        // Collect all match ranges first, then build AttributedString in one pass
         var ranges: [Range<String.Index>] = []
         var searchStart = lower.startIndex
         while let range = lower.range(of: term, range: searchStart..<lower.endIndex) {
             ranges.append(range)
             searchStart = range.upperBound
         }
-
         guard !ranges.isEmpty else { return Text(text) }
-
         var attributed = AttributedString(text)
         for range in ranges {
             let attrStart = AttributedString.Index(range.lowerBound, within: attributed)!
@@ -634,30 +651,16 @@ struct SearchResultRow: View {
             attributed[attrStart..<attrEnd].foregroundColor = .accentColor
             attributed[attrStart..<attrEnd].font = .body.bold()
         }
-
         return Text(attributed)
     }
 
     private func loadContextVerses() {
-        // Find the translation file path
         guard let translation = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation }) else { return }
-
-        // Load previous verse
         if result.verse > 1 {
             prevVerseText = try? ModuleService.loadSingleVerse(
-                from: translation.filePath,
-                book: result.book,
-                chapter: result.chapter,
-                verse: result.verse - 1
-            )
+                from: translation.filePath, book: result.book, chapter: result.chapter, verse: result.verse - 1)
         }
-
-        // Load next verse
         nextVerseText = try? ModuleService.loadSingleVerse(
-            from: translation.filePath,
-            book: result.book,
-            chapter: result.chapter,
-            verse: result.verse + 1
-        )
+            from: translation.filePath, book: result.book, chapter: result.chapter, verse: result.verse + 1)
     }
 }
