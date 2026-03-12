@@ -32,14 +32,9 @@ struct SidebarView: View {
     // MARK: - Tab Picker
 
     private var sidebarTabPicker: some View {
-        Picker("", selection: $windowState.selectedSidebarTab) {
-            ForEach(SidebarTab.allCases, id: \.self) { tab in
-                Label(tab.label, systemImage: tab.icon)
-                    .tag(tab)
-            }
+        GlassSegmentedPicker(selection: $windowState.selectedSidebarTab) { tab in
+            tab.label
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
     }
@@ -98,15 +93,15 @@ struct SidebarView: View {
                 }
                 .contextMenu {
                     if let pane = windowState.panes.first {
-                        Button("Open in Current Pane") {
-                            pane.selectedTranslationId = translation.id
+                        Button(L("manage.assign_pane")) {
+                            windowState.navigate(paneId: pane.id, translationId: translation.id)
                         }
                     }
-                    Button("Open in New Pane") {
+                    Button(L("manage.assign_new_pane")) {
                         windowState.addPane(translationId: translation.id)
                     }
                     Divider()
-                    Button("Remove Translation", role: .destructive) {
+                    Button(L("manage.remove_ellipsis"), role: .destructive) {
                         store.removeTranslation(translation.id)
                     }
                 }
@@ -120,7 +115,7 @@ struct SidebarView: View {
                     Image(systemName: "books.vertical")
                         .font(.system(size: 32))
                         .foregroundStyle(.quaternary)
-                    Text("No Translations")
+                    Text(L("sidebar.no_translations"))
                         .font(.callout)
                         .foregroundStyle(.tertiary)
                 }
@@ -131,7 +126,7 @@ struct SidebarView: View {
             Button(action: {
                 NotificationCenter.default.post(name: .manageTranslations, object: nil)
             }) {
-                Label("Manage...", systemImage: "gearshape")
+                Label(L("sidebar.manage"), systemImage: "gearshape")
             }
             .buttonStyle(.borderless)
             .foregroundStyle(Color.accentColor)
@@ -150,7 +145,7 @@ struct SidebarView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
-            .help("Settings")
+            .help(L("sidebar.settings_help"))
 
             Button(action: { showHistory = true }) {
                 Image(systemName: "clock")
@@ -159,7 +154,7 @@ struct SidebarView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
-            .help("Reading History")
+            .help(L("sidebar.history_help"))
 
             Spacer()
         }

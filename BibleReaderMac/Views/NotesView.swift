@@ -4,9 +4,17 @@ import UniformTypeIdentifiers
 // MARK: - Sort Options
 
 enum NoteSortOrder: String, CaseIterable {
-    case dateNewest = "Newest First"
-    case dateOldest = "Oldest First"
-    case bookOrder = "Book Order"
+    case dateNewest = "dateNewest"
+    case dateOldest = "dateOldest"
+    case bookOrder  = "bookOrder"
+
+    var label: String {
+        switch self {
+        case .dateNewest: return L("notes.sort_newest")
+        case .dateOldest: return L("notes.sort_oldest")
+        case .bookOrder:  return L("notes.sort_book_order")
+        }
+    }
 }
 
 // MARK: - Notes View
@@ -18,6 +26,7 @@ struct NotesView: View {
     @State private var sortOrder: NoteSortOrder = .dateNewest
     @State private var groupByBook: Bool = false
     @State private var showDeleteAllConfirmation: Bool = false
+    @State private var showPDFExport: Bool = false
     @State private var editingNoteId: UUID?
     @State private var editingNoteContent: String = ""
 
@@ -84,7 +93,7 @@ struct NotesView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Notes")
+                Text(L("notes.title"))
                     .font(.title2.weight(.semibold))
                 Spacer()
                 if !store.notes.isEmpty {
@@ -92,6 +101,16 @@ struct NotesView: View {
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
+                // Export to PDF — always visible
+                Button(action: { showPDFExport = true }) {
+                    Image(systemName: "arrow.down.doc")
+                        .font(.callout)
+                        .frame(width: 26, height: 26)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Export notes to PDF")
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -104,7 +123,7 @@ struct NotesView: View {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(.secondary)
                             .font(.caption)
-                        TextField("Filter notes...", text: $searchText)
+                        TextField(L("notes.filter"), text: $searchText)
                             .textFieldStyle(.plain)
                             .font(.callout)
                         if !searchText.isEmpty {
@@ -130,14 +149,14 @@ struct NotesView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(groupByBook ? Color.accentColor : Color.secondary)
-                    .help(groupByBook ? "Show flat list" : "Group by book")
+                    .help(groupByBook ? L("notes.show_flat") : L("notes.group_by_book"))
 
                     // Sort menu
                     Menu {
                         ForEach(NoteSortOrder.allCases, id: \.self) { order in
                             Button(action: { withAnimation(.easeInOut(duration: 0.2)) { sortOrder = order } }) {
                                 HStack {
-                                    Text(order.rawValue)
+                                    Text(order.label)
                                     if sortOrder == order {
                                         Image(systemName: "checkmark")
                                     }
@@ -150,18 +169,7 @@ struct NotesView: View {
                     }
                     .menuStyle(.borderlessButton)
                     .frame(width: 20)
-                    .help("Sort order")
-
-                    // Export notes
-                    Button(action: { exportNotes() }) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.callout)
-                            .frame(width: 26, height: 26)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .help("Export notes to text file")
+                    .help(L("notes.sort_order"))
 
                     // Delete all
                     Button(action: { showDeleteAllConfirmation = true }) {
@@ -172,7 +180,7 @@ struct NotesView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
-                    .help("Delete all notes")
+                    .help(L("notes.delete_all_help"))
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
@@ -192,15 +200,18 @@ struct NotesView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .alert("Delete All Notes?", isPresented: $showDeleteAllConfirmation) {
-            Button("Delete All", role: .destructive) {
+        .alert(L("notes.delete_all_title"), isPresented: $showDeleteAllConfirmation) {
+            Button(L("delete_all"), role: .destructive) {
                 for note in store.notes {
                     store.removeNote(note.id)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(L("cancel"), role: .cancel) {}
         } message: {
-            Text("This will permanently remove all \(store.notes.count) notes. This cannot be undone.")
+            Text(String(format: L("notes.delete_all_msg"), store.notes.count))
+        }
+        .sheet(isPresented: $showPDFExport) {
+            NoteExportView(notes: filteredNotes)
         }
         .sheet(isPresented: Binding(
             get: { editingNoteId != nil },
@@ -235,10 +246,10 @@ struct NotesView: View {
             Image(systemName: "note.text")
                 .font(.system(size: 48))
                 .foregroundStyle(.quaternary)
-            Text("No Notes")
+            Text(L("notes.empty_title"))
                 .font(.title2)
                 .foregroundStyle(.tertiary)
-            Text("Right-click a verse and select \"Add Note\" to save notes here.")
+            Text(L("notes.empty_hint"))
                 .font(.callout)
                 .foregroundStyle(.quaternary)
                 .multilineTextAlignment(.center)
@@ -251,7 +262,7 @@ struct NotesView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 32))
                 .foregroundStyle(.quaternary)
-            Text("No matching notes")
+            Text(L("notes.no_match"))
                 .font(.callout)
                 .foregroundStyle(.tertiary)
         }
@@ -321,22 +332,22 @@ struct NotesView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Delete note")
+            .help(L("notes.delete_help"))
         }
             .contentShape(Rectangle())
             .onTapGesture {
                 navigateToNote(note)
             }
             .contextMenu {
-                Button("Go to Verse") {
+                Button(L("notes.go_to_verse")) {
                     navigateToNote(note)
                 }
                 Divider()
-                Button("Edit Note") {
+                Button(L("notes.edit")) {
                     editingNoteContent = note.content
                     editingNoteId = note.id
                 }
-                Button("Copy Note") {
+                Button(L("notes.copy")) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(
                         "\(formatVerseId(note.verseId))\n\(note.content)",
@@ -344,7 +355,7 @@ struct NotesView: View {
                     )
                 }
                 Divider()
-                Button("Delete Note", role: .destructive) {
+                Button(L("notes.delete"), role: .destructive) {
                     withAnimation(.easeInOut(duration: 0.25)) {
                         store.removeNote(note.id)
                     }
@@ -363,13 +374,13 @@ struct NotesView: View {
 
         guard let pane = windowState.panes.first else { return }
 
-        if store.loadedTranslations.contains(where: { $0.id == note.translationId }) {
-            pane.selectedTranslationId = note.translationId
-        }
-
-        pane.selectedBook = book
-        pane.selectedChapter = chapter
-        store.loadVerses(for: pane)
+        let newTranslationId = store.loadedTranslations.contains(where: { $0.id == note.translationId })
+            ? note.translationId : pane.translationId
+        windowState.navigate(paneId: pane.id, book: book, chapter: chapter, translationId: newTranslationId)
+        guard let updated = windowState.panes.first else { return }
+        let verses = store.loadVerses(translationId: updated.translationId, book: book, chapter: chapter)
+        let scheme = store.versificationScheme(for: updated.translationId)
+        windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
 
         NotificationCenter.default.post(name: .navigateToReader, object: nil)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -469,6 +480,216 @@ struct NoteRow: View {
     }
 }
 
+// MARK: - Note Export View
+
+struct NoteExportView: View {
+    @Environment(\.dismiss) private var dismiss
+    let notes: [Note]
+
+    @State private var includeVerseRefs: Bool = true
+    @State private var includeTimestamps: Bool = false
+    @State private var groupByBook: Bool = false
+    @State private var titleText: String = "Bible Reader — Notes Export"
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f
+    }()
+
+    // Cached book-order index for grouping
+    private static let bookOrderIndex: [String: Int] = {
+        var map = [String: Int]()
+        for (i, book) in BibleBooks.all.enumerated() { map[book] = i }
+        return map
+    }()
+
+    private var previewText: String {
+        var lines: [String] = []
+        if !titleText.trimmingCharacters(in: .whitespaces).isEmpty {
+            lines.append(titleText)
+            lines.append(String(repeating: "─", count: 40))
+            lines.append("")
+        }
+
+        let sorted: [Note]
+        if groupByBook {
+            let idx = Self.bookOrderIndex
+            sorted = notes.sorted { lhs, rhs in
+                let lb = String(lhs.verseId.split(separator: ":").first ?? "")
+                let rb = String(rhs.verseId.split(separator: ":").first ?? "")
+                let li = idx[lb] ?? 999
+                let ri = idx[rb] ?? 999
+                if li != ri { return li < ri }
+                return lhs.verseId < rhs.verseId
+            }
+        } else {
+            sorted = notes
+        }
+
+        var currentBook: String? = nil
+        for note in sorted {
+            let book = String(note.verseId.split(separator: ":").first ?? "")
+            if groupByBook && book != currentBook {
+                if currentBook != nil { lines.append("") }
+                lines.append("── \(book) ──")
+                currentBook = book
+            }
+            if includeVerseRefs {
+                lines.append(formatVerseId(note.verseId))
+            }
+            lines.append(note.content)
+            if includeTimestamps {
+                lines.append("  \(Self.dateFormatter.string(from: note.updatedAt))")
+            }
+            lines.append("")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Title bar
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Export Notes to PDF")
+                        .font(.headline)
+                    Text("\(notes.count) note\(notes.count == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
+
+            Divider()
+
+            HStack(alignment: .top, spacing: 0) {
+                // Options panel
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Options")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Document Title")
+                            .font(.callout.weight(.medium))
+                        TextField("Title", text: $titleText)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Include")
+                            .font(.callout.weight(.medium))
+                        Toggle("Verse references", isOn: $includeVerseRefs)
+                            .toggleStyle(.checkbox)
+                        Toggle("Timestamps", isOn: $includeTimestamps)
+                            .toggleStyle(.checkbox)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Layout")
+                            .font(.callout.weight(.medium))
+                        Toggle("Group by book", isOn: $groupByBook)
+                            .toggleStyle(.checkbox)
+                    }
+
+                    Spacer()
+                }
+                .padding(20)
+                .frame(width: 200)
+
+                Divider()
+
+                // Preview panel
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Preview")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 2)
+
+                    ScrollView {
+                        Text(previewText.isEmpty ? "No notes to preview." : previewText)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(.primary.opacity(0.04))
+                            )
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(maxHeight: .infinity)
+
+            Divider()
+
+            // Footer buttons
+            HStack {
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button(action: exportAsPDF) {
+                    Label("Export PDF", systemImage: "arrow.down.doc.fill")
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(notes.isEmpty)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+        }
+        .frame(minWidth: 580, idealWidth: 640, minHeight: 420, idealHeight: 500)
+        .glassSheet()
+    }
+
+    private func exportAsPDF() {
+        let content = previewText
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.nameFieldStringValue = "BibleReader_Notes.pdf"
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+
+            let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 510, height: 792))
+            textView.string = content
+            textView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+            textView.isEditable = false
+            textView.textContainerInset = NSSize(width: 40, height: 40)
+
+            let printInfo = NSPrintInfo()
+            printInfo.paperSize = NSSize(width: 612, height: 792)
+            printInfo.topMargin = 36
+            printInfo.bottomMargin = 36
+            printInfo.leftMargin = 36
+            printInfo.rightMargin = 36
+            printInfo.isVerticallyCentered = false
+
+            let pdfData = textView.dataWithPDF(inside: textView.bounds)
+            try? pdfData.write(to: url)
+            dismiss()
+        }
+    }
+
+    private func formatVerseId(_ id: String) -> String {
+        let parts = id.split(separator: ":")
+        guard parts.count == 3 else { return id }
+        return "\(parts[0]) \(parts[1]):\(parts[2])"
+    }
+}
+
 // MARK: - Note Content Editor
 
 struct NoteContentEditor: View {
@@ -480,7 +701,7 @@ struct NoteContentEditor: View {
     var body: some View {
         VStack(spacing: 16) {
             HStack {
-                Text("Edit Note")
+                Text(L("notes.edit_title"))
                     .font(.headline)
                 Spacer()
                 Text(verseRef)
@@ -496,10 +717,10 @@ struct NoteContentEditor: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             HStack {
-                Button("Cancel", action: onCancel)
+                Button(L("cancel"), action: onCancel)
                     .keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Save") { onSave(noteText) }
+                Button(L("save")) { onSave(noteText) }
                     .keyboardShortcut(.defaultAction)
             }
         }

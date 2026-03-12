@@ -86,7 +86,7 @@ struct BookmarksView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Bookmarks")
+                Text(L("bookmarks.title"))
                     .font(.title2.weight(.semibold))
                 Spacer()
                 if !store.bookmarks.isEmpty {
@@ -106,7 +106,7 @@ struct BookmarksView: View {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(.secondary)
                             .font(.caption)
-                        TextField("Filter bookmarks...", text: $searchText)
+                        TextField(L("bookmarks.filter"), text: $searchText)
                             .textFieldStyle(.plain)
                             .font(.callout)
                         if !searchText.isEmpty {
@@ -132,7 +132,7 @@ struct BookmarksView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(groupByBook ? Color.accentColor : Color.secondary)
-                    .help(groupByBook ? "Show flat list" : "Group by book")
+                    .help(groupByBook ? L("bookmarks.show_flat") : L("bookmarks.group_by_book"))
 
                     // Sort menu
                     Menu {
@@ -152,7 +152,7 @@ struct BookmarksView: View {
                     }
                     .menuStyle(.borderlessButton)
                     .frame(width: 20)
-                    .help("Sort order")
+                    .help(L("bookmarks.sort_order"))
 
                     // Delete all
                     Button(action: { showDeleteAllConfirmation = true }) {
@@ -163,7 +163,7 @@ struct BookmarksView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
-                    .help("Delete all bookmarks")
+                    .help(L("bookmarks.delete_all_help"))
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
@@ -183,15 +183,15 @@ struct BookmarksView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .alert("Delete All Bookmarks?", isPresented: $showDeleteAllConfirmation) {
-            Button("Delete All", role: .destructive) {
+        .alert(L("bookmarks.delete_all_title"), isPresented: $showDeleteAllConfirmation) {
+            Button(L("bookmarks.delete_all_title"), role: .destructive) {
                 for bm in store.bookmarks {
                     store.removeBookmark(bm.id)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(L("cancel"), role: .cancel) {}
         } message: {
-            Text("This will permanently remove all \(store.bookmarks.count) bookmarks. This cannot be undone.")
+            Text("\(L("bookmarks.empty_title")): \(store.bookmarks.count). \(L("alert.clear_history_msg"))")
         }
         .sheet(isPresented: Binding(
             get: { editingBookmarkId != nil },
@@ -220,10 +220,10 @@ struct BookmarksView: View {
             Image(systemName: "bookmark")
                 .font(.system(size: 48))
                 .foregroundStyle(.quaternary)
-            Text("No Bookmarks")
+            Text(L("bookmarks.empty_title"))
                 .font(.title2)
                 .foregroundStyle(.tertiary)
-            Text("Right-click a verse and select \"Bookmark Verse\" to save it here.")
+            Text(L("bookmarks.empty_hint"))
                 .font(.callout)
                 .foregroundStyle(.quaternary)
                 .multilineTextAlignment(.center)
@@ -236,7 +236,7 @@ struct BookmarksView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 32))
                 .foregroundStyle(.quaternary)
-            Text("No matching bookmarks")
+            Text(L("bookmarks.no_match"))
                 .font(.callout)
                 .foregroundStyle(.tertiary)
         }
@@ -306,28 +306,28 @@ struct BookmarksView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Delete bookmark")
+            .help(L("bookmarks.delete_help"))
         }
             .contentShape(Rectangle())
             .onTapGesture {
                 navigateToBookmark(bookmark)
             }
             .contextMenu {
-                Button("Go to Verse") {
+                Button(L("bookmarks.go_to_verse")) {
                     navigateToBookmark(bookmark)
                 }
                 Divider()
-                Button(bookmark.note == nil ? "Add Note" : "Edit Note") {
+                Button(bookmark.note == nil ? L("bookmarks.add_note") : L("bookmarks.edit_note")) {
                     editingNoteText = bookmark.note ?? ""
                     editingBookmarkId = bookmark.id
                 }
                 if bookmark.note != nil {
-                    Button("Remove Note") {
+                    Button(L("bookmarks.remove_note")) {
                         store.updateBookmarkNote(id: bookmark.id, note: nil)
                     }
                 }
                 Divider()
-                Button("Remove Bookmark", role: .destructive) {
+                Button(L("bookmarks.remove"), role: .destructive) {
                     withAnimation(.easeInOut(duration: 0.25)) {
                         store.removeBookmark(bookmark.id)
                     }
@@ -346,13 +346,13 @@ struct BookmarksView: View {
 
         guard let pane = windowState.panes.first else { return }
 
-        if store.loadedTranslations.contains(where: { $0.id == bookmark.translationId }) {
-            pane.selectedTranslationId = bookmark.translationId
-        }
-
-        pane.selectedBook = book
-        pane.selectedChapter = chapter
-        store.loadVerses(for: pane)
+        let newTranslationId = store.loadedTranslations.contains(where: { $0.id == bookmark.translationId })
+            ? bookmark.translationId : pane.translationId
+        windowState.navigate(paneId: pane.id, book: book, chapter: chapter, translationId: newTranslationId)
+        guard let updated = windowState.panes.first else { return }
+        let verses = store.loadVerses(translationId: updated.translationId, book: book, chapter: chapter)
+        let scheme = store.versificationScheme(for: updated.translationId)
+        windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
 
         NotificationCenter.default.post(name: .navigateToReader, object: nil)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -449,7 +449,7 @@ struct BookmarkNoteEditor: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Bookmark Note")
+            Text(L("bookmarks.note_title"))
                 .font(.headline)
             TextEditor(text: $noteText)
                 .font(.body)
@@ -460,10 +460,10 @@ struct BookmarkNoteEditor: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             HStack {
-                Button("Cancel", action: onCancel)
+                Button(L("cancel"), action: onCancel)
                     .keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Save") { onSave(noteText) }
+                Button(L("save")) { onSave(noteText) }
                     .keyboardShortcut(.defaultAction)
             }
         }

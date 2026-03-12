@@ -58,7 +58,7 @@ struct CrossReferenceView: View {
             HStack {
                 Image(systemName: "arrow.triangle.branch")
                     .foregroundStyle(.secondary)
-                Text("Cross References")
+                Text(L("crossref.title"))
                     .font(.headline)
                 Spacer()
 
@@ -70,7 +70,7 @@ struct CrossReferenceView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
-                    .help("Go back to previous verse")
+                    .help(L("crossref.back_help"))
                 }
 
                 Button(action: {
@@ -85,7 +85,7 @@ struct CrossReferenceView: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.borderless)
-                .help("Close cross-references panel")
+                .help(L("crossref.close_help"))
             }
 
             // Current verse display
@@ -95,7 +95,7 @@ struct CrossReferenceView: View {
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(Color.accentColor)
                     Spacer()
-                    Button("Open in Reader") {
+                    Button(L("crossref.open_in_reader")) {
                         navigateReaderTo(verseId: verseId)
                     }
                     .buttonStyle(.borderless)
@@ -105,12 +105,12 @@ struct CrossReferenceView: View {
 
             // Manual verse reference input
             HStack(spacing: 6) {
-                TextField("Enter verse (e.g. John 3:16)", text: $manualRefInput)
+                TextField(L("crossref.verse_placeholder"), text: $manualRefInput)
                     .textFieldStyle(.roundedBorder)
                     .font(.callout)
                     .onSubmit { lookupManualRef() }
 
-                Button("Look Up") { lookupManualRef() }
+                Button(L("crossref.look_up")) { lookupManualRef() }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(manualRefInput.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -128,14 +128,14 @@ struct CrossReferenceView: View {
         if selectedVerseId == nil {
             emptyState
         } else if isLoading {
-            ProgressView("Loading cross-references...")
+            ProgressView(L("crossref.loading"))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if tskRefs.isEmpty {
             noRefsState
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    sectionHeader("Cross References (TSK)", count: tskRefs.count)
+                    sectionHeader(L("crossref.section"), count: tskRefs.count)
                     ForEach(tskRefs) { ref in
                         tskRefRow(ref)
                     }
@@ -225,10 +225,10 @@ struct CrossReferenceView: View {
             Image(systemName: "arrow.triangle.branch")
                 .font(.system(size: 48))
                 .foregroundStyle(.quaternary)
-            Text("Cross References")
+            Text(L("crossref.empty_title"))
                 .font(.title2)
                 .foregroundStyle(.tertiary)
-            Text("Enter a verse reference above, or tap a verse\nin the reader to see its cross-references.")
+            Text(L("crossref.empty_hint"))
                 .font(.callout)
                 .foregroundStyle(.quaternary)
                 .multilineTextAlignment(.center)
@@ -241,10 +241,10 @@ struct CrossReferenceView: View {
             Image(systemName: "doc.text.magnifyingglass")
                 .font(.system(size: 36))
                 .foregroundStyle(.quaternary)
-            Text("No cross-references found")
+            Text(L("crossref.none_found"))
                 .font(.callout.weight(.medium))
                 .foregroundStyle(.secondary)
-            Text("This verse has no cross-references\nin the loaded modules.")
+            Text(L("crossref.none_hint"))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)

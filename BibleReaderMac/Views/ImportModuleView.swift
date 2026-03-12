@@ -28,10 +28,10 @@ struct ImportModuleView: View {
 
             // Buttons
             HStack(spacing: 12) {
-                Button("Done") { dismiss() }
+                Button(L("done")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
 
-                Button("Choose File...") {
+                Button(L("import.choose_file")) {
                     importHandler.showOpenPanel(store: store)
                 }
                 .keyboardShortcut(.defaultAction)
@@ -62,7 +62,7 @@ struct ImportModuleView: View {
                     if importHandler.isProcessing {
                         ProgressView()
                             .scaleEffect(1.2)
-                        Text("Importing...")
+                        Text(L("import.importing"))
                             .font(.headline)
                             .foregroundStyle(.secondary)
                     } else {
@@ -71,11 +71,11 @@ struct ImportModuleView: View {
                             .foregroundColor(isDragTargeted ? .accentColor : .secondary)
                             .symbolEffect(.bounce, value: isDragTargeted)
 
-                        Text("Drop .brbmod files here")
+                        Text(L("import.drop_hint"))
                             .font(.headline)
                             .foregroundStyle(isDragTargeted ? .primary : .secondary)
 
-                        Text("or click \"Choose File\" to browse")
+                        Text(L("import.or_choose"))
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                     }

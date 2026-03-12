@@ -44,7 +44,7 @@ struct StrongsSidebarView: View {
             Divider()
 
             if isLoading {
-                ProgressView("Loading concordance...")
+                ProgressView(L("strongs.loading"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if focusedEntry != nil {
                 focusedEntryView
@@ -71,7 +71,7 @@ struct StrongsSidebarView: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Strong's Concordance")
+                Text(L("inspector.strongs_title"))
                     .font(.headline)
                 Text(verseRef)
                     .font(.subheadline)
@@ -88,7 +88,7 @@ struct StrongsSidebarView: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.borderless)
-            .help("Close concordance sidebar")
+            .help(L("strongs.close_help"))
         }
         .padding(.horizontal, 12)
         .padding(.top, 12)
@@ -135,7 +135,7 @@ struct StrongsSidebarView: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.primary)
                     }
-                    Text(entry.testament == .old ? "Hebrew" : "Greek")
+                    Text(entry.testament == .old ? L("strongs.lang_hebrew") : L("strongs.lang_greek"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -168,7 +168,7 @@ struct StrongsSidebarView: View {
             // Definition
             if let def = entry.strongsDefinition, !def.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
-                    sectionLabel("Definition")
+                    sectionLabel(L("strongs.definition"))
                     Text(cleanDefinition(def))
                         .font(.callout)
                         .foregroundStyle(.primary)
@@ -179,7 +179,7 @@ struct StrongsSidebarView: View {
             // Derivation
             if let deriv = entry.derivation, !deriv.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
-                    sectionLabel("Derivation")
+                    sectionLabel(L("strongs.derivation"))
                     Text(cleanDefinition(deriv))
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -191,7 +191,7 @@ struct StrongsSidebarView: View {
             if let kjv = entry.kjvDefinition, !kjv.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
-                        sectionLabel("KJV Usage")
+                        sectionLabel(L("strongs.kjv_usage"))
                         let total = totalUsageCount(kjv)
                         if let total {
                             Text("(\(total) occurrences)")
@@ -239,7 +239,7 @@ struct StrongsSidebarView: View {
 
             Button(action: toggleVerses) {
                 HStack {
-                    sectionLabel("Verses Using This Word")
+                    sectionLabel(L("strongs.verses_using"))
                     Spacer()
                     if isLoadingVerses {
                         ProgressView()
@@ -258,14 +258,14 @@ struct StrongsSidebarView: View {
             if versesOpen, let refs = verseRefs {
                 VStack(alignment: .leading, spacing: 0) {
                     if refs.isEmpty {
-                        Text("No verses found")
+                        Text(L("strongs.no_verses"))
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                             .padding(.horizontal, 12)
                             .padding(.bottom, 8)
                     } else {
                         if refs.count >= 300 {
-                            Text("Showing first 300 results")
+                            Text(L("strongs.showing_300"))
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                                 .padding(.horizontal, 12)
@@ -291,7 +291,7 @@ struct StrongsSidebarView: View {
             if isLoadingSimilar {
                 HStack {
                     Divider()
-                    ProgressView("Finding similar entries...")
+                    ProgressView(L("strongs.loading_similar"))
                         .font(.caption)
                     Spacer()
                 }
@@ -300,7 +300,7 @@ struct StrongsSidebarView: View {
                 Divider()
 
                 HStack(spacing: 6) {
-                    sectionLabel("Other Words Translated \"\(focusedWord.isEmpty ? "the same" : focusedWord)\"")
+                    sectionLabel(String(format: L("strongs.other_words"), focusedWord.isEmpty ? L("strongs.the_same") : focusedWord))
                     Rectangle()
                         .frame(height: 1)
                         .foregroundStyle(.quaternary)
@@ -344,7 +344,7 @@ struct StrongsSidebarView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 3))
 
                     if isExact {
-                        Text("Best Match")
+                        Text(L("strongs.best_match"))
                             .font(.system(size: 9, weight: .semibold))
                             .foregroundStyle(.blue)
                             .textCase(.uppercase)
@@ -404,7 +404,7 @@ struct StrongsSidebarView: View {
 
             if let def = entry.strongsDefinition, !def.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
-                    sectionLabel("Definition")
+                    sectionLabel(L("strongs.definition"))
                     Text(cleanDefinition(def))
                         .font(.caption)
                         .foregroundStyle(.primary)
@@ -413,7 +413,7 @@ struct StrongsSidebarView: View {
             }
             if let deriv = entry.derivation, !deriv.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
-                    sectionLabel("Derivation")
+                    sectionLabel(L("strongs.derivation"))
                     Text(cleanDefinition(deriv))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -423,7 +423,7 @@ struct StrongsSidebarView: View {
             if let kjv = entry.kjvDefinition, !kjv.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 4) {
-                        sectionLabel("KJV Usage")
+                        sectionLabel(L("strongs.kjv_usage"))
                         let total = totalUsageCount(kjv)
                         if let total {
                             Text("(\(total) occurrences)")
@@ -469,7 +469,7 @@ struct StrongsSidebarView: View {
                     switchFocus(to: entry)
                 }
             }) {
-                Text("View full detail")
+                Text(L("strongs.view_full_detail"))
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.blue)
             }
@@ -484,7 +484,7 @@ struct StrongsSidebarView: View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: { toggleSimilarVerses(for: entry.number) }) {
                 HStack(spacing: 4) {
-                    Text("Verses Using This Word")
+                    Text(L("strongs.verses_using"))
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
@@ -504,13 +504,13 @@ struct StrongsSidebarView: View {
 
             if similarVersesOpen.contains(entry.number), let refs = similarVerseRefs[entry.number] {
                 if refs.isEmpty {
-                    Text("No verses found")
+                    Text(L("strongs.no_verses"))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .padding(.bottom, 4)
                 } else {
                     if refs.count >= 300 {
-                        Text("Showing first 300 results")
+                        Text(L("strongs.showing_300"))
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                             .padding(.bottom, 2)
@@ -555,10 +555,10 @@ struct StrongsSidebarView: View {
             Image(systemName: "hand.tap")
                 .font(.system(size: 36))
                 .foregroundStyle(.quaternary)
-            Text("Tap a Word")
+            Text(L("strongs.tap_a_word"))
                 .font(.callout.weight(.medium))
                 .foregroundStyle(.secondary)
-            Text("Click any word in the verse to see its Strong's concordance entry.")
+            Text(L("strongs.tap_hint"))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
@@ -574,10 +574,10 @@ struct StrongsSidebarView: View {
             Image(systemName: "character.book.closed")
                 .font(.system(size: 36))
                 .foregroundStyle(.quaternary)
-            Text("No Strong's Data")
+            Text(L("strongs.no_data_title"))
                 .font(.callout.weight(.medium))
                 .foregroundStyle(.secondary)
-            Text("This verse has no Strong's concordance tags. Try a tagged translation like KJV.")
+            Text(L("strongs.no_data_hint"))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)

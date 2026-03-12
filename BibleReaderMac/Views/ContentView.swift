@@ -41,97 +41,72 @@ struct ContentView: View {
 
     // MARK: - Extracted Sub-Views
 
+    private static let panelAnimation = Animation.spring(response: 0.32, dampingFraction: 0.88)
+    private static let sidebarWidth: CGFloat = 272
+    private static let inspectorWidth: CGFloat = 312
+
+    // Binding that maps windowState.showSidebar (Bool) <-> NavigationSplitViewVisibility
+    private var columnVisibility: Binding<NavigationSplitViewVisibility> {
+        Binding(
+            get: { windowState.showSidebar ? .doubleColumn : .detailOnly },
+            set: { newValue in
+                let shouldShow = (newValue != .detailOnly)
+                if shouldShow != windowState.showSidebar {
+                    windowState.showSidebar = shouldShow
+                }
+            }
+        )
+    }
+
     private var mainLayout: some View {
-        ZStack {
-            // Main content fills the entire width
-            Group {
-                if windowState.showSearchPanel {
-                    VSplitView {
-                        SearchView()
-                            .frame(minHeight: 200, idealHeight: 350)
-                        ReaderView()
-                            .vibrancyBackground(material: .contentBackground, blendingMode: .behindWindow)
-                            .frame(minHeight: 200)
-                    }
-                } else {
-                    ReaderView()
-                        .vibrancyBackground(material: .contentBackground, blendingMode: .behindWindow)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .animation(.easeInOut(duration: 0.2), value: windowState.showSearchPanel)
-
-            // Dim overlay when either sidebar is open
-            if windowState.showSidebar || windowState.showInspector {
-                Color.black.opacity(0.15)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        if windowState.showSidebar {
-                            windowState.toggleSidebar()
-                        }
-                        if windowState.showInspector {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                windowState.showInspector = false
-                            }
-                        }
-                    }
-                    .transition(.opacity)
-            }
-
-            // Left overlay sidebar
-            if windowState.showSidebar {
-                HStack(spacing: 0) {
-                    SidebarView()
-                        .frame(width: 280)
-                        .frame(maxHeight: .infinity)
-                        .vibrancyBackground(material: .sidebar)
-                        .shadow(color: .black.opacity(0.2), radius: 8, x: 2, y: 0)
-                    Spacer()
-                }
-                .transition(.move(edge: .leading))
-            }
-
-            // Right overlay panel (concordance, cross-refs)
-            if windowState.showInspector {
-                HStack(spacing: 0) {
-                    Spacer()
+        // Native macOS NavigationSplitView — sidebar gets the proper translucent sidebar
+        // material, integrates with the titlebar, and pushes content aside like Notes.app.
+        NavigationSplitView(columnVisibility: columnVisibility) {
+            SidebarView()
+                .navigationSplitViewColumnWidth(
+                    min: 220, ideal: ContentView.sidebarWidth, max: 360
+                )
+        } detail: {
+            ReaderView()
+                .vibrancyBackground(material: .contentBackground, blendingMode: .behindWindow)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .inspector(isPresented: $windowState.showInspector) {
                     InspectorPanelView()
-                        .frame(width: 320)
-                        .frame(maxHeight: .infinity)
-                        .vibrancyBackground(material: .sidebar)
-                        .shadow(color: .black.opacity(0.2), radius: 8, x: -2, y: 0)
+                        .inspectorColumnWidth(
+                            min: 260, ideal: ContentView.inspectorWidth, max: 420
+                        )
                 }
-                .transition(.move(edge: .trailing))
+        }
+        .navigationSplitViewStyle(.balanced)
+        .overlay(alignment: .topTrailing) {
+            if windowState.showSearchPanel && windowState.searchHasSearched {
+                SearchResultsPanel()
+                    .padding(.top, 8)
+                    .padding(.trailing, 16)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
+                    .zIndex(100)
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: windowState.showSidebar)
-        .animation(.easeInOut(duration: 0.25), value: windowState.showInspector)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: windowState.showSearchPanel && windowState.searchHasSearched)
     }
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
-            Button(action: { windowState.toggleSidebar() }) {
-                Label(L("toolbar.sidebar"), systemImage: "sidebar.leading")
-            }
-            .help(L("toolbar.toggle_sidebar"))
-            .keyboardShortcut("s", modifiers: [.command, .shift])
-        }
-
         ToolbarItemGroup(placement: .primaryAction) {
             Button(action: {
-                withAnimation(.easeInOut(duration: 0.25)) {
+                withAnimation(ContentView.panelAnimation) {
                     windowState.showInspector.toggle()
                 }
             }) {
                 Label(L("toolbar.inspector"), systemImage: "sidebar.trailing")
             }
             .help(L("toolbar.toggle_inspector"))
+            .keyboardShortcut("i", modifiers: [.command, .shift])
 
-            Button(action: { windowState.toggleSearchPanel() }) {
-                Label(L("toolbar.search"), systemImage: "magnifyingglass")
-            }
-            .help(L("toolbar.search_help"))
+            SearchToolbarItem()
         }
     }
 
@@ -395,15 +370,10 @@ struct InspectorPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Tab picker (text labels, matching left sidebar style)
-            Picker("", selection: $windowState.inspectorTab) {
-                ForEach(InspectorTab.allCases, id: \.self) { tab in
-                    Label(tab.label, systemImage: tab.icon)
-                        .tag(tab)
-                }
+            // Glass segmented tab picker — capsule pill with sliding glass selection indicator
+            GlassSegmentedPicker(selection: $windowState.inspectorTab) { tab in
+                tab.label
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 

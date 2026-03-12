@@ -1,6 +1,16 @@
 import Foundation
 
 enum BibleBooks {
+
+    /// Returns the localized display name for a canonical English book name.
+    /// Internal IDs (e.g. stored in DB, pane state) always use the English canonical name.
+    static func localizedName(for englishName: String) -> String {
+        let key = "book." + englishName
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "_")
+        return L(key)
+    }
+
     static let all: [String] = [
         "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
         "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",

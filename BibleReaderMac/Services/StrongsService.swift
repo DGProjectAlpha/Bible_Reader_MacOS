@@ -11,8 +11,26 @@ enum StrongsService {
     private static var cache: [String: StrongsEntry] = [:]
     private static let cacheLock = NSLock()
 
+    // MARK: - Strongs-capable module registry
+
+    /// File paths of modules known to have a `strongs` table, used as fallback for modules that don't.
+    private static var strongsCapableFilePaths: [String] = []
+    private static let strongsCapableLock = NSLock()
+
+    /// Register a module file path as having a `strongs` table.
+    /// Called by BibleStore when a translation with a strongs table is loaded.
+    static func registerStrongsCapableModule(_ filePath: String) {
+        strongsCapableLock.lock()
+        if !strongsCapableFilePaths.contains(filePath) {
+            strongsCapableFilePaths.append(filePath)
+        }
+        strongsCapableLock.unlock()
+    }
+
     /// Look up a single Strong's entry by number (e.g. "H7225", "G3056").
-    /// Checks in-memory cache first, then queries the module database.
+    /// Checks in-memory cache first, then queries the module database,
+    /// then falls back to any other registered strongs-capable module (e.g. KJV),
+    /// then tries bundled JSON files.
     static func lookup(_ number: String, in filePath: String) -> StrongsEntry? {
         cacheLock.lock()
         if let cached = cache[number] {
@@ -21,7 +39,7 @@ enum StrongsService {
         }
         cacheLock.unlock()
 
-        // Try loading from the module's strongs table
+        // Try loading from the module's own strongs table
         if let entry = queryModule(number: number, filePath: filePath) {
             cacheLock.lock()
             cache[number] = entry
@@ -29,7 +47,22 @@ enum StrongsService {
             return entry
         }
 
-        // Try bundled JSON fallback
+        // Fallback: try any other registered strongs-capable module (e.g. bundled KJV/ASV).
+        // Allows modules like RST that have word_tags but no strongs table to show full concordance details.
+        strongsCapableLock.lock()
+        let capablePaths = strongsCapableFilePaths.filter { $0 != filePath }
+        strongsCapableLock.unlock()
+
+        for fallbackPath in capablePaths {
+            if let entry = queryModule(number: number, filePath: fallbackPath) {
+                cacheLock.lock()
+                cache[number] = entry
+                cacheLock.unlock()
+                return entry
+            }
+        }
+
+        // Final fallback: bundled JSON files
         if let entry = loadFromBundledJSON(number: number) {
             cacheLock.lock()
             cache[number] = entry
@@ -72,7 +105,32 @@ enum StrongsService {
         }
         cacheLock.unlock()
 
-        // Fallback to bundled JSON for any remaining
+        // Fallback: try any other registered strongs-capable module (e.g. bundled KJV)
+        // This lets modules like RST (which have word_tags but no strongs table) show full concordance details.
+        if !stillMissing.isEmpty {
+            strongsCapableLock.lock()
+            let capablePaths = strongsCapableFilePaths.filter { $0 != filePath }
+            strongsCapableLock.unlock()
+
+            for fallbackPath in capablePaths {
+                let fallbackEntries = batchQueryModule(numbers: stillMissing, filePath: fallbackPath)
+                var stillStillMissing: [String] = []
+                cacheLock.lock()
+                for num in stillMissing {
+                    if let entry = fallbackEntries[num] {
+                        cache[num] = entry
+                        results[num] = entry
+                    } else {
+                        stillStillMissing.append(num)
+                    }
+                }
+                cacheLock.unlock()
+                stillMissing = stillStillMissing
+                if stillMissing.isEmpty { break }
+            }
+        }
+
+        // Final fallback: bundled JSON files
         for num in stillMissing {
             if let entry = loadFromBundledJSON(number: num) {
                 cacheLock.lock()

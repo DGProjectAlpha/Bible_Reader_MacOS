@@ -23,35 +23,35 @@ struct BibleReaderMacApp: App {
         .defaultSize(width: 1200, height: 800)
         .commands {
             // Keep default New Window (Cmd+N) behavior from WindowGroup
-            CommandMenu("Bible") {
-                Button("Import Module...") {
+            CommandMenu(L("menu.bible")) {
+                Button(L("menu.import_module")) {
                     NotificationCenter.default.post(name: .importModule, object: nil)
                 }
                 .keyboardShortcut("i", modifiers: [.command])
 
-                Button("Manage Translations") {
+                Button(L("menu.manage_translations")) {
                     NotificationCenter.default.post(name: .manageTranslations, object: nil)
                 }
                 .keyboardShortcut("t", modifiers: [.command, .shift])
 
                 Divider()
 
-                Button("Search...") {
+                Button(L("menu.search")) {
                     NotificationCenter.default.post(name: .globalSearch, object: nil)
                 }
                 .keyboardShortcut("f", modifiers: [.command])
 
                 Divider()
 
-                Button("Add Translation Pane") {
+                Button(L("menu.add_pane")) {
                     NotificationCenter.default.post(name: .addTranslationPane, object: nil)
                 }
                 .keyboardShortcut("\\", modifiers: [.command])
             }
 
-            CommandMenu("View") {
+            CommandMenu(L("menu.view")) {
                 // Sidebar tabs
-                Button("Bookmarks Sidebar") {
+                Button(L("menu.bookmarks_sidebar")) {
                     NotificationCenter.default.post(
                         name: .switchSidebarTab,
                         object: nil,
@@ -60,7 +60,7 @@ struct BibleReaderMacApp: App {
                 }
                 .keyboardShortcut("1", modifiers: [.command])
 
-                Button("Notes Sidebar") {
+                Button(L("menu.notes_sidebar")) {
                     NotificationCenter.default.post(
                         name: .switchSidebarTab,
                         object: nil,
@@ -69,7 +69,7 @@ struct BibleReaderMacApp: App {
                 }
                 .keyboardShortcut("2", modifiers: [.command])
 
-                Button("Modules Sidebar") {
+                Button(L("menu.modules_sidebar")) {
                     NotificationCenter.default.post(
                         name: .switchSidebarTab,
                         object: nil,
@@ -81,12 +81,12 @@ struct BibleReaderMacApp: App {
                 Divider()
 
                 // Inspector toggles
-                Button("Toggle Strong's") {
+                Button(L("menu.toggle_strongs")) {
                     NotificationCenter.default.post(name: .toggleStrongsInspector, object: nil)
                 }
                 .keyboardShortcut("s", modifiers: [.command, .option])
 
-                Button("Toggle Cross-References") {
+                Button(L("menu.toggle_crossrefs")) {
                     NotificationCenter.default.post(name: .toggleCrossRefsInspector, object: nil)
                 }
                 .keyboardShortcut("r", modifiers: [.command, .option])
@@ -94,52 +94,52 @@ struct BibleReaderMacApp: App {
                 Divider()
 
                 // Font size
-                Button("Increase Font Size") {
+                Button(L("menu.increase_font")) {
                     let current = UserDefaults.standard.double(forKey: "fontSize")
                     let size = current > 0 ? current : 15
                     UserDefaults.standard.set(min(36, size + 1), forKey: "fontSize")
                 }
                 .keyboardShortcut("+", modifiers: [.command])
 
-                Button("Decrease Font Size") {
+                Button(L("menu.decrease_font")) {
                     let current = UserDefaults.standard.double(forKey: "fontSize")
                     let size = current > 0 ? current : 15
                     UserDefaults.standard.set(max(10, size - 1), forKey: "fontSize")
                 }
                 .keyboardShortcut("-", modifiers: [.command])
 
-                Button("Reset Font Size") {
+                Button(L("menu.reset_font")) {
                     UserDefaults.standard.set(15.0, forKey: "fontSize")
                 }
                 .keyboardShortcut("0", modifiers: [.command])
             }
 
-            CommandMenu("Bookmarks") {
-                Button("Bookmark Current Verse") {
+            CommandMenu(L("menu.bookmarks")) {
+                Button(L("menu.bookmark_verse")) {
                     NotificationCenter.default.post(name: .bookmarkCurrentVerse, object: nil)
                 }
                 .keyboardShortcut("d", modifiers: [.command])
             }
 
-            CommandMenu("Navigate") {
-                Button("Previous Chapter") {
+            CommandMenu(L("menu.navigate")) {
+                Button(L("menu.prev_chapter")) {
                     NotificationCenter.default.post(name: .navigatePreviousChapter, object: nil)
                 }
                 .keyboardShortcut(.leftArrow, modifiers: [.command])
 
-                Button("Next Chapter") {
+                Button(L("menu.next_chapter")) {
                     NotificationCenter.default.post(name: .navigateNextChapter, object: nil)
                 }
                 .keyboardShortcut(.rightArrow, modifiers: [.command])
 
                 Divider()
 
-                Button("Previous Book") {
+                Button(L("menu.prev_book")) {
                     NotificationCenter.default.post(name: .navigatePreviousBook, object: nil)
                 }
                 .keyboardShortcut(.leftArrow, modifiers: [.command, .shift])
 
-                Button("Next Book") {
+                Button(L("menu.next_book")) {
                     NotificationCenter.default.post(name: .navigateNextBook, object: nil)
                 }
                 .keyboardShortcut(.rightArrow, modifiers: [.command, .shift])

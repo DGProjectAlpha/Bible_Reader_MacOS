@@ -81,6 +81,10 @@ class WindowState: ObservableObject {
     // Search
     @Published var showSearchPanel: Bool = false
     @Published var searchQuery: String = ""
+    @Published var searchResults: [SearchResult] = []
+    @Published var searchIsSearching: Bool = false
+    @Published var searchResultsCapped: Bool = false
+    @Published var searchHasSearched: Bool = false
 
     // Last active pane for cross-ref navigation targeting
     @Published var lastActivePaneId: UUID?
@@ -131,6 +135,11 @@ class WindowState: ObservableObject {
             newPane.verticalBuddyId = sourcePaneId
         }
         panes.insert(newPane, at: idx + 1)
+    }
+
+    func togglePaneSync(_ id: UUID) {
+        guard let idx = panes.firstIndex(where: { $0.id == id }) else { return }
+        panes[idx].isSyncEnabled.toggle()
     }
 
     func removePane(_ id: UUID) {
@@ -190,5 +199,8 @@ class WindowState: ObservableObject {
             return
         }
         windowTitle = "\(pane.book) \(pane.chapter) — BibleReader"
+        // Persist last position so ContentView can restore on next launch
+        UserDefaults.standard.set(pane.book, forKey: "lastBook")
+        UserDefaults.standard.set(pane.chapter, forKey: "lastChapter")
     }
 }

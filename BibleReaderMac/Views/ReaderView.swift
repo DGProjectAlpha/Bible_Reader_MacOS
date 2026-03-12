@@ -6,31 +6,24 @@ import Combine
 struct ReaderView: View {
     @EnvironmentObject var store: BibleStore
     @EnvironmentObject var windowState: WindowState
-    @AppStorage("syncScrolling") private var syncScrolling = true
     @StateObject private var syncCoordinator = ScrollSyncCoordinator()
 
     var body: some View {
         Group {
             if store.loadedTranslations.isEmpty {
                 emptyState
+            } else if windowState.panes.isEmpty {
+                // Panes not yet created (handleOnAppear hasn't fired)
+                Color.clear
             } else if windowState.panes.count == 1 {
                 ReaderPaneView(paneId: windowState.panes[0].id,
-                               syncScrolling: $syncScrolling,
                                coordinator: syncCoordinator)
             } else {
                 splitPaneGrid()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .toolbar {
-            ToolbarItemGroup(placement: .automatic) {
-                Toggle(isOn: $syncScrolling) {
-                    Label(L("reader.sync_scroll"), systemImage: syncScrolling ? "link" : "link.badge.plus")
-                }
-                .help(syncScrolling ? L("reader.sync_enabled") : L("reader.sync_disabled"))
-            }
-        }
-        // Cross-ref navigation: jump reader to a specific verse
+        // Cross-ref / search navigation: jump reader to a specific verse
         .onReceive(NotificationCenter.default.publisher(for: .navigateToVerse)) { notification in
             guard let userInfo = notification.userInfo,
                   let book = userInfo["book"] as? String,
@@ -45,18 +38,31 @@ struct ReaderView: View {
                 targetId = first.id
             } else { return }
 
+            // Navigate the target pane
             navigateTo(paneId: targetId, book: book, chapter: chapter)
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                syncCoordinator.scrollProxies[targetId]?.scrollTo(
-                    "verse-\(targetId)-\(verse)", anchor: .top
-                )
+            // If the target pane has sync enabled, propagate to all other synced panes
+            if let targetPane = windowState.panes.first(where: { $0.id == targetId }),
+               targetPane.isSyncEnabled {
+                for otherPane in windowState.panes where otherPane.id != targetId && otherPane.isSyncEnabled {
+                    navigateTo(paneId: otherPane.id, book: book, chapter: chapter)
+                }
             }
-        }
-        .onChange(of: syncScrolling) {
-            guard syncScrolling, let leader = windowState.panes.first else { return }
-            for pane in windowState.panes.dropFirst() {
-                navigateTo(paneId: pane.id, book: leader.book, chapter: leader.chapter)
+
+            // Scroll all relevant panes to the target verse after chapter loads
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                let panesToScroll: [UUID]
+                if let targetPane = windowState.panes.first(where: { $0.id == targetId }),
+                   targetPane.isSyncEnabled {
+                    panesToScroll = windowState.panes.filter { $0.isSyncEnabled }.map { $0.id }
+                } else {
+                    panesToScroll = [targetId]
+                }
+                for paneId in panesToScroll {
+                    syncCoordinator.scrollProxies[paneId]?.scrollTo(
+                        "verse-\(paneId)-\(verse)", anchor: .top
+                    )
+                }
             }
         }
     }
@@ -96,40 +102,40 @@ struct ReaderView: View {
         return columns
     }
 
-    @ViewBuilder
-    private func columnView(_ col: PaneColumn) -> some View {
+    private func columnContent(_ col: PaneColumn) -> AnyView {
         if let bottomId = col.bottom {
-            VSplitView {
-                ReaderPaneView(paneId: col.top, syncScrolling: $syncScrolling, coordinator: syncCoordinator)
-                    .frame(minHeight: 100, idealHeight: .infinity, maxHeight: .infinity)
-                ReaderPaneView(paneId: bottomId, syncScrolling: $syncScrolling, coordinator: syncCoordinator)
-                    .frame(minHeight: 100, idealHeight: .infinity, maxHeight: .infinity)
-            }
+            // Vertical split — stacked panes inside a column
+            return AnyView(
+                EqualSplitView(
+                    isVertical: false,
+                    panes: [
+                        AnyView(ReaderPaneView(paneId: col.top, coordinator: syncCoordinator)
+                            .frame(minHeight: 100, maxHeight: .infinity)),
+                        AnyView(ReaderPaneView(paneId: bottomId, coordinator: syncCoordinator)
+                            .frame(minHeight: 100, maxHeight: .infinity))
+                    ]
+                )
+            )
         } else {
-            ReaderPaneView(paneId: col.top, syncScrolling: $syncScrolling, coordinator: syncCoordinator)
+            return AnyView(ReaderPaneView(paneId: col.top, coordinator: syncCoordinator))
         }
     }
 
     @ViewBuilder
     private func splitPaneGrid() -> some View {
         let cols = buildColumns()
-        switch cols.count {
-        case 2:
-            HSplitView { columnView(cols[0]); columnView(cols[1]) }
-        case 3:
-            HSplitView { columnView(cols[0]); columnView(cols[1]); columnView(cols[2]) }
-        case 4:
-            HSplitView { columnView(cols[0]); columnView(cols[1]); columnView(cols[2]); columnView(cols[3]) }
-        case 5:
-            HSplitView { columnView(cols[0]); columnView(cols[1]); columnView(cols[2]); columnView(cols[3]); columnView(cols[4]) }
-        case 6:
-            HSplitView { columnView(cols[0]); columnView(cols[1]); columnView(cols[2]); columnView(cols[3]); columnView(cols[4]); columnView(cols[5]) }
-        case 7:
-            HSplitView { columnView(cols[0]); columnView(cols[1]); columnView(cols[2]); columnView(cols[3]); columnView(cols[4]); columnView(cols[5]); columnView(cols[6]) }
-        case 8:
-            HSplitView { columnView(cols[0]); columnView(cols[1]); columnView(cols[2]); columnView(cols[3]); columnView(cols[4]); columnView(cols[5]); columnView(cols[6]); columnView(cols[7]) }
-        default:
-            columnView(cols[0])
+        if cols.isEmpty {
+            Color.clear
+        } else if cols.count == 1 {
+            columnContent(cols[0])
+        } else {
+            // Horizontal split — side-by-side columns, each equal width
+            EqualSplitView(
+                isVertical: true,
+                panes: cols.map { col in
+                    AnyView(columnContent(col).frame(minWidth: 200, maxWidth: .infinity))
+                }
+            )
         }
     }
 
@@ -157,6 +163,106 @@ struct ReaderView: View {
     }
 }
 
+// MARK: - Equal Split View
+//
+// Wraps NSSplitView to equalise divider positions whenever the pane count changes.
+// Accepts views as [AnyView] so the coordinator can manage individual subviews.
+// The user can still drag dividers freely after the initial equalisation.
+
+struct EqualSplitView: NSViewRepresentable {
+    /// true  → vertical dividers, side-by-side (like HSplitView)
+    /// false → horizontal dividers, stacked (like VSplitView)
+    let isVertical: Bool
+    /// The individual pane views.
+    let panes: [AnyView]
+
+    // MARK: Coordinator
+
+    @MainActor
+    class Coordinator: NSObject, NSSplitViewDelegate {
+        var hostingViews: [NSHostingView<AnyView>] = []
+        var lastEqualizedCount: Int = 0
+
+        /// Set all dividers to equal positions.
+        func equalizeNow(_ splitView: NSSplitView) {
+            let count = splitView.arrangedSubviews.count
+            guard count > 1 else { return }
+            let thickness = splitView.dividerThickness
+            let total = splitView.isVertical ? splitView.bounds.width : splitView.bounds.height
+            guard total > 0 else { return }
+            let paneSize = (total - CGFloat(count - 1) * thickness) / CGFloat(count)
+            var pos: CGFloat = 0
+            for i in 0..<(count - 1) {
+                pos += paneSize
+                splitView.setPosition(pos, ofDividerAt: i)
+                pos += thickness
+            }
+            lastEqualizedCount = count
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    // MARK: NSViewRepresentable
+
+    func makeNSView(context: Context) -> NSSplitView {
+        let splitView = NSSplitView()
+        splitView.isVertical = isVertical
+        splitView.dividerStyle = .thin
+        splitView.delegate = context.coordinator
+
+        for view in panes {
+            let hosting = NSHostingView(rootView: view)
+            hosting.translatesAutoresizingMaskIntoConstraints = false
+            splitView.addArrangedSubview(hosting)
+            context.coordinator.hostingViews.append(hosting)
+        }
+
+        // Equalize after the view has been laid out
+        DispatchQueue.main.async {
+            context.coordinator.equalizeNow(splitView)
+        }
+        return splitView
+    }
+
+    func updateNSView(_ splitView: NSSplitView, context: Context) {
+        let coordinator = context.coordinator
+
+        // Sync hosting views with current panes array
+        let existingCount = coordinator.hostingViews.count
+        let newCount = panes.count
+
+        if newCount > existingCount {
+            // Add new panes
+            for i in existingCount..<newCount {
+                let hosting = NSHostingView(rootView: panes[i])
+                hosting.translatesAutoresizingMaskIntoConstraints = false
+                splitView.addArrangedSubview(hosting)
+                coordinator.hostingViews.append(hosting)
+            }
+            DispatchQueue.main.async {
+                coordinator.equalizeNow(splitView)
+            }
+        } else if newCount < existingCount {
+            // Remove extra panes (from the end)
+            for i in (newCount..<existingCount).reversed() {
+                let hosting = coordinator.hostingViews[i]
+                splitView.removeArrangedSubview(hosting)
+                hosting.removeFromSuperview()
+                coordinator.hostingViews.remove(at: i)
+            }
+            DispatchQueue.main.async {
+                coordinator.equalizeNow(splitView)
+            }
+        } else {
+            // Same count — update root views in place
+            for (i, view) in panes.enumerated() {
+                coordinator.hostingViews[i].rootView = view
+            }
+        }
+    }
+}
+
 // MARK: - Scroll Sync Coordinator
 
 @MainActor
@@ -171,16 +277,15 @@ class ScrollSyncCoordinator: ObservableObject {
         scrollProxies[paneId] = proxy
     }
 
-    func reportVisibleVerse(_ verse: Int, from paneId: UUID) {
+    func reportVisibleVerse(_ verse: Int, from paneId: UUID, syncedPaneIds: Set<UUID>) {
+        guard syncedPaneIds.contains(paneId) else { return }
         guard !suppressedPanes.contains(paneId) else { return }
         guard verse != lastSyncedVerse || lastSourcePane != paneId else { return }
         lastSourcePane = paneId
         lastSyncedVerse = verse
-        for (otherId, proxy) in scrollProxies where otherId != paneId {
-            suppressPane(otherId, for: 0.3)
-            var tx = Transaction()
-            tx.disablesAnimations = true
-            withTransaction(tx) {
+        for (otherId, proxy) in scrollProxies where otherId != paneId && syncedPaneIds.contains(otherId) {
+            suppressPane(otherId, for: 0.4)
+            withAnimation(.easeInOut(duration: 0.25)) {
                 proxy.scrollTo("verse-\(otherId)-\(verse)", anchor: .top)
             }
         }
@@ -232,7 +337,6 @@ struct ReaderPaneView: View {
     @EnvironmentObject var windowState: WindowState
 
     let paneId: UUID
-    @Binding var syncScrolling: Bool
     @ObservedObject var coordinator: ScrollSyncCoordinator
 
     @AppStorage("fontSize") private var fontSize: Double = 15
@@ -253,23 +357,45 @@ struct ReaderPaneView: View {
     @State private var visibleVerseTracker = VisibleVerseTracker()
     @State private var noteEditingVerse: Verse?
 
+    /// Cached metadata — rebuilt only when verse set or user-data changes, not every render.
+    @State private var cachedMetadata: [String: (Bool, HighlightColor?, Bool)] = [:]
+    @State private var metadataCacheKey: String = ""
+
     // Computed from windowState — never stored locally
     private var pane: ReaderPane? {
         windowState.panes.first { $0.id == paneId }
     }
     private var isSolo: Bool { windowState.panes.count == 1 }
 
+    /// A string that changes whenever the verse set, bookmarks, highlights, or notes change.
+    private func metadataKey(for pane: ReaderPane) -> String {
+        let verseIds = pane.verses.map(\.id).joined(separator: ",")
+        let bmKey = store.bookmarks.map { "\($0.verseId)|\($0.translationId)" }.joined()
+        let hlKey = store.highlights.map { "\($0.verseId)|\($0.translationId)" }.joined()
+        let ntKey = store.notes.map { "\($0.verseId)|\($0.translationId)" }.joined()
+        return "\(verseIds)|\(bmKey)|\(hlKey)|\(ntKey)"
+    }
+
     var body: some View {
-        guard let pane else { return AnyView(EmptyView()) }
-        return AnyView(
+        if let pane {
             VStack(spacing: 0) {
                 paneHeader(pane)
                 Divider()
                 verseContent(pane)
             }
-            .vibrancyBackground(material: .contentBackground, blendingMode: .withinWindow)
+            .background {
+                VisualEffectBackground(
+                    material: .contentBackground,
+                    blendingMode: .behindWindow,
+                    isEmphasized: false
+                )
+            }
             .onAppear {
                 loadChapter(pane: pane)
+                refreshMetadataIfNeeded(pane: pane)
+            }
+            .onChange(of: metadataKey(for: pane)) {
+                cachedMetadata = buildMetadata(pane)
             }
             .sheet(item: $noteEditingVerse) { verse in
                 NoteEditorSheet(
@@ -288,7 +414,7 @@ struct ReaderPaneView: View {
                     }
                 )
             }
-        )
+        }
     }
 
     // MARK: - Load chapter (the ONE place verses get loaded)
@@ -298,6 +424,13 @@ struct ReaderPaneView: View {
         let scheme = store.versificationScheme(for: pane.translationId)
         windowState.setVerses(paneId: paneId, verses: verses, versificationScheme: scheme)
         visibleVerseTracker.clear()
+    }
+
+    private func refreshMetadataIfNeeded(pane: ReaderPane) {
+        let key = metadataKey(for: pane)
+        guard key != metadataCacheKey else { return }
+        metadataCacheKey = key
+        cachedMetadata = buildMetadata(pane)
     }
 
     // MARK: - Navigation actions (called directly, no reactive chains)
@@ -359,9 +492,10 @@ struct ReaderPaneView: View {
     }
 
     private func reportNavigation(_ p: ReaderPane) {
-        guard syncScrolling else { return }
-        // Sync other panes to same position
-        for otherPane in windowState.panes where otherPane.id != paneId {
+        // Only sync if this pane has sync enabled
+        guard p.isSyncEnabled else { return }
+        // Sync other panes that also have sync enabled
+        for otherPane in windowState.panes where otherPane.id != paneId && otherPane.isSyncEnabled {
             windowState.navigate(paneId: otherPane.id, book: p.book, chapter: p.chapter)
             guard let updated = windowState.panes.first(where: { $0.id == otherPane.id }) else { continue }
             let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
@@ -406,15 +540,13 @@ struct ReaderPaneView: View {
                 .fixedSize()
                 .help(L("reader.select_book"))
 
-                // Chapter nav
-                HStack(spacing: 4) {
+                // Chapter nav — prev/next flat buttons, chapter picker inline
+                HStack(spacing: 2) {
                     Button(action: prevChapter) {
                         Image(systemName: "chevron.left")
-                            .font(.caption.weight(.semibold))
-                            .frame(width: 24, height: 24)
-                            .contentShape(Rectangle())
+                            .font(.system(size: 13, weight: .semibold))
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.flatToolbar)
                     .disabled(pane.chapter <= 1 && BibleBooks.all.firstIndex(of: pane.book) == 0)
                     .help(L("reader.prev_chapter"))
 
@@ -433,35 +565,49 @@ struct ReaderPaneView: View {
 
                     Button(action: nextChapter) {
                         Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .frame(width: 24, height: 24)
-                            .contentShape(Rectangle())
+                            .font(.system(size: 13, weight: .semibold))
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.flatToolbar)
                     .disabled(pane.chapter >= pane.chapterCount && BibleBooks.all.firstIndex(of: pane.book) == BibleBooks.all.count - 1)
                     .help(L("reader.next_chapter"))
                 }
 
-                // Font size
-                HStack(spacing: 4) {
+                // Font size group: [A-  15  A+]
+                HStack(spacing: 0) {
                     Button(action: { fontSize = max(10, fontSize - 1) }) {
                         Image(systemName: "textformat.size.smaller")
-                            .font(.callout).frame(width: 26, height: 26).contentShape(Rectangle())
+                            .font(.system(size: 13, weight: .medium))
+                            .padding(.horizontal, 8).padding(.vertical, 6)
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.primary.opacity(0.7))
                     .help(L("reader.decrease_font"))
 
+                    Divider().frame(height: 14)
+
                     Text("\(Int(fontSize))")
-                        .font(.callout.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .frame(width: 24, alignment: .center)
+                        .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.primary.opacity(0.75))
+                        .frame(width: 24)
+
+                    Divider().frame(height: 14)
 
                     Button(action: { fontSize = min(36, fontSize + 1) }) {
                         Image(systemName: "textformat.size.larger")
-                            .font(.callout).frame(width: 26, height: 26).contentShape(Rectangle())
+                            .font(.system(size: 13, weight: .medium))
+                            .padding(.horizontal, 8).padding(.vertical, 6)
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.primary.opacity(0.7))
                     .help(L("reader.increase_font"))
+                }
+                .background {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.primary.opacity(0.06))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.75)
                 }
 
                 // Split buttons
@@ -469,7 +615,6 @@ struct ReaderPaneView: View {
                     Divider().frame(height: 20)
                     Button(action: {
                         windowState.splitPane(paneId, direction: .horizontal)
-                        // Load the new pane
                         if let newPane = windowState.panes.last {
                             let verses = store.loadVerses(translationId: newPane.translationId, book: newPane.book, chapter: newPane.chapter)
                             let scheme = store.versificationScheme(for: newPane.translationId)
@@ -477,10 +622,9 @@ struct ReaderPaneView: View {
                         }
                     }) {
                         Image(systemName: "rectangle.split.2x1")
-                            .font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                            .frame(width: 22, height: 22).contentShape(Rectangle())
+                            .font(.system(size: 13, weight: .medium))
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.flatToolbar)
                     .help(L("reader.split_right"))
 
                     Button(action: {
@@ -492,11 +636,21 @@ struct ReaderPaneView: View {
                         }
                     }) {
                         Image(systemName: "rectangle.split.1x2")
-                            .font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                            .frame(width: 22, height: 22).contentShape(Rectangle())
+                            .font(.system(size: 13, weight: .medium))
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.flatToolbar)
                     .help(L("reader.split_down"))
+                }
+
+                // Per-pane sync button
+                if !isSolo {
+                    Divider().frame(height: 20)
+                    Button(action: { windowState.togglePaneSync(paneId) }) {
+                        Image(systemName: pane.isSyncEnabled ? "link" : "link.badge.plus")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .buttonStyle(.flatToolbar(isActive: pane.isSyncEnabled))
+                    .help(pane.isSyncEnabled ? L("reader.sync_enabled") : L("reader.sync_disabled"))
                 }
 
                 // Close pane button
@@ -504,27 +658,27 @@ struct ReaderPaneView: View {
                     Divider().frame(height: 20)
                     Button(action: { windowState.removePane(paneId) }) {
                         Image(systemName: "xmark")
-                            .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
-                            .frame(width: 22, height: 22).contentShape(Rectangle())
+                            .font(.system(size: 12, weight: .semibold))
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.flatToolbar)
                     .help(L("reader.close_pane"))
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
 
             if showChapterTitles {
                 HStack {
                     Text(displayBookName(pane) + " \(pane.chapter)")
-                        .font(.headline).foregroundStyle(.primary)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
                     Spacer()
                     if let t = store.translation(for: pane.translationId) {
                         Text(t.name).font(.caption).foregroundStyle(.tertiary)
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 5)
             }
         }
         .glassHeader()
@@ -542,7 +696,7 @@ struct ReaderPaneView: View {
 
     @ViewBuilder
     private func verseContent(_ pane: ReaderPane) -> some View {
-        let metadata = buildMetadata(pane)
+        let metadata = cachedMetadata
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
@@ -597,9 +751,10 @@ struct ReaderPaneView: View {
                             .contextMenu { verseContextMenu(verse: verse, pane: pane) }
                             .onAppear {
                                 visibleVerseTracker.insert(verse.number)
-                                if syncScrolling {
-                                    visibleVerseTracker.reportDebounced { [weak coordinator, paneId] top in
-                                        coordinator?.reportVisibleVerse(top, from: paneId)
+                                if pane.isSyncEnabled {
+                                    visibleVerseTracker.reportDebounced { [weak coordinator] top in
+                                        let syncedIds = Set(windowState.panes.filter { $0.isSyncEnabled }.map { $0.id })
+                                        coordinator?.reportVisibleVerse(top, from: paneId, syncedPaneIds: syncedIds)
                                     }
                                 }
                             }
@@ -608,8 +763,8 @@ struct ReaderPaneView: View {
                         chapterNavFooter(pane)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
             }
             .background(sepiaBackground)
             .onAppear {
@@ -617,6 +772,10 @@ struct ReaderPaneView: View {
                 coordinator.registerScrollProxy(proxy, for: paneId)
             }
         }
+        // Force the ScrollView + LazyVStack to fully recreate when the loaded verse set changes.
+        // Without this, LazyVStack caches previously-rendered verse rows and shows stale content.
+        // Includes translationId so switching translations also forces a full refresh.
+        .id("\(pane.verses.first?.id ?? "\(pane.book):\(pane.chapter)")|\(pane.translationId)")
     }
 
     private func buildMetadata(_ pane: ReaderPane) -> [String: (Bool, HighlightColor?, Bool)] {

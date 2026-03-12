@@ -15,7 +15,7 @@ struct ManageTranslationsView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Manage Translations")
+                Text(L("manage.title"))
                     .font(.title2.weight(.semibold))
                 Spacer()
                 Button(action: { dismiss() }) {
@@ -49,14 +49,14 @@ struct ManageTranslationsView: View {
         }
         .frame(minWidth: 520, idealWidth: 640, minHeight: 380, idealHeight: 480)
         .glassSheet()
-        .alert("Remove Translation?", isPresented: $showDeleteConfirm, presenting: pendingDeleteId) { id in
-            Button("Remove", role: .destructive) {
+        .alert(L("manage.remove_confirm_title"), isPresented: $showDeleteConfirm, presenting: pendingDeleteId) { id in
+            Button(L("remove"), role: .destructive) {
                 store.removeTranslation(id)
                 if selectedTranslationId == id {
                     selectedTranslationId = store.loadedTranslations.first?.id
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(L("cancel"), role: .cancel) {}
         } message: { id in
             if let t = store.loadedTranslations.first(where: { $0.id == id }) {
                 Text("This will delete \(t.name) (\(t.abbreviation)) from disk. This cannot be undone.")
@@ -70,10 +70,10 @@ struct ManageTranslationsView: View {
         VStack(spacing: 0) {
             // Pane assignment header
             HStack {
-                Text("Installed")
+                Text(L("manage.installed"))
                     .font(.headline)
                 Spacer()
-                Text("\(store.loadedTranslations.count) modules")
+                Text("\(store.loadedTranslations.count) " + L("manage.modules_count"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -86,7 +86,7 @@ struct ManageTranslationsView: View {
                 ForEach(store.loadedTranslations) { translation in
                     TranslationListRow(
                         translation: translation,
-                        isAssignedToPane: windowState.panes.contains(where: { $0.selectedTranslationId == translation.id }),
+                        isAssignedToPane: windowState.panes.contains(where: { $0.translationId == translation.id }),
                         paneIndex: paneIndex(for: translation.id)
                     )
                     .tag(translation.id)
@@ -100,16 +100,16 @@ struct ManageTranslationsView: View {
                         draggedItem: $draggedTranslation
                     ))
                     .contextMenu {
-                        Button("Assign to New Pane") {
+                        Button(L("manage.assign_new_pane")) {
                             assignToNewPane(translation)
                         }
                         .disabled(windowState.panes.count >= 4)
 
                         if windowState.panes.count > 0 {
-                            Menu("Assign to Pane") {
+                            Menu(L("manage.assign_pane")) {
                                 ForEach(Array(windowState.panes.enumerated()), id: \.element.id) { idx, pane in
-                                    Button("Pane \(idx + 1)\(paneLabel(pane))") {
-                                        pane.selectedTranslationId = translation.id
+                                    Button("\(L("manage.pane_label")) \(idx + 1)\(paneLabel(pane))") {
+                                        windowState.navigate(paneId: pane.id, translationId: translation.id)
                                     }
                                 }
                             }
@@ -117,7 +117,7 @@ struct ManageTranslationsView: View {
 
                         Divider()
 
-                        Button("Remove…", role: .destructive) {
+                        Button(L("manage.remove_ellipsis"), role: .destructive) {
                             pendingDeleteId = translation.id
                             showDeleteConfirm = true
                         }
@@ -148,7 +148,7 @@ struct ManageTranslationsView: View {
                 Image(systemName: "book.closed")
                     .font(.system(size: 36))
                     .foregroundStyle(.quaternary)
-                Text("Select a translation")
+                Text(L("manage.select_translation"))
                     .foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -162,13 +162,13 @@ struct ManageTranslationsView: View {
             Image(systemName: "tray")
                 .font(.system(size: 48))
                 .foregroundStyle(.quaternary)
-            Text("No Translations Installed")
+            Text(L("manage.no_translations_title"))
                 .font(.title3.weight(.medium))
                 .foregroundStyle(.secondary)
-            Text("Import a .brbmod module to get started.")
+            Text(L("manage.no_translations_hint"))
                 .font(.callout)
                 .foregroundStyle(.tertiary)
-            Button("Import Module…") {
+            Button(L("manage.import_module")) {
                 NotificationCenter.default.post(name: .importModule, object: nil)
             }
             .controlSize(.large)
@@ -184,24 +184,26 @@ struct ManageTranslationsView: View {
             Button(action: {
                 NotificationCenter.default.post(name: .importModule, object: nil)
             }) {
-                Label("Import…", systemImage: "plus")
+                Label(L("manage.import_ellipsis"), systemImage: "plus")
             }
 
             // Pane controls
             Divider().frame(height: 20)
 
-            Text("Panes: \(windowState.panes.count)")
+            Text(L("manage.panes_label") + "\(windowState.panes.count)")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            Button(action: { windowState.addPane(translationId: store.loadedTranslations.first?.id) }) {
+            Button(action: {
+                if let tId = store.firstTranslationId() { windowState.addPane(translationId: tId) }
+            }) {
                 Image(systemName: "plus.rectangle.on.rectangle")
                     .frame(width: 24, height: 24)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
             .disabled(windowState.panes.count >= 4 || store.loadedTranslations.isEmpty)
-            .help("Add reader pane")
+            .help(L("manage.add_pane_help"))
 
             if windowState.panes.count > 1 {
                 Button(action: {
@@ -214,12 +216,12 @@ struct ManageTranslationsView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
-                .help("Remove last pane")
+                .help(L("manage.remove_pane_help"))
             }
 
             Spacer()
 
-            Button("Done") { dismiss() }
+            Button(L("done")) { dismiss() }
                 .keyboardShortcut(.defaultAction)
         }
         .padding(.horizontal, 16)
@@ -230,14 +232,14 @@ struct ManageTranslationsView: View {
     // MARK: - Helpers
 
     private func paneIndex(for translationId: UUID) -> Int? {
-        guard let idx = windowState.panes.firstIndex(where: { $0.selectedTranslationId == translationId }) else {
+        guard let idx = windowState.panes.firstIndex(where: { $0.translationId == translationId }) else {
             return nil
         }
         return idx
     }
 
     private func paneLabel(_ pane: ReaderPane) -> String {
-        if let t = store.loadedTranslations.first(where: { $0.id == pane.selectedTranslationId }) {
+        if let t = store.loadedTranslations.first(where: { $0.id == pane.translationId }) {
             return " — \(t.abbreviation)"
         }
         return ""
@@ -268,7 +270,7 @@ struct TranslationListRow: View {
                     Text(translation.abbreviation)
                         .font(.callout.weight(.semibold))
                     if let idx = paneIndex {
-                        Text("Pane \(idx + 1)")
+                        Text("\(L("manage.pane_label")) \(idx + 1)")
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 5)
@@ -326,28 +328,28 @@ struct TranslationDetailView: View {
                     GridItem(.fixed(120), alignment: .topTrailing),
                     GridItem(.flexible(), alignment: .topLeading)
                 ], alignment: .leading, spacing: 8) {
-                    metadataRow("Language", translation.language)
-                    metadataRow("Versification", translation.versificationScheme)
-                    metadataRow("Format", translation.metadata.format == .tagged ? "Tagged (Strong's)" : "Plain text")
+                    metadataRow(L("manage.language"), translation.language)
+                    metadataRow(L("manage.versification"), translation.versificationScheme)
+                    metadataRow(L("manage.format"), translation.metadata.format == .tagged ? L("manage.tagged") : L("manage.plain_text"))
 
                     if let info = moduleInfo {
-                        metadataRow("Books", "\(info.bookCount)")
-                        metadataRow("Verses", "\(info.totalVerses)")
-                        metadataRow("File size", ByteCountFormatter.string(fromByteCount: Int64(info.fileSize), countStyle: .file))
+                        metadataRow(L("manage.books"), "\(info.bookCount)")
+                        metadataRow(L("manage.verses"), "\(info.totalVerses)")
+                        metadataRow(L("manage.file_size"), ByteCountFormatter.string(fromByteCount: Int64(info.fileSize), countStyle: .file))
                         if info.hasWordTags {
-                            metadataRow("Strong's", "Yes")
+                            metadataRow(L("manage.strongs"), L("yes"))
                         }
                         if info.hasCrossRefs {
-                            metadataRow("Cross-refs", "Yes")
+                            metadataRow(L("manage.crossrefs"), L("yes"))
                         }
                     }
 
                     if let copyright = translation.metadata.copyright, !copyright.isEmpty {
-                        metadataRow("Copyright", copyright)
+                        metadataRow(L("manage.copyright"), copyright)
                     }
 
                     if let notes = translation.metadata.notes, !notes.isEmpty {
-                        metadataRow("Notes", notes)
+                        metadataRow(L("manage.notes_field"), notes)
                     }
                 }
 
@@ -355,17 +357,17 @@ struct TranslationDetailView: View {
 
                 // Pane assignment
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Pane Assignment")
+                    Text(L("manage.pane_assignment"))
                         .font(.callout.weight(.medium))
 
                     ForEach(Array(windowState.panes.enumerated()), id: \.element.id) { idx, pane in
                         HStack {
-                            Text("Pane \(idx + 1)")
+                            Text("\(L("manage.pane_label")) \(idx + 1)")
                                 .font(.callout)
                             Spacer()
                             Picker("", selection: Binding(
-                                get: { pane.selectedTranslationId },
-                                set: { pane.selectedTranslationId = $0 }
+                                get: { pane.translationId },
+                                set: { windowState.navigate(paneId: pane.id, translationId: $0) }
                             )) {
                                 ForEach(store.loadedTranslations) { t in
                                     Text(t.abbreviation).tag(t.id)

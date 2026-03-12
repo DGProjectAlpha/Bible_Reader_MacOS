@@ -305,7 +305,7 @@ struct AppearanceSettingsTab: View {
 // MARK: - Reading Tab
 
 struct ReadingSettingsTab: View {
-    @AppStorage("syncScrolling") private var syncScrolling: Bool = true
+
     @AppStorage("restoreLastPosition") private var restoreLastPosition: Bool = true
     @AppStorage("showChapterTitles") private var showChapterTitles: Bool = true
     @AppStorage("verseNumberStyle") private var verseNumberStyle: String = "superscript"
@@ -313,7 +313,7 @@ struct ReadingSettingsTab: View {
     var body: some View {
         Form {
             Section(L("settings.scroll_navigation")) {
-                Toggle(L("settings.sync_scroll"), isOn: $syncScrolling)
+
                 Toggle(L("settings.restore_position"), isOn: $restoreLastPosition)
             }
 

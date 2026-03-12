@@ -12,6 +12,8 @@ struct ReaderPane: Identifiable {
     var verses: [Verse]
     var versificationScheme: String
     var verticalBuddyId: UUID?
+    /// Whether this pane participates in cross-pane sync (navigation + scroll).
+    var isSyncEnabled: Bool
 
     var chapterCount: Int {
         let scheme = VersificationScheme.from(versificationScheme)
@@ -26,6 +28,7 @@ struct ReaderPane: Identifiable {
         self.verses = []
         self.versificationScheme = "kjv"
         self.verticalBuddyId = nil
+        self.isSyncEnabled = false
     }
 }
 
@@ -77,6 +80,18 @@ class BibleStore: ObservableObject {
         rebuildBookmarkIndex()
         rebuildHighlightIndex()
         rebuildNoteIndex()
+        registerStrongsCapableModules()
+    }
+
+    /// Register any loaded modules that have a `strongs` table so they can serve
+    /// as fallback concordance sources for modules (like RST) that don't.
+    private func registerStrongsCapableModules() {
+        for translation in loadedTranslations {
+            if let conn = try? ModuleConnectionPool.shared.connection(for: translation.filePath),
+               (try? conn.tableExists("strongs")) == true {
+                StrongsService.registerStrongsCapableModule(translation.filePath)
+            }
+        }
     }
 
     // MARK: - Translation helpers
@@ -227,6 +242,11 @@ class BibleStore: ObservableObject {
     func importModule(from url: URL) async throws {
         let translation = try moduleManager.importModule(from: url)
         loadedTranslations.append(translation)
+        // Register as strongs-capable if applicable
+        if let conn = try? ModuleConnectionPool.shared.connection(for: translation.filePath),
+           (try? conn.tableExists("strongs")) == true {
+            StrongsService.registerStrongsCapableModule(translation.filePath)
+        }
     }
 
     func removeTranslation(_ id: UUID) {

@@ -76,7 +76,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "versesPerLine": false,
             "showVerseNumbers": true,
             "windowRestoration": true,
-            "syncScrolling": true,
+
             "restoreLastPosition": true,
             "activeProfile": "Default",
             "profileList": "Default",
@@ -86,7 +86,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "showChapterTitles": true,
             "fontFamily": "System",
             "verseNumberStyle": "superscript",
-            "paragraphMode": false
+            "paragraphMode": false,
+            "appLanguage": "en"
         ]
         UserDefaults.standard.register(defaults: defaults)
     }

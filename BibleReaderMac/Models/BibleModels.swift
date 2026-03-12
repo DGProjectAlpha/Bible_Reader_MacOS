@@ -63,6 +63,27 @@ struct Translation: Identifiable, Codable, Hashable {
         self.filePath = filePath
     }
 
+    /// Derive a stable, deterministic UUID from a file path so the same module
+    /// always has the same ID regardless of cache state or app restarts.
+    static func stableId(for filePath: String) -> UUID {
+        // Use the last path component (filename) as the seed — stable across container moves
+        let seed = URL(fileURLWithPath: filePath).lastPathComponent
+        var hash = seed.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
+            (acc ^ UInt64(byte)) &* 1099511628211
+        }
+        // Map the 64-bit hash into a UUID (version 4 layout with fixed variant/version bits)
+        var bytes = (0..<16).map { i -> UInt8 in
+            defer { hash = hash &* 6364136223846793005 &+ 1442695040888963407 }
+            return UInt8(hash >> 56)
+        }
+        bytes[6] = (bytes[6] & 0x0F) | 0x40  // version 4
+        bytes[8] = (bytes[8] & 0x3F) | 0x80  // variant bits
+        return UUID(uuid: (bytes[0],bytes[1],bytes[2],bytes[3],
+                           bytes[4],bytes[5],bytes[6],bytes[7],
+                           bytes[8],bytes[9],bytes[10],bytes[11],
+                           bytes[12],bytes[13],bytes[14],bytes[15]))
+    }
+
     var name: String { metadata.name }
     var abbreviation: String { metadata.abbreviation }
     var language: String { metadata.language }

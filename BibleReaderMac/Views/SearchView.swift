@@ -13,16 +13,9 @@ struct SearchToolbarItem: View {
 
     @State private var searchText = ""
     @State private var scope: SearchScope = .bible
-    @State private var isSearching = false
-    @State private var results: [SearchResult] = []
     @State private var selectedModuleIds: Set<UUID> = []
     @State private var showModuleFilter = false
-    @State private var hasSearched = false
-    @State private var resultsCapped = false
-    @State private var showVerseLookup = false
-    @State private var lookupText = ""
     @State private var debounceTask: Task<Void, Never>?
-    @State private var showResults = false
     @FocusState private var isFieldFocused: Bool
 
     private var isExpanded: Bool { windowState.showSearchPanel }
@@ -36,10 +29,10 @@ struct SearchToolbarItem: View {
             if isExpanded {
                 // Expanded search field
                 HStack(spacing: 8) {
-                    Image(systemName: isSearching ? "clock" : "magnifyingglass")
+                    Image(systemName: windowState.searchIsSearching ? "clock" : "magnifyingglass")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.primary.opacity(0.45))
-                        .animation(.easeInOut(duration: 0.15), value: isSearching)
+                        .animation(.easeInOut(duration: 0.15), value: windowState.searchIsSearching)
                         .frame(width: 16)
 
                     TextField(L("search.placeholder"), text: $searchText)
@@ -49,6 +42,7 @@ struct SearchToolbarItem: View {
                         .focused($isFieldFocused)
                         .frame(width: 220)
                         .onSubmit { performSearch() }
+                        .onAppear { isFieldFocused = true }
 
                     if !searchText.isEmpty {
                         Button(action: clearSearch) {
@@ -64,7 +58,7 @@ struct SearchToolbarItem: View {
                     // Scope indicator
                     Menu {
                         ForEach(SearchScope.allCases, id: \.self) { s in
-                            Button(action: { scope = s; if hasSearched { performSearch() } }) {
+                            Button(action: { scope = s; if windowState.searchHasSearched { performSearch() } }) {
                                 HStack {
                                     Text(s.rawValue)
                                     if scope == s {
@@ -117,9 +111,6 @@ struct SearchToolbarItem: View {
                     insertion: .move(edge: .trailing).combined(with: .opacity),
                     removal: .move(edge: .trailing).combined(with: .opacity)
                 ))
-                .popover(isPresented: $showResults, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
-                    resultsPopover
-                }
             } else {
                 // Collapsed: just a magnifying glass button
                 Button(action: expand) {
@@ -158,12 +149,9 @@ struct SearchToolbarItem: View {
             debounceTask?.cancel()
             let trimmed = newValue.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty {
-                withAnimation(.easeOut(duration: 0.18)) {
-                    results = []
-                    hasSearched = false
-                    resultsCapped = false
-                    showResults = false
-                }
+                windowState.searchResults = []
+                windowState.searchHasSearched = false
+                windowState.searchResultsCapped = false
                 return
             }
             debounceTask = Task {
@@ -173,87 +161,16 @@ struct SearchToolbarItem: View {
             }
         }
         .onChange(of: scope) { _, _ in
-            if hasSearched { performSearch() }
+            if windowState.searchHasSearched { performSearch() }
         }
     }
 
     // MARK: - Results Popover
 
-    private var resultsPopover: some View {
-        VStack(spacing: 0) {
-            // Count row
-            HStack(spacing: 8) {
-                if isSearching {
-                    ProgressView().controlSize(.mini)
-                    Text(L("search.searching"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text(resultCountLabel)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    if resultsCapped {
-                        Text(L("search.capped"))
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                Spacer()
-
-                // Go-to-verse button
-                Button(action: { showVerseLookup.toggle() }) {
-                    Image(systemName: "number")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.45))
-                }
-                .buttonStyle(.plain)
-                .help(L("search.go_to_verse_help"))
-                .popover(isPresented: $showVerseLookup) { verseLookupPopover }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-
-            Divider()
-
-            if !isSearching && results.isEmpty {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.quaternary)
-                    Text(L("search.no_results"))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(results) { result in
-                            SearchResultRow(
-                                result: result,
-                                searchText: searchText,
-                                store: store,
-                                onNavigate: { navigateToResult(result) },
-                                onSyncAll: { syncAllPanes(to: result) },
-                                onOpenParallel: { openInParallel(result) }
-                            )
-                            .contentShape(Rectangle())
-                            .onTapGesture { navigateAndClose(result) }
-                            if result.id != results.last?.id {
-                                Divider().padding(.leading, 14)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                .frame(maxHeight: 460)
-            }
-        }
-        .frame(width: 420)
-    }
-
     private var resultCountLabel: String {
-        if resultsCapped { return L("search.many_results") }
-        return "\(results.count) result\(results.count == 1 ? "" : "s")"
+        if windowState.searchResultsCapped { return L("search.many_results") }
+        let c = windowState.searchResults.count
+        return "\(c) result\(c == 1 ? "" : "s")"
     }
 
     private var scopeIcon: String {
@@ -264,28 +181,6 @@ struct SearchToolbarItem: View {
         case .book: return "bookmark"
         case .chapter: return "number"
         }
-    }
-
-    // MARK: - Verse Lookup Popover
-
-    private var verseLookupPopover: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(L("search.go_to_ref_title")).font(.headline)
-            Text(L("search.ref_placeholder"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            HStack {
-                TextField(L("search.ref_format"), text: $lookupText)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { performVerseLookup() }
-                Button(L("go")) { performVerseLookup() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .disabled(lookupText.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-        }
-        .padding(12)
-        .frame(minWidth: 260, maxWidth: 400)
     }
 
     // MARK: - Module Filter Popover
@@ -326,14 +221,11 @@ struct SearchToolbarItem: View {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
             windowState.showSearchPanel = true
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            isFieldFocused = true
-        }
+        // Focus is set via .onAppear on the TextField when it enters the hierarchy
     }
 
     private func collapse() {
         isFieldFocused = false
-        showResults = false
         // Don't clear searchText so re-opening shows last query
         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
             windowState.showSearchPanel = false
@@ -341,13 +233,11 @@ struct SearchToolbarItem: View {
     }
 
     private func clearSearch() {
-        withAnimation(.easeOut(duration: 0.18)) {
-            searchText = ""
-            results = []
-            hasSearched = false
-            resultsCapped = false
-            showResults = false
-        }
+        searchText = ""
+        windowState.searchResults = []
+        windowState.searchHasSearched = false
+        windowState.searchResultsCapped = false
+        windowState.searchIsSearching = false
     }
 
     // MARK: - Actions
@@ -356,11 +246,11 @@ struct SearchToolbarItem: View {
         let query = searchText.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return }
 
-        isSearching = true
-        hasSearched = true
-        results = []
-        resultsCapped = false
-        showResults = true
+        windowState.searchIsSearching = true
+        windowState.searchHasSearched = true
+        windowState.searchResults = []
+        windowState.searchResultsCapped = false
+        NotificationCenter.default.post(name: .init("SearchPanelQueryChanged"), object: query)
 
         let currentBook = windowState.panes.first?.book
         let currentChapter = windowState.panes.first?.chapter
@@ -394,160 +284,16 @@ struct SearchToolbarItem: View {
                     print("Search failed for \(translation.abbreviation): \(error)")
                 }
             }
-            let capped = collected.count >= 500
+            let finalResults = collected
+            let capped = finalResults.count >= 500
             await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    results = collected
-                    resultsCapped = capped
-                    isSearching = false
-                }
+                windowState.searchResults = finalResults
+                windowState.searchResultsCapped = capped
+                windowState.searchIsSearching = false
             }
         }
     }
 
-    private func navigateToResult(_ result: SearchResult) {
-        guard let pane = windowState.panes.first else { return }
-        let translationId = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation })?.id ?? pane.translationId
-        windowState.navigate(paneId: pane.id, book: result.book, chapter: result.chapter, translationId: translationId)
-        guard let updated = windowState.panes.first else { return }
-        let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
-        let scheme = store.versificationScheme(for: updated.translationId)
-        windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            NotificationCenter.default.post(name: .navigateToVerse, object: nil,
-                userInfo: ["book": result.book, "chapter": result.chapter, "verse": result.verse])
-        }
-    }
-
-    private func navigateAndClose(_ result: SearchResult) {
-        navigateToResult(result)
-        collapse()
-    }
-
-    private func syncAllPanes(to result: SearchResult) {
-        for pane in windowState.panes {
-            let translationId = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation })?.id ?? pane.translationId
-            windowState.navigate(paneId: pane.id, book: result.book, chapter: result.chapter, translationId: translationId)
-            guard let updated = windowState.panes.first(where: { $0.id == pane.id }) else { continue }
-            let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
-            let scheme = store.versificationScheme(for: updated.translationId)
-            windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            NotificationCenter.default.post(name: .navigateToVerse, object: nil,
-                userInfo: ["book": result.book, "chapter": result.chapter, "verse": result.verse])
-        }
-        collapse()
-    }
-
-    private func openInParallel(_ result: SearchResult) {
-        let translationId = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation })?.id
-            ?? store.firstTranslationId() ?? UUID()
-        windowState.addPane(translationId: translationId, book: result.book, chapter: result.chapter)
-        guard let newPane = windowState.panes.last else { return }
-        let verses = store.loadVerses(translationId: newPane.translationId, book: newPane.book, chapter: newPane.chapter)
-        let scheme = store.versificationScheme(for: newPane.translationId)
-        windowState.setVerses(paneId: newPane.id, verses: verses, versificationScheme: scheme)
-    }
-
-    // MARK: - Verse Lookup
-
-    private func performVerseLookup() {
-        let input = lookupText.trimmingCharacters(in: .whitespaces)
-        guard !input.isEmpty else { return }
-        let parsed = parseVerseReference(input)
-        guard let book = parsed.book else { return }
-        guard let pane = windowState.panes.first else { return }
-        windowState.navigate(paneId: pane.id, book: book, chapter: parsed.chapter)
-        guard let updated = windowState.panes.first else { return }
-        let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
-        let scheme = store.versificationScheme(for: updated.translationId)
-        windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
-        if let verse = parsed.verse {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                NotificationCenter.default.post(name: .navigateToVerse, object: nil,
-                    userInfo: ["book": book, "chapter": parsed.chapter, "verse": verse])
-            }
-        }
-        showVerseLookup = false
-        lookupText = ""
-        collapse()
-    }
-
-    private func parseVerseReference(_ input: String) -> (book: String?, chapter: Int, verse: Int?) {
-        let trimmed = input.trimmingCharacters(in: .whitespaces)
-        var bookPart = ""
-        var numericPart = ""
-        let components = trimmed.components(separatedBy: " ").filter { !$0.isEmpty }
-        guard !components.isEmpty else { return (nil, 1, nil) }
-        if let lastComponent = components.last,
-           let firstChar = lastComponent.first,
-           firstChar.isNumber || lastComponent.contains(":") {
-            numericPart = lastComponent
-            bookPart = components.dropLast().joined(separator: " ")
-        } else {
-            bookPart = trimmed
-        }
-        var chapter = 1
-        var verse: Int? = nil
-        if numericPart.contains(":") {
-            let parts = numericPart.split(separator: ":")
-            chapter = Int(parts[0]) ?? 1
-            if parts.count > 1 { verse = Int(parts[1]) }
-        } else if let ch = Int(numericPart) {
-            chapter = ch
-        }
-        return (matchBookName(bookPart), chapter, verse)
-    }
-
-    private func matchBookName(_ input: String) -> String? {
-        let lower = input.lowercased().trimmingCharacters(in: .whitespaces)
-        guard !lower.isEmpty else { return nil }
-        if let exact = BibleBooks.all.first(where: { $0.lowercased() == lower }) { return exact }
-        let abbreviations: [String: String] = [
-            "gen": "Genesis", "ex": "Exodus", "exo": "Exodus", "lev": "Leviticus",
-            "num": "Numbers", "deut": "Deuteronomy", "deu": "Deuteronomy",
-            "josh": "Joshua", "jos": "Joshua", "judg": "Judges", "jdg": "Judges",
-            "ruth": "Ruth", "1 sam": "1 Samuel", "1sam": "1 Samuel",
-            "2 sam": "2 Samuel", "2sam": "2 Samuel",
-            "1 kgs": "1 Kings", "1kgs": "1 Kings", "1 ki": "1 Kings", "1ki": "1 Kings",
-            "2 kgs": "2 Kings", "2kgs": "2 Kings", "2 ki": "2 Kings", "2ki": "2 Kings",
-            "1 chr": "1 Chronicles", "1chr": "1 Chronicles", "1 ch": "1 Chronicles",
-            "2 chr": "2 Chronicles", "2chr": "2 Chronicles", "2 ch": "2 Chronicles",
-            "ezr": "Ezra", "neh": "Nehemiah", "est": "Esther",
-            "job": "Job", "ps": "Psalms", "psa": "Psalms", "psalm": "Psalms",
-            "prov": "Proverbs", "pro": "Proverbs", "eccl": "Ecclesiastes", "ecc": "Ecclesiastes",
-            "song": "Song of Solomon", "sos": "Song of Solomon", "ss": "Song of Solomon",
-            "isa": "Isaiah", "jer": "Jeremiah", "lam": "Lamentations",
-            "ezek": "Ezekiel", "eze": "Ezekiel", "dan": "Daniel",
-            "hos": "Hosea", "joe": "Joel", "amo": "Amos", "oba": "Obadiah", "obad": "Obadiah",
-            "jon": "Jonah", "mic": "Micah", "nah": "Nahum", "hab": "Habakkuk",
-            "zeph": "Zephaniah", "zep": "Zephaniah", "hag": "Haggai",
-            "zech": "Zechariah", "zec": "Zechariah", "mal": "Malachi",
-            "matt": "Matthew", "mat": "Matthew", "mk": "Mark", "mar": "Mark",
-            "lk": "Luke", "luk": "Luke", "jn": "John", "joh": "John",
-            "acts": "Acts", "act": "Acts",
-            "rom": "Romans", "1 cor": "1 Corinthians", "1cor": "1 Corinthians",
-            "2 cor": "2 Corinthians", "2cor": "2 Corinthians",
-            "gal": "Galatians", "eph": "Ephesians", "phil": "Philippians", "php": "Philippians",
-            "col": "Colossians", "1 thess": "1 Thessalonians", "1thess": "1 Thessalonians",
-            "1 th": "1 Thessalonians", "1th": "1 Thessalonians",
-            "2 thess": "2 Thessalonians", "2thess": "2 Thessalonians",
-            "2 th": "2 Thessalonians", "2th": "2 Thessalonians",
-            "1 tim": "1 Timothy", "1tim": "1 Timothy", "2 tim": "2 Timothy", "2tim": "2 Timothy",
-            "tit": "Titus", "phm": "Philemon", "phlm": "Philemon",
-            "heb": "Hebrews", "jas": "James", "jam": "James",
-            "1 pet": "1 Peter", "1pet": "1 Peter", "1 pe": "1 Peter",
-            "2 pet": "2 Peter", "2pet": "2 Peter", "2 pe": "2 Peter",
-            "1 jn": "1 John", "1jn": "1 John", "1 jo": "1 John",
-            "2 jn": "2 John", "2jn": "2 John", "2 jo": "2 John",
-            "3 jn": "3 John", "3jn": "3 John", "3 jo": "3 John",
-            "jude": "Jude", "rev": "Revelation", "apo": "Revelation"
-        ]
-        if let abbr = abbreviations[lower] { return abbr }
-        if let prefix = BibleBooks.all.first(where: { $0.lowercased().hasPrefix(lower) }) { return prefix }
-        return nil
-    }
 }
 
 // MARK: - Search Result Row
@@ -664,3 +410,218 @@ struct SearchResultRow: View {
             from: translation.filePath, book: result.book, chapter: result.chapter, verse: result.verse + 1)
     }
 }
+// MARK: - Search Results Panel (window-level overlay, rendered in ContentView)
+
+struct SearchResultsPanel: View {
+    @EnvironmentObject var store: BibleStore
+    @EnvironmentObject var windowState: WindowState
+
+    @State private var searchText: String = ""
+    @State private var showVerseLookup = false
+    @State private var lookupText = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header row
+            HStack(spacing: 8) {
+                if windowState.searchIsSearching {
+                    ProgressView().controlSize(.mini)
+                    Text(L("search.searching"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(resultCountLabel)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    if windowState.searchResultsCapped {
+                        Text(L("search.capped"))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                Spacer()
+
+                Button(action: { showVerseLookup.toggle() }) {
+                    Image(systemName: "number")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.45))
+                }
+                .buttonStyle(.plain)
+                .help(L("search.go_to_verse_help"))
+                .popover(isPresented: $showVerseLookup) { verseLookupPopover }
+
+                Button(action: {
+                    windowState.showSearchPanel = false
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(L("search.close_help"))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+
+            Divider()
+
+            if windowState.searchIsSearching {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(L("search.searching"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            } else if windowState.searchResults.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.quaternary)
+                    Text(L("search.no_results"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(windowState.searchResults) { result in
+                            SearchResultRow(
+                                result: result,
+                                searchText: searchText,
+                                store: store,
+                                onNavigate: { navigateToResult(result) },
+                                onSyncAll: { syncAllPanes(to: result) },
+                                onOpenParallel: { openInParallel(result) }
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture { navigateToResult(result) }
+                            if result.id != windowState.searchResults.last?.id {
+                                Divider().padding(.leading, 14)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .frame(maxHeight: min(460, (NSScreen.main?.frame.height ?? 900) * 0.5))
+            }
+        }
+        .frame(width: 440)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(.primary.opacity(0.08), lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 8)
+        .onReceive(NotificationCenter.default.publisher(for: .init("SearchPanelQueryChanged"))) { notif in
+            if let q = notif.object as? String { searchText = q }
+        }
+    }
+
+    private var resultCountLabel: String {
+        if windowState.searchResultsCapped { return L("search.many_results") }
+        let c = windowState.searchResults.count
+        return "\(c) result\(c == 1 ? "" : "s")"
+    }
+
+    private var verseLookupPopover: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("search.go_to_ref_title")).font(.headline)
+            Text(L("search.ref_placeholder"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                TextField(L("search.ref_format"), text: $lookupText)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { performVerseLookup() }
+                Button(L("go")) { performVerseLookup() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(lookupText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(12)
+        .frame(minWidth: 260, maxWidth: 400)
+    }
+
+    private func navigateToResult(_ result: SearchResult) {
+        guard let pane = windowState.panes.first else { return }
+        let translationId = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation })?.id ?? pane.translationId
+        windowState.navigate(paneId: pane.id, book: result.book, chapter: result.chapter, translationId: translationId)
+        guard let updated = windowState.panes.first else { return }
+        let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
+        let scheme = store.versificationScheme(for: updated.translationId)
+        windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            NotificationCenter.default.post(name: .navigateToVerse, object: nil,
+                userInfo: ["book": result.book, "chapter": result.chapter, "verse": result.verse])
+        }
+    }
+
+    private func syncAllPanes(to result: SearchResult) {
+        for pane in windowState.panes {
+            let translationId = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation })?.id ?? pane.translationId
+            windowState.navigate(paneId: pane.id, book: result.book, chapter: result.chapter, translationId: translationId)
+            guard let updated = windowState.panes.first(where: { $0.id == pane.id }) else { continue }
+            let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
+            let scheme = store.versificationScheme(for: updated.translationId)
+            windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            NotificationCenter.default.post(name: .navigateToVerse, object: nil,
+                userInfo: ["book": result.book, "chapter": result.chapter, "verse": result.verse])
+        }
+    }
+
+    private func openInParallel(_ result: SearchResult) {
+        let translationId = store.loadedTranslations.first(where: { $0.abbreviation == result.translationAbbreviation })?.id
+            ?? store.firstTranslationId() ?? UUID()
+        windowState.addPane(translationId: translationId, book: result.book, chapter: result.chapter)
+        guard let newPane = windowState.panes.last else { return }
+        let verses = store.loadVerses(translationId: newPane.translationId, book: newPane.book, chapter: newPane.chapter)
+        let scheme = store.versificationScheme(for: newPane.translationId)
+        windowState.setVerses(paneId: newPane.id, verses: verses, versificationScheme: scheme)
+    }
+
+    private func performVerseLookup() {
+        let input = lookupText.trimmingCharacters(in: .whitespaces)
+        guard !input.isEmpty else { return }
+        guard let pane = windowState.panes.first else { return }
+        // Simple parse: "Book Chapter:Verse"
+        let parts = input.split(separator: " ")
+        guard let last = parts.last else { return }
+        var book: String
+        var chapter = 1
+        var verse: Int? = nil
+        if last.contains(":") {
+            let cv = last.split(separator: ":")
+            chapter = Int(cv[0]) ?? 1
+            if cv.count > 1 { verse = Int(cv[1]) }
+            book = parts.dropLast().joined(separator: " ")
+        } else if let ch = Int(last) {
+            chapter = ch
+            book = parts.dropLast().joined(separator: " ")
+        } else {
+            book = input
+        }
+        guard let matchedBook = BibleBooks.all.first(where: { $0.lowercased() == book.lowercased() })
+            ?? BibleBooks.all.first(where: { $0.lowercased().hasPrefix(book.lowercased()) }) else { return }
+        windowState.navigate(paneId: pane.id, book: matchedBook, chapter: chapter)
+        guard let updated = windowState.panes.first else { return }
+        let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
+        let scheme = store.versificationScheme(for: updated.translationId)
+        windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
+        if let v = verse {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                NotificationCenter.default.post(name: .navigateToVerse, object: nil,
+                    userInfo: ["book": matchedBook, "chapter": chapter, "verse": v])
+            }
+        }
+        showVerseLookup = false
+        lookupText = ""
+        windowState.showSearchPanel = false
+    }
+}
+

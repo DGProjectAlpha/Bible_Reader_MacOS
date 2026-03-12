@@ -13,9 +13,17 @@ struct StrongsLookupView: View {
     @State private var testament: TestamentFilter = .all
 
     enum TestamentFilter: String, CaseIterable {
-        case all = "All"
-        case old = "Hebrew (OT)"
-        case new = "Greek (NT)"
+        case all = "all"
+        case old = "old"
+        case new = "new"
+
+        var label: String {
+            switch self {
+            case .all: return L("strongs_lookup.all")
+            case .old: return L("strongs_lookup.hebrew")
+            case .new: return L("strongs_lookup.greek")
+            }
+        }
     }
 
     var body: some View {
@@ -25,7 +33,7 @@ struct StrongsLookupView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
-                    TextField("Strong's number (H1234, G3056) or word...", text: $searchText)
+                    TextField(L("strongs_lookup.placeholder"), text: $searchText)
                         .textFieldStyle(.plain)
                         .onSubmit { performLookup() }
 
@@ -41,9 +49,9 @@ struct StrongsLookupView: View {
                 .padding(.vertical, 8)
                 .glassPanel(cornerRadius: 8, material: .headerView)
 
-                Picker("Testament", selection: $testament) {
+                Picker(L("strongs_lookup.testament"), selection: $testament) {
                     ForEach(TestamentFilter.allCases, id: \.self) { t in
-                        Text(t.rawValue).tag(t)
+                        Text(t.label).tag(t)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -55,17 +63,17 @@ struct StrongsLookupView: View {
             Divider()
 
             if isSearching {
-                ProgressView("Searching...")
+                ProgressView(L("strongs_lookup.searching"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if lookupResults.isEmpty && !searchText.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 36))
                         .foregroundStyle(.quaternary)
-                    Text("No results found")
+                    Text(L("strongs_lookup.no_results"))
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                    Text("Try a Strong's number like H7225 or G3056")
+                    Text(L("strongs_lookup.try_hint"))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -75,10 +83,10 @@ struct StrongsLookupView: View {
                     Image(systemName: "character.book.closed")
                         .font(.system(size: 48))
                         .foregroundStyle(.quaternary)
-                    Text("Strong's Concordance")
+                    Text(L("strongs_lookup.title"))
                         .font(.title2)
                         .foregroundStyle(.tertiary)
-                    Text("Search by number (H1234) or word to look up Hebrew/Greek definitions.\nOr tap any verse in the Reader to see its Strong's tags.")
+                    Text(L("strongs_lookup.intro"))
                         .font(.callout)
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
@@ -119,7 +127,7 @@ struct StrongsLookupView: View {
                     if let entry = selectedEntry {
                         StrongsDetailView(entry: entry)
                     } else {
-                        Text("Select an entry")
+                        Text(L("strongs_lookup.select_entry"))
                             .font(.callout)
                             .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -127,7 +135,7 @@ struct StrongsLookupView: View {
                 }
             }
         }
-        .navigationTitle("Strong's Concordance")
+        .navigationTitle(L("strongs_lookup.nav_title"))
     }
 
     private func performLookup() {
@@ -202,9 +210,9 @@ struct StrongsDetailView: View {
 
                 // Transliteration + pronunciation
                 VStack(alignment: .leading, spacing: 6) {
-                    labeledField("Transliteration", entry.transliteration)
+                    labeledField(L("strongs.transliteration"), entry.transliteration)
                     if let pron = entry.pronunciation {
-                        labeledField("Pronunciation", pron)
+                        labeledField(L("strongs.pronunciation"), pron)
                     }
                 }
 
@@ -213,7 +221,7 @@ struct StrongsDetailView: View {
                 // Definition
                 if let def = entry.strongsDefinition {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Strong's Definition")
+                        Text(L("strongs.definition"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.secondary)
                         Text(cleanDef(def))
@@ -225,7 +233,7 @@ struct StrongsDetailView: View {
                 // KJV usage
                 if let kjv = entry.kjvDefinition {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("KJV Translation Usage")
+                        Text(L("strongs.kjv_usage"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.secondary)
                         Text(kjv)
@@ -238,7 +246,7 @@ struct StrongsDetailView: View {
                 // Derivation
                 if let deriv = entry.derivation {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Derivation")
+                        Text(L("strongs.derivation"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.secondary)
                         Text(deriv)
@@ -251,7 +259,7 @@ struct StrongsDetailView: View {
                 // Testament
                 HStack(spacing: 6) {
                     Image(systemName: entry.testament == .old ? "textformat.abc" : "textformat.abc.dottedunderline")
-                    Text(entry.testament == .old ? "Hebrew (Old Testament)" : "Greek (New Testament)")
+                    Text(entry.testament == .old ? L("strongs.hebrew") : L("strongs.greek"))
                 }
                 .font(.caption)
                 .foregroundStyle(.tertiary)

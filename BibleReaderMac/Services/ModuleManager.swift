@@ -211,7 +211,7 @@ final class ModuleManager {
         persistCache()
 
         return Translation(
-            id: info.id,
+            id: Translation.stableId(for: destination.path),
             metadata: metadata,
             filePath: destination.path
         )
@@ -240,10 +240,12 @@ final class ModuleManager {
     }
 
     /// Build Translation objects from cached info for all valid modules.
+    /// IDs are always derived deterministically from the file path so they are
+    /// stable across restarts, cache resets, and reinstalls.
     func loadTranslations() -> [Translation] {
         return listCachedModules().map { info in
             Translation(
-                id: info.id,
+                id: Translation.stableId(for: info.filePath),
                 metadata: info.metadata,
                 filePath: info.filePath
             )
@@ -507,7 +509,7 @@ final class ModuleManager {
         let lastModified = (attrs?[.modificationDate] as? Date) ?? Date()
 
         return CachedModuleInfo(
-            id: UUID(),
+            id: Translation.stableId(for: fileURL.path),
             filePath: fileURL.path,
             fileName: fileURL.lastPathComponent,
             metadata: metadata,

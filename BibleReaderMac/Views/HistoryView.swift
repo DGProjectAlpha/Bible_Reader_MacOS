@@ -9,11 +9,11 @@ struct HistoryView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Reading History")
+                Text(L("history.title"))
                     .font(.title2.weight(.semibold))
                 Spacer()
                 if !store.readingHistory.isEmpty {
-                    Button("Clear All") {
+                    Button(L("history.clear_all")) {
                         store.clearHistory()
                     }
                     .font(.callout)
@@ -39,10 +39,10 @@ struct HistoryView: View {
                     Image(systemName: "clock")
                         .font(.system(size: 48))
                         .foregroundStyle(.quaternary)
-                    Text("No Reading History")
+                    Text(L("history.empty_title"))
                         .font(.title2)
                         .foregroundStyle(.tertiary)
-                    Text("Your reading history will appear here as you navigate chapters.")
+                    Text(L("history.empty_hint"))
                         .font(.callout)
                         .foregroundStyle(.quaternary)
                         .multilineTextAlignment(.center)
@@ -107,8 +107,8 @@ struct HistoryView: View {
 
         return order.map { key in
             let label: String
-            if key == today { label = "Today" }
-            else if key == yesterday { label = "Yesterday" }
+            if key == today { label = L("history.today") }
+            else if key == yesterday { label = L("history.yesterday") }
             else { label = key }
             return HistoryGroup(date: key, label: label, entries: groups[key] ?? [])
         }
@@ -116,12 +116,12 @@ struct HistoryView: View {
 
     private func navigateToHistory(_ entry: ReadingHistoryEntry) {
         guard let pane = windowState.panes.first else { return }
-        if let translation = store.loadedTranslations.first(where: { $0.abbreviation == entry.translationAbbreviation }) {
-            pane.selectedTranslationId = translation.id
-        }
-        pane.selectedBook = entry.book
-        pane.selectedChapter = entry.chapter
-        store.loadVerses(for: pane)
+        let translationId = store.loadedTranslations.first(where: { $0.abbreviation == entry.translationAbbreviation })?.id ?? pane.translationId
+        windowState.navigate(paneId: pane.id, book: entry.book, chapter: entry.chapter, translationId: translationId)
+        guard let updated = windowState.panes.first else { return }
+        let verses = store.loadVerses(translationId: updated.translationId, book: updated.book, chapter: updated.chapter)
+        let scheme = store.versificationScheme(for: updated.translationId)
+        windowState.setVerses(paneId: pane.id, verses: verses, versificationScheme: scheme)
         NotificationCenter.default.post(name: .navigateToReader, object: nil)
     }
 }
