@@ -1,6 +1,6 @@
 import Foundation
 
-@Observable
+@MainActor @Observable
 final class UserDataStore {
     var bookmarks: [Bookmark] = []
     var notes: [Note] = []
