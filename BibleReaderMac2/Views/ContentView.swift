@@ -132,7 +132,7 @@ struct ContentView: View {
         .animation(.spring(duration: 0.35, bounce: 0.2), value: uiStateStore.inspectorVisible)
         .sheet(isPresented: $uiState.searchVisible) {
             SearchView()
-                .presentationBackground(.glass)
+                .presentationBackground(.ultraThinMaterial)
         }
     }
 
