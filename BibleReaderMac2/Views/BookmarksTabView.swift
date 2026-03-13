@@ -128,7 +128,7 @@ struct BookmarksTabView: View {
 
                         Divider()
 
-                        ForEach(userDataStore.bookmarks.sorted(by: { $0.dateAdded > $1.dateAdded })) { bookmark in
+                        ForEach(userDataStore.bookmarks.sorted(by: { $0.createdAt > $1.createdAt })) { bookmark in
                             bookmarkListRow(bookmark)
                         }
                     }
