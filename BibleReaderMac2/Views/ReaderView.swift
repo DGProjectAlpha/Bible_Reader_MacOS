@@ -1,24 +1,5 @@
 import SwiftUI
 
-private struct ChapterNavButton: View {
-    let systemImage: String
-    let helpText: String
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-        }
-        .buttonStyle(.borderless)
-        .help(helpText)
-        .scaleEffect(isHovering ? 1.03 : 1.0)
-        .animation(.spring(duration: 0.2, bounce: 0.3), value: isHovering)
-        .onHover { hovering in isHovering = hovering }
-    }
-}
-
 struct ReaderView: View {
     @Environment(BibleStore.self) private var bibleStore
     @Environment(UIStateStore.self) private var uiState
@@ -30,60 +11,25 @@ struct ReaderView: View {
     @State private var isLoading = true
     @State private var chapterId = ""
     @State private var navigatingForward = true
+    @State private var scrollTarget: Int? = nil
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
+        ZStack(alignment: .top) {
             chapterContent
+                .padding(.top, 44)
+
+            PaneToolbar(
+                pane: pane,
+                verseCount: verses.count,
+                onScrollToVerse: { verseNumber in
+                    scrollTarget = verseNumber
+                }
+            )
+            .frame(maxWidth: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: pane.location) {
             await loadChapter()
-        }
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        HStack {
-            if let module = bibleStore.modules.first(where: { $0.id == pane.location.moduleId }) {
-                Text(module.abbreviation)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.accentColor.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-
-                if let book = module.books.first(where: { $0.id == pane.location.book }) {
-                    Text(book.name)
-                        .font(.headline)
-                } else {
-                    Text(pane.location.book)
-                        .font(.headline)
-                }
-            }
-
-            Text("Chapter \(pane.location.chapter)")
-                .font(.headline)
-
-            Spacer()
-
-            chapterNav
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-
-    private var chapterNav: some View {
-        HStack(spacing: 4) {
-            ChapterNavButton(systemImage: "chevron.left", helpText: "Previous Chapter") {
-                Task { await navigatePrevious() }
-            }
-            ChapterNavButton(systemImage: "chevron.right", helpText: "Next Chapter") {
-                Task { await navigateNext() }
-            }
         }
     }
 
@@ -98,38 +44,45 @@ struct ReaderView: View {
             } else {
                 verseList
                     .id(chapterId)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: navigatingForward ? .trailing : .leading).combined(with: .opacity),
-                        removal: .move(edge: navigatingForward ? .leading : .trailing).combined(with: .opacity)
-                    ))
             }
         }
-        .animation(.spring(duration: 0.35, bounce: 0.2), value: chapterId)
+        .animation(nil, value: chapterId)
     }
 
     private var verseList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 2) {
-                ForEach(verses) { verse in
-                    VerseRow(
-                        verse: verse,
-                        isSelected: uiState.selectedVerseId == verse.id,
-                        fontSize: uiState.fontSize,
-                        glassNamespace: glassNamespace,
-                        onSelect: {
-                            withAnimation(.spring(duration: 0.25, bounce: 0.1)) {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(verses) { verse in
+                        VerseRow(
+                            verse: verse,
+                            isSelected: uiState.selectedVerseId == verse.id,
+                            fontSize: uiState.fontSize,
+                            glassNamespace: glassNamespace,
+                            onSelect: {
+                                withAnimation(nil) {
+                                    uiState.selectedVerseId = verse.id
+                                }
+                            },
+                            onStrongsTap: { strongsId in
                                 uiState.selectedVerseId = verse.id
+                                uiState.sidebarVisible = true
+                                uiState.expandedSidebarSections.insert(SidebarSection.strongs.rawValue)
                             }
-                        },
-                        onStrongsTap: { strongsId in
-                            uiState.selectedVerseId = verse.id
-                            uiState.inspectorTab = .strongs
-                            uiState.inspectorVisible = true
-                        }
-                    )
+                        )
+                        .id(verse.number)
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            .onChange(of: scrollTarget) { _, target in
+                if let target {
+                    withAnimation(nil) {
+                        proxy.scrollTo(target, anchor: .top)
+                    }
+                    scrollTarget = nil
                 }
             }
-            .padding(.vertical, 8)
         }
     }
 
@@ -175,17 +128,4 @@ struct ReaderView: View {
         isLoading = false
     }
 
-    // MARK: - Navigation
-
-    private func navigatePrevious() async {
-        navigatingForward = false
-        bibleStore.setActivePane(id: pane.id)
-        await bibleStore.navigatePreviousChapter()
-    }
-
-    private func navigateNext() async {
-        navigatingForward = true
-        bibleStore.setActivePane(id: pane.id)
-        await bibleStore.navigateNextChapter()
-    }
 }

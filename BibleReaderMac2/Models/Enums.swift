@@ -15,3 +15,13 @@ enum LoadingState {
 enum InspectorTab {
     case strongs, crossRef, notes, bookmarks
 }
+
+enum SidebarSection: String, CaseIterable {
+    case bookmarks = "bookmarks"
+    case highlights = "highlights"
+    case notes = "notes"
+    case strongs = "strongs"
+    case crossReferences = "crossReferences"
+    case search = "search"
+    case recentHistory = "recentHistory"
+}

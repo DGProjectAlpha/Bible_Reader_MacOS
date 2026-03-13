@@ -1,0 +1,306 @@
+==============================================================
+  BIBLEREADER MAC 2 — UI CHANGES TASK LIST
+  Created: 2026-03-13
+  Each step is a standalone /task. Execute in order.
+  All changes must comply with definitions.txt architecture
+  and Apple SwiftUI macOS API best practices.
+==============================================================
+
+--------------------------------------------------------------
+STEP 1: PER-PANE FLOATING NAVIGATION BAR
+--------------------------------------------------------------
+
+GOAL: Remove book/chapter navigation from the left sidebar and
+move it into a floating overlay toolbar at the top of each
+individual ReaderView pane. Each pane gets its own independent
+navigation controls.
+
+WHAT TO BUILD:
+- New file: Views/PaneToolbar.swift
+- A horizontal bar overlaid at the top of each ReaderView using
+  ZStack + VStack alignment, floating OVER the verse scroll content
+- The bar must use .background(.ultraThinMaterial) with
+  RoundedRectangle(cornerRadius: 10) so it is semi-transparent
+  and the verse text is visible scrolling behind it
+- The bar must stay pinned to the top of the pane (not scroll away)
+
+CONTROLS IN THE BAR (left to right):
+1. Module picker — Menu { ForEach modules } label: { Text(abbreviation) }
+   Switching module reloads the pane via bibleStore.navigate()
+2. Book picker — Menu with two sections: "Old Testament" and "New Testament"
+   Each section lists book names. Selecting a book navigates to chapter 1.
+3. Chapter picker — Menu listing 1..N chapters for the current book
+4. Verse picker — Menu listing 1..N verses for current chapter (optional,
+   scrolls to verse via ScrollViewReader.scrollTo)
+5. Spacer
+6. Split Horizontal button — SF Symbol "rectangle.split.1x2"
+   Calls bibleStore.addPane() with splitDirection: .horizontal
+7. Split Vertical button — SF Symbol "rectangle.split.2x1"
+   Calls bibleStore.addPane() with splitDirection: .vertical
+8. Close pane button (X) — only visible when panes.count > 1
+
+STYLING:
+- All pickers use .menuStyle(.borderlessButton) for compact look
+- Font: .callout weight .medium for labels
+- SF Symbols: .font(.body) .foregroundStyle(.secondary)
+- Buttons get .buttonStyle(.plain) with hover scale 1.05
+- The entire bar: .padding(.horizontal, 12) .padding(.vertical, 6)
+
+CHANGES TO EXISTING FILES:
+- ReaderView.swift: wrap existing ScrollView in a ZStack. Place
+  PaneToolbar at top with .frame(maxWidth: .infinity, alignment: .top)
+  Add .padding(.top, 44) to the ScrollView content so verses
+  don't hide behind the toolbar
+- SidebarView.swift: REMOVE the module picker section, REMOVE the
+  Old/New Testament book list and chapter grid sections entirely.
+  Keep only: recent history section, and whatever remains after Step 2.
+- ReaderArea.swift: no changes needed, pane management already works
+
+APPLE API REFERENCES:
+- Menu (macOS 11+): content + label pattern for dropdown
+- .background(.ultraThinMaterial, in: RoundedRectangle(...)) for glass blur
+- ScrollViewReader + scrollTo for verse jumping
+- ZStack with alignment: .top for overlay pinning
+
+--------------------------------------------------------------
+STEP 2: CONSOLIDATE RIGHT PANEL INTO LEFT SIDEBAR
+--------------------------------------------------------------
+
+GOAL: Eliminate the right-side inspector panel entirely. Move all
+its functionality (Strong's, cross-references, notes, bookmarks,
+highlights) into the left sidebar as expandable DisclosureGroup
+sections.
+
+WHAT TO BUILD:
+- Refactor SidebarView.swift to contain these sections using
+  DisclosureGroup (macOS 11+), each independently expandable:
+
+  1. "Bookmarks" — DisclosureGroup with bookmark icon
+     When expanded: list of all bookmarks sorted by createdAt desc
+     Each row: colored circle (10pt) + verse reference + note preview (1 line)
+     Tap: navigates to that verse in the active pane
+     Context menu: delete bookmark
+
+  2. "Highlights" — DisclosureGroup with paintbrush icon
+     When expanded: list of all highlights grouped by color
+     Each color section: color name header + list of verse references
+     Tap: navigates to verse
+     Context menu: remove highlight
+
+  3. "Notes" — DisclosureGroup with note.text icon
+     When expanded: list of all notes sorted by updatedAt desc
+     Each row: verse reference (bold) + note preview (2 lines max)
+     Tap: navigates to verse, opens inline note editor
+
+  4. "Strong's Numbers" — DisclosureGroup with textformat.123 icon
+     When expanded: shows Strong's data for the currently selected verse
+     (same content as current InspectorView Strong's tab)
+     If no verse selected: "Select a verse to view Strong's numbers"
+
+  5. "Cross References" — DisclosureGroup with arrow.triangle.branch icon
+     When expanded: shows cross-refs for currently selected verse
+     (same content as current InspectorView cross-ref tab)
+     If no verse selected: "Select a verse to view cross references"
+
+  6. "Search" — DisclosureGroup with magnifyingglass icon
+     When expanded: search field + results list
+     (move SearchView content inline here instead of a sheet)
+
+  7. "Recent History" — DisclosureGroup with clock icon
+     Keep existing recent history functionality
+
+SIDEBAR STYLING:
+- Use List with .listStyle(.sidebar) for native macOS sidebar appearance
+- Each DisclosureGroup gets .padding(.vertical, 2)
+- Section content uses .font(uiState.fontSize) where applicable
+- The sidebar itself: .background(.ultraThinMaterial) for translucency
+
+CHANGES TO EXISTING FILES:
+- ContentView.swift: REMOVE the inspector panel (third column) entirely.
+  Change from 3-column HSplitView to 2-column: [Sidebar | ReaderArea]
+  REMOVE all inspector toggle logic, toolbar buttons for inspector tabs
+  REMOVE .inspector() modifier if present
+- InspectorView.swift: Extract reusable logic (Strong's lookup, cross-ref
+  display) into helper functions or sub-views that SidebarView can call.
+  The file can remain for code organization but is no longer a standalone panel.
+- BookmarksTabView.swift: Merge into SidebarView or keep as a sub-view
+  imported by SidebarView's bookmarks DisclosureGroup
+- UIStateStore.swift: REMOVE inspectorVisible, inspectorTab properties.
+  Add: expandedSidebarSections: Set<String> to track which DisclosureGroups
+  are open (persisted via @AppStorage as JSON or just ephemeral)
+- SearchView.swift: Refactor from sheet to inline content for sidebar embed
+- Toolbar: remove inspector toggle buttons, keep sidebar toggle (Cmd+S)
+
+APPLE API REFERENCES:
+- DisclosureGroup(_:isExpanded:content:) for expandable sections
+- List with .listStyle(.sidebar) for native macOS sidebar
+- .background(.ultraThinMaterial) for translucent sidebar
+
+--------------------------------------------------------------
+STEP 3: DISABLE ANIMATIONS ON CHAPTER CHANGES AND SPLITS
+--------------------------------------------------------------
+
+GOAL: Remove all bounce/spring animations when changing chapters
+or splitting/closing panes. Navigation should be instant — no
+slide, no bounce, no transition. Panels opening/closing should
+also be instant, not animated.
+
+WHAT TO CHANGE:
+
+1. ReaderView.swift — Chapter transitions:
+   - REMOVE the .transition(.asymmetric(...)) on the verse content
+   - REMOVE .animation(.spring(...), value: chapterId) or similar
+   - Wrap chapter navigation state changes in withAnimation(nil) { }
+     OR apply .animation(nil, value: pane.location) to the verse container
+   - The chapter content should simply APPEAR — no slide, no opacity fade
+
+2. ReaderArea.swift — Pane add/remove:
+   - REMOVE .animation(.spring(duration: 0.35, bounce: 0.2)) on pane changes
+   - Wrap bibleStore.addPane() and bibleStore.removePane() calls in
+     withAnimation(nil) { } so new panes appear instantly
+   - No transition on pane insertion/removal
+
+3. ContentView.swift — Sidebar toggle:
+   - REMOVE .animation(.spring(duration: 0.35, bounce: 0.2)) on sidebar toggle
+   - Sidebar should appear/disappear instantly (no slide animation)
+   - Use withAnimation(nil) { uiState.sidebarVisible.toggle() }
+
+4. SidebarView.swift — DisclosureGroup animations:
+   - Keep DisclosureGroup expand/collapse animations (these are fine,
+     they're Apple-native and subtle)
+   - But if any custom spring animations were added to sidebar content,
+     remove them
+
+5. General cleanup:
+   - Search for all instances of .transition( and .animation(.spring
+     in View files. Remove any that relate to navigation or panel toggling.
+   - Hover effects (.scaleEffect on hover) may STAY — those are
+     micro-interactions, not navigation animations
+
+APPLE API REFERENCES:
+- withAnimation(nil) { } — suppresses animation for state changes
+- .animation(nil, value: x) — disables animation for specific value
+- Transaction with disablesAnimations = true for broader suppression
+
+--------------------------------------------------------------
+STEP 4: FIX VERTICAL SPLIT VIEW RESIZING
+--------------------------------------------------------------
+
+GOAL: Both horizontal and vertical splits must be user-resizable
+by dragging the divider. Currently only horizontal split can be
+resized.
+
+WHAT TO CHANGE:
+
+1. ReaderArea.swift:
+   - Verify that vertical pane stacks use VSplitView (not VStack).
+     VSplitView (macOS 10.15+) provides built-in draggable dividers.
+   - If the code uses VStack or manual GeometryReader for vertical
+     splits, REPLACE with VSplitView { pane1; pane2 }
+   - Each child in VSplitView needs .frame(minHeight: 150, idealHeight: 300)
+     to allow resizing with a reasonable minimum
+   - Each child in HSplitView needs .frame(minWidth: 200, idealWidth: 400)
+   - Do NOT use .frame(maxHeight: .infinity) as it can lock the divider
+
+2. Verify HSplitView children also have proper min/ideal/max constraints
+   so horizontal dividers remain draggable
+
+APPLE API REFERENCES:
+- VSplitView (macOS 10.15+): arranges children vertically with
+  user-draggable dividers. Children sized via .frame(minHeight:idealHeight:maxHeight:)
+- HSplitView (macOS 10.15+): same pattern horizontally
+- Both require children to have flexible frame constraints for
+  the divider to be draggable
+
+--------------------------------------------------------------
+STEP 5: FIX FONT SIZE CONTROLS
+--------------------------------------------------------------
+
+GOAL: Font increase/decrease buttons must actually change the
+bible verse text size in all reading panes.
+
+WHAT TO INVESTIGATE AND FIX:
+
+1. UIStateStore.swift — fontSize property:
+   - Verify fontSize is @AppStorage-backed (persisted) and @Observable
+   - It should be: var fontSize: Double = 16.0
+   - If using @AppStorage directly, the @Observable wrapper may not
+     publish changes. Fix: use a computed property that reads/writes
+     @AppStorage, or use a didSet to sync
+
+2. Toolbar/Settings font buttons:
+   - Find where font +/- buttons are defined (likely toolbar or SettingsView)
+   - Verify they modify uiState.fontSize directly:
+     Button { uiState.fontSize += 1 } label: { Image(systemName: "textformat.size.larger") }
+     Button { uiState.fontSize -= 1 } label: { Image(systemName: "textformat.size.smaller") }
+   - Add bounds: max(10, min(40, fontSize))
+
+3. VerseRow.swift — Apply font size:
+   - The verse text must use .font(.system(size: uiState.fontSize))
+   - Verify VerseRow reads @Environment(UIStateStore.self) var uiState
+   - The verse number should scale proportionally: .font(.system(size: uiState.fontSize * 0.7))
+
+4. If font size buttons are in the toolbar but the toolbar was removed
+   during Step 2 cleanup, add them to PaneToolbar.swift (from Step 1)
+   or to a global toolbar that persists:
+   - Option A: Add A+/A- buttons to each PaneToolbar (per-pane font control)
+   - Option B: Add to the main window toolbar (global font control)
+   Recommend Option B — font size should be global, not per-pane.
+
+5. SettingsView.swift — Font slider:
+   - Verify the slider also writes to uiState.fontSize
+   - The slider preview text should update live
+
+APPLE API REFERENCES:
+- @AppStorage for persisted user defaults
+- .font(.system(size:)) for dynamic font sizing
+- @Observable property changes trigger view updates automatically
+
+--------------------------------------------------------------
+STEP 6: SIDEBAR OPEN/CLOSE POLISH
+--------------------------------------------------------------
+
+GOAL: After Steps 1-5, verify the sidebar opens and closes
+cleanly. It should use .ultraThinMaterial background for a
+translucent floating feel, not a solid opaque panel.
+
+WHAT TO VERIFY AND FIX:
+
+1. ContentView.swift:
+   - Sidebar column in HSplitView should have:
+     .frame(minWidth: 220, idealWidth: 280, maxWidth: 350)
+   - Apply .background(.ultraThinMaterial) to the sidebar container
+
+2. SidebarView.swift:
+   - Root view should use List { ... } .listStyle(.sidebar) for native
+     macOS sidebar appearance (automatic translucency)
+   - Do NOT wrap in a custom background — .listStyle(.sidebar) handles it
+
+3. Toggle behavior:
+   - Sidebar toggle should use NavigationSplitView's built-in column
+     visibility if migrated, OR simply toggle the sidebar frame width
+     to 0 with no animation (per Step 3)
+
+4. If the current HSplitView approach doesn't give a native sidebar feel,
+   consider migrating to NavigationSplitView:
+
+   NavigationSplitView(columnVisibility: $columnVisibility) {
+       SidebarView()
+           .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 350)
+   } detail: {
+       ReaderArea()
+   }
+
+   This gives automatic sidebar toggle button, native translucency,
+   and proper macOS sidebar behavior. The detail area would contain
+   the full ReaderArea with its HSplitView/VSplitView pane layout.
+
+APPLE API REFERENCES:
+- NavigationSplitView with columnVisibility binding
+- .navigationSplitViewColumnWidth(min:ideal:max:)
+- .listStyle(.sidebar) for native macOS sidebar appearance
+- NavigationSplitViewVisibility (.all, .detailOnly) for toggle
+
+==============================================================
+  END OF UI CHANGES
+==============================================================

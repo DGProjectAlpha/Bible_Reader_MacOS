@@ -87,6 +87,6 @@ struct SearchView: View {
         Task {
             await bibleStore.navigate(paneId: paneId, to: location)
         }
-        uiState.searchVisible = false
+        // Search is now inline in sidebar, no sheet to dismiss
     }
 }

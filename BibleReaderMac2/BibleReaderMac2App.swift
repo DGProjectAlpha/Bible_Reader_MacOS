@@ -21,24 +21,30 @@ struct BibleReaderMac2App: App {
                 }
         }
         .commands {
-            CommandMenu("Inspector") {
+            CommandMenu("Sidebar") {
                 Button("Strong's Numbers") {
-                    uiStateStore.inspectorTab = .strongs
-                    uiStateStore.inspectorVisible = true
+                    uiStateStore.sidebarVisible = true
+                    uiStateStore.expandedSidebarSections.insert(SidebarSection.strongs.rawValue)
                 }
                 .keyboardShortcut("1", modifiers: .command)
 
                 Button("Cross-References") {
-                    uiStateStore.inspectorTab = .crossRef
-                    uiStateStore.inspectorVisible = true
+                    uiStateStore.sidebarVisible = true
+                    uiStateStore.expandedSidebarSections.insert(SidebarSection.crossReferences.rawValue)
                 }
                 .keyboardShortcut("2", modifiers: .command)
 
                 Button("Notes") {
-                    uiStateStore.inspectorTab = .notes
-                    uiStateStore.inspectorVisible = true
+                    uiStateStore.sidebarVisible = true
+                    uiStateStore.expandedSidebarSections.insert(SidebarSection.notes.rawValue)
                 }
                 .keyboardShortcut("3", modifiers: .command)
+
+                Button("Search") {
+                    uiStateStore.sidebarVisible = true
+                    uiStateStore.expandedSidebarSections.insert(SidebarSection.search.rawValue)
+                }
+                .keyboardShortcut("f", modifiers: .command)
             }
         }
 

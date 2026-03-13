@@ -58,6 +58,7 @@ struct InspectorView: View {
     @Environment(UserDataStore.self) private var userDataStore
     @Environment(UIStateStore.self) private var uiStateStore
 
+    @State private var inspectorTab: InspectorTab = .strongs
     @State private var wordTags: [ResolvedWordTag] = []
     @State private var crossRefs: [ResolvedCrossReference] = []
     @State private var selectedStrongsEntry: StrongsEntry? = nil
@@ -69,11 +70,9 @@ struct InspectorView: View {
     @State private var isLoadingDetail = false
 
     var body: some View {
-        @Bindable var uiState = uiStateStore
-
         VStack(spacing: 0) {
             // Tab picker
-            Picker("Inspector", selection: $uiState.inspectorTab) {
+            Picker("Inspector", selection: $inspectorTab) {
                 Text("Strong's").tag(InspectorTab.strongs)
                 Text("Cross-Refs").tag(InspectorTab.crossRef)
                 Text("Notes").tag(InspectorTab.notes)
@@ -86,7 +85,7 @@ struct InspectorView: View {
 
             // Content
             Group {
-                switch uiStateStore.inspectorTab {
+                switch inspectorTab {
                 case .strongs:
                     strongsTab
                 case .crossRef:
@@ -103,7 +102,7 @@ struct InspectorView: View {
         .onChange(of: uiStateStore.selectedVerseId) {
             loadDataForSelectedVerse()
         }
-        .onChange(of: uiStateStore.inspectorTab) {
+        .onChange(of: inspectorTab) {
             loadDataForSelectedVerse()
         }
     }
@@ -787,7 +786,7 @@ struct InspectorView: View {
         let book = String(parts[0])
         let moduleId = bibleStore.activeModuleId
 
-        switch uiStateStore.inspectorTab {
+        switch inspectorTab {
         case .strongs:
             isLoadingStrongs = true
             Task {

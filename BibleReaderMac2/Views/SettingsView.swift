@@ -16,7 +16,7 @@ struct SettingsView: View {
                         Text("\(Int(uiState.fontSize)) pt")
                             .foregroundStyle(.secondary)
                     }
-                    Slider(value: $uiState.fontSize, in: 10...32, step: 1) {
+                    Slider(value: $uiState.fontSize, in: 10...40, step: 1) {
                         Text("Font Size")
                     }
                     HStack {

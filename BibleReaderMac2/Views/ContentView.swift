@@ -6,31 +6,23 @@ struct ContentView: View {
     @Environment(UIStateStore.self) private var uiStateStore
 
     var body: some View {
-        @Bindable var uiState = uiStateStore
-
         HSplitView {
             // Sidebar
             if uiStateStore.sidebarVisible {
                 SidebarView()
-                    .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
-                    .transition(.move(edge: .leading))
+                    .frame(minWidth: 220, idealWidth: 280, maxWidth: 350)
+                    .background(.ultraThinMaterial)
+                    .transition(.identity)
             }
 
             // Reader Area (detail)
             ReaderArea()
                 .frame(minWidth: 400)
-
-            // Inspector
-            if uiStateStore.inspectorVisible {
-                InspectorView()
-                    .frame(minWidth: 200, idealWidth: 300, maxWidth: 400)
-                    .transition(.move(edge: .trailing))
-            }
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button {
-                    withAnimation(.spring(duration: 0.35, bounce: 0.2)) {
+                    withAnimation(nil) {
                         uiStateStore.sidebarVisible.toggle()
                     }
                 } label: {
@@ -68,7 +60,7 @@ struct ContentView: View {
                 .help("Decrease Font Size")
 
                 Button {
-                    if uiStateStore.fontSize < 32 {
+                    if uiStateStore.fontSize < 40 {
                         uiStateStore.fontSize += 1
                     }
                 } label: {
@@ -79,7 +71,7 @@ struct ContentView: View {
 
             ToolbarItemGroup(placement: .automatic) {
                 Button {
-                    withAnimation(.spring(duration: 0.35, bounce: 0.2)) {
+                    withAnimation(nil) {
                         bibleStore.addPane(direction: .horizontal)
                     }
                 } label: {
@@ -88,7 +80,7 @@ struct ContentView: View {
                 .help("Split Right")
 
                 Button {
-                    withAnimation(.spring(duration: 0.35, bounce: 0.2)) {
+                    withAnimation(nil) {
                         bibleStore.addPane(direction: .vertical)
                     }
                 } label: {
@@ -104,34 +96,8 @@ struct ContentView: View {
                 .help("Settings")
                 .keyboardShortcut(",", modifiers: .command)
             }
-
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    uiStateStore.searchVisible.toggle()
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                }
-                .help("Search")
-                .keyboardShortcut("f", modifiers: .command)
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    withAnimation(.spring(duration: 0.35, bounce: 0.2)) {
-                        uiStateStore.inspectorVisible.toggle()
-                    }
-                } label: {
-                    Image(systemName: "sidebar.trailing")
-                }
-                .help("Toggle Inspector")
-            }
         }
-        .animation(.spring(duration: 0.35, bounce: 0.2), value: uiStateStore.sidebarVisible)
-        .animation(.spring(duration: 0.35, bounce: 0.2), value: uiStateStore.inspectorVisible)
-        .sheet(isPresented: $uiState.searchVisible) {
-            SearchView()
-                .presentationBackground(.ultraThinMaterial)
-        }
+        .animation(nil, value: uiStateStore.sidebarVisible)
     }
 
 }

@@ -73,7 +73,7 @@ struct ReaderArea: View {
                 HStack {
                     Spacer()
                     CloseButton {
-                        withAnimation(.spring(duration: 0.35, bounce: 0.2)) {
+                        withAnimation(nil) {
                             bibleStore.removePane(id: pane.id)
                         }
                     }

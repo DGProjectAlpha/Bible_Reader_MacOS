@@ -1,0 +1,212 @@
+import SwiftUI
+
+struct PaneToolbar: View {
+    @Environment(BibleStore.self) private var bibleStore
+    @Environment(UIStateStore.self) private var uiState
+
+    let pane: ReadingPane
+    var verseCount: Int = 0
+    var onScrollToVerse: ((Int) -> Void)? = nil
+
+    private var currentModule: Module? {
+        bibleStore.modules.first(where: { $0.id == pane.location.moduleId })
+    }
+
+    private var currentBook: Book? {
+        currentModule?.books.first(where: { $0.id == pane.location.book })
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            modulePicker
+            bookPicker
+            chapterPicker
+            versePicker
+
+            Spacer()
+
+            splitHorizontalButton
+            splitVerticalButton
+            if bibleStore.panes.count > 1 {
+                closePaneButton
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 10)
+        )
+        .padding(.horizontal, 8)
+        .padding(.top, 6)
+    }
+
+    // MARK: - Module Picker
+
+    private var modulePicker: some View {
+        Menu {
+            ForEach(bibleStore.modules) { module in
+                Button(module.name) {
+                    Task {
+                        let loc = BibleLocation(
+                            moduleId: module.id,
+                            book: pane.location.book,
+                            chapter: pane.location.chapter
+                        )
+                        await bibleStore.navigate(paneId: pane.id, to: loc)
+                    }
+                }
+            }
+        } label: {
+            Text(currentModule?.abbreviation ?? "—")
+                .font(.callout)
+                .fontWeight(.medium)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    // MARK: - Book Picker
+
+    private var bookPicker: some View {
+        Menu {
+            let books = currentModule?.books ?? []
+            let otBooks = books.filter { $0.testament == .old }
+            let ntBooks = books.filter { $0.testament == .new }
+
+            Section("Old Testament") {
+                ForEach(otBooks) { book in
+                    Button(book.name) {
+                        Task {
+                            let loc = BibleLocation(
+                                moduleId: pane.location.moduleId,
+                                book: book.id,
+                                chapter: 1
+                            )
+                            await bibleStore.navigate(paneId: pane.id, to: loc)
+                        }
+                    }
+                }
+            }
+            Section("New Testament") {
+                ForEach(ntBooks) { book in
+                    Button(book.name) {
+                        Task {
+                            let loc = BibleLocation(
+                                moduleId: pane.location.moduleId,
+                                book: book.id,
+                                chapter: 1
+                            )
+                            await bibleStore.navigate(paneId: pane.id, to: loc)
+                        }
+                    }
+                }
+            }
+        } label: {
+            Text(currentBook?.name ?? pane.location.book)
+                .font(.callout)
+                .fontWeight(.medium)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    // MARK: - Chapter Picker
+
+    private var chapterPicker: some View {
+        Menu {
+            let count = currentBook?.chapterCount ?? 1
+            ForEach(1...count, id: \.self) { ch in
+                Button("\(ch)") {
+                    Task {
+                        let loc = BibleLocation(
+                            moduleId: pane.location.moduleId,
+                            book: pane.location.book,
+                            chapter: ch
+                        )
+                        await bibleStore.navigate(paneId: pane.id, to: loc)
+                    }
+                }
+            }
+        } label: {
+            Text("Ch \(pane.location.chapter)")
+                .font(.callout)
+                .fontWeight(.medium)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    // MARK: - Verse Picker
+
+    private var versePicker: some View {
+        Menu {
+            if verseCount > 0 {
+                ForEach(1...verseCount, id: \.self) { v in
+                    Button("Verse \(v)") {
+                        onScrollToVerse?(v)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.down.to.line")
+                .font(.body)
+                .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    // MARK: - Split Buttons
+
+    private var splitHorizontalButton: some View {
+        PaneToolbarButton(systemImage: "rectangle.split.2x1") {
+            bibleStore.setActivePane(id: pane.id)
+            withAnimation(nil) {
+                bibleStore.addPane(direction: .horizontal)
+            }
+        }
+        .help("Split Horizontal")
+    }
+
+    private var splitVerticalButton: some View {
+        PaneToolbarButton(systemImage: "rectangle.split.1x2") {
+            bibleStore.setActivePane(id: pane.id)
+            withAnimation(nil) {
+                bibleStore.addPane(direction: .vertical)
+            }
+        }
+        .help("Split Vertical")
+    }
+
+    private var closePaneButton: some View {
+        PaneToolbarButton(systemImage: "xmark") {
+            withAnimation(nil) {
+                bibleStore.removePane(id: pane.id)
+            }
+        }
+        .help("Close Pane")
+    }
+
+}
+
+// MARK: - Toolbar Icon Button
+
+private struct PaneToolbarButton: View {
+    let systemImage: String
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.body)
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isHovering ? 1.05 : 1.0)
+        .animation(.spring(duration: 0.2, bounce: 0.3), value: isHovering)
+        .onHover { hovering in isHovering = hovering }
+    }
+}
