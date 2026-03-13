@@ -1,6 +1,6 @@
 import Foundation
 
-@Observable
+@MainActor @Observable
 final class BibleStore {
     var modules: [Module] = []
     var activeModuleId: String = ""

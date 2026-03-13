@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-@Observable
+@MainActor @Observable
 final class UIStateStore {
     var sidebarVisible: Bool = true
     var inspectorVisible: Bool = false

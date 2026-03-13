@@ -24,7 +24,7 @@ struct CanonicalRef: Hashable {
 
 // MARK: - Versification Service
 
-final class VersificationService {
+final class VersificationService: Sendable {
 
     static let shared = VersificationService()
     private init() {}
