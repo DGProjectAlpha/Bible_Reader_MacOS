@@ -14,7 +14,8 @@ final class UIStateStore {
         : UserDefaults.standard.double(forKey: "fontSize")
     {
         didSet {
-            fontSize = max(10, min(40, fontSize))
+            let clamped = max(10, min(40, fontSize))
+            if clamped != fontSize { fontSize = clamped; return }
             UserDefaults.standard.set(fontSize, forKey: "fontSize")
         }
     }
