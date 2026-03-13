@@ -63,9 +63,7 @@ struct VerseRow: View {
         .overlay {
             if isSelected {
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(.clear)
-                    .glassEffect(in: RoundedRectangle(cornerRadius: 6))
-                    .glassEffectID("selectedVerse", in: glassNamespace)
+                    .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
                     .allowsHitTesting(false)
             }
         }
@@ -147,7 +145,7 @@ struct VerseRow: View {
         }
         .sheet(isPresented: $showNoteEditor) {
             noteEditorSheet
-                .presentationBackground(.glass)
+                .presentationBackground(.ultraThinMaterial)
         }
     }
 
@@ -182,7 +180,7 @@ struct VerseRow: View {
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button("Save") {
+                Button {
                     Task { await saveNote() }
                 } label: {
                     Text("Save")
@@ -203,18 +201,20 @@ struct VerseRow: View {
 
         for (i, word) in words.enumerated() {
             if i > 0 {
-                result = result + Text(" ")
+                result = Text("\(result)\(Text(" "))")
             }
 
             if i < verse.strongsNumbers.count, !verse.strongsNumbers[i].isEmpty {
-                result = result + Text(String(word))
+                let styledWord = Text(String(word))
                     .font(.system(size: fontSize))
-                    .foregroundStyle(.accentColor)
-                    .underline(color: .accentColor.opacity(0.4))
+                    .foregroundStyle(Color.accentColor)
+                    .underline(color: Color.accentColor.opacity(0.4))
+                result = Text("\(result)\(styledWord)")
             } else {
-                result = result + Text(String(word))
+                let styledWord = Text(String(word))
                     .font(.system(size: fontSize))
                     .foregroundStyle(.primary)
+                result = Text("\(result)\(styledWord)")
             }
         }
 
