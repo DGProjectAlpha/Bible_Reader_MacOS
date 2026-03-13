@@ -25,7 +25,7 @@ struct ReaderView: View {
                     scrollTarget = verseNumber
                 }
             )
-            .frame(maxWidth: .infinity, alignment: .top)
+            .frame(maxWidth: CGFloat.infinity, alignment: Alignment.top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: pane.location) {
@@ -70,7 +70,7 @@ struct ReaderView: View {
                                 uiState.expandedSidebarSections.insert(SidebarSection.strongs.rawValue)
                             }
                         )
-                        .id(verse.number)
+                        .id(verse.verseNumber)
                     }
                 }
                 .padding(.vertical, 8)
