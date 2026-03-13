@@ -37,6 +37,7 @@
 		A1000021B /* CrossReferenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000011B /* CrossReferenceService.swift */; };
 		A1000021C /* BookmarksTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000011C /* BookmarksTabView.swift */; };
 		A10000220 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000150 /* Assets.xcassets */; };
+		A10000221 /* BundledModules in Resources */ = {isa = PBXBuildFile; fileRef = A10000152 /* BundledModules */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -72,6 +73,7 @@
 		A1000011C /* BookmarksTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksTabView.swift; sourceTree = "<group>"; };
 		A10000150 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A10000151 /* BibleReaderMac2.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BibleReaderMac2.entitlements; sourceTree = "<group>"; };
+		A10000152 /* BundledModules */ = {isa = PBXFileReference; lastKnownFileType = folder; path = BundledModules; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -99,6 +101,7 @@
 				A10000100 /* BibleReaderMac2App.swift */,
 				A10000150 /* Assets.xcassets */,
 				A10000151 /* BibleReaderMac2.entitlements */,
+				A10000152 /* BundledModules */,
 				A10000021 /* Models */,
 				A10000022 /* Store */,
 				A10000023 /* Views */,
@@ -238,6 +241,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000220 /* Assets.xcassets in Resources */,
+				A10000221 /* BundledModules in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
