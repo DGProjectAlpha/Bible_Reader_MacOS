@@ -37,7 +37,7 @@ struct SidebarView: View {
 
             bookList
         }
-        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Module Picker

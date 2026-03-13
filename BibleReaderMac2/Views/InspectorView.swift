@@ -99,7 +99,7 @@ struct InspectorView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         .onChange(of: uiStateStore.selectedVerseId) {
             loadDataForSelectedVerse()
         }
