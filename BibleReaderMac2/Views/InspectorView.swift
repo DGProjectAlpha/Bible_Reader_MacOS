@@ -776,10 +776,6 @@ struct InspectorView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                let sorted = userDataStore.bookmarks.sorted { $0.createdAt > $1.createdAt }
-                let grouped = Dictionary(grouping: sorted) { colorForBookmark($0.color).description }
-                _ = grouped // suppress warning, we group by color visually below
-
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         // Summary header
