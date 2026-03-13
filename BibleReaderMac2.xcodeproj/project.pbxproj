@@ -35,6 +35,7 @@
 		A10000219 /* StrongsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000119 /* StrongsService.swift */; };
 		A1000021A /* ModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000011A /* ModuleManager.swift */; };
 		A1000021B /* CrossReferenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000011B /* CrossReferenceService.swift */; };
+		A1000021C /* BookmarksTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000011C /* BookmarksTabView.swift */; };
 		A10000220 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000150 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -68,6 +69,7 @@
 		A10000119 /* StrongsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrongsService.swift; sourceTree = "<group>"; };
 		A1000011A /* ModuleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleManager.swift; sourceTree = "<group>"; };
 		A1000011B /* CrossReferenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossReferenceService.swift; sourceTree = "<group>"; };
+		A1000011C /* BookmarksTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksTabView.swift; sourceTree = "<group>"; };
 		A10000150 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A10000151 /* BibleReaderMac2.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BibleReaderMac2.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -136,6 +138,7 @@
 		A10000023 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				A1000011C /* BookmarksTabView.swift */,
 				A10000114 /* ContentView.swift */,
 				A10000110 /* InspectorView.swift */,
 				A1000010E /* ReaderArea.swift */,
@@ -262,6 +265,7 @@
 				A1000020E /* ReaderArea.swift in Sources */,
 				A1000020F /* SearchView.swift in Sources */,
 				A10000210 /* InspectorView.swift in Sources */,
+				A1000021C /* BookmarksTabView.swift in Sources */,
 				A10000211 /* SettingsView.swift in Sources */,
 				A10000212 /* VerseRow.swift in Sources */,
 				A10000213 /* SidebarView.swift in Sources */,

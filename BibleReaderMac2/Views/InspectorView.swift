@@ -32,7 +32,7 @@ extension View {
 
 // MARK: - Hover Highlight Modifier
 
-private struct HoverHighlight: ViewModifier {
+struct HoverHighlight: ViewModifier {
     @State private var isHovering = false
 
     func body(content: Content) -> some View {
@@ -48,7 +48,7 @@ private struct HoverHighlight: ViewModifier {
 }
 
 extension View {
-    fileprivate func hoverHighlight() -> some View {
+    func hoverHighlight() -> some View {
         modifier(HoverHighlight())
     }
 }
@@ -687,163 +687,10 @@ struct InspectorView: View {
         .hoverHighlight()
     }
 
-    // MARK: - Bookmarks Tab
+    // MARK: - Bookmarks Tab (extracted to BookmarksTabView.swift)
 
     private var bookmarksTab: some View {
-        Group {
-            if let verseId = uiStateStore.selectedVerseId {
-                verseBookmarksView(verseId: verseId)
-            } else {
-                allBookmarksList
-            }
-        }
-    }
-
-    private func verseBookmarksView(verseId: String) -> some View {
-        let verseBookmarks = userDataStore.bookmarks.filter { $0.verseId == verseId }
-
-        return VStack(alignment: .leading, spacing: 0) {
-            // Header with add button
-            HStack(spacing: 6) {
-                Image(systemName: "bookmark.fill")
-                    .foregroundStyle(Color.accentColor)
-                Text(verseId)
-                    .font(.subheadline.bold())
-                Spacer()
-                Button {
-                    Task {
-                        let bookmark = Bookmark(
-                            id: UUID(),
-                            verseId: verseId,
-                            color: .yellow,
-                            note: "",
-                            createdAt: Date()
-                        )
-                        await userDataStore.addBookmark(bookmark)
-                    }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(Color.accentColor)
-                }
-                .buttonStyle(.plain)
-                .help("Add bookmark")
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-
-            Divider()
-
-            if verseBookmarks.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "bookmark")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text("No bookmarks for this verse")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    Text("Tap + to add one")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(verseBookmarks) { bookmark in
-                            BookmarkRowView(bookmark: bookmark)
-                                .environment(userDataStore)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var allBookmarksList: some View {
-        Group {
-            if userDataStore.bookmarks.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "bookmark")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text("No bookmarks yet")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    Text("Select a verse to add a bookmark")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        // Summary header
-                        HStack(spacing: 8) {
-                            Image(systemName: "bookmark.fill")
-                                .foregroundStyle(Color.accentColor)
-                            Text("\(userDataStore.bookmarks.count) bookmark\(userDataStore.bookmarks.count == 1 ? "" : "s")")
-                                .font(.subheadline.bold())
-                            Spacer()
-
-                            // Color summary dots
-                            ForEach(BookmarkColor.allCases, id: \.self) { color in
-                                let count = userDataStore.bookmarks.filter { $0.color == color }.count
-                                if count > 0 {
-                                    HStack(spacing: 2) {
-                                        Circle()
-                                            .fill(colorForBookmark(color))
-                                            .frame(width: 8, height: 8)
-                                        Text("\(count)")
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-
-                        Divider()
-
-                        ForEach(userDataStore.bookmarks.sorted(by: { $0.dateAdded > $1.dateAdded })) { bookmark in
-                            bookmarkListRow(bookmark)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func bookmarkListRow(_ bookmark: Bookmark) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(colorForBookmark(bookmark.color))
-                    .frame(width: 10, height: 10)
-                Text(bookmark.verseId)
-                    .font(.subheadline.bold())
-                    .foregroundStyle(Color.accentColor)
-                Spacer()
-                Text(bookmark.createdAt, style: .date)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            if !bookmark.note.isEmpty {
-                Text(bookmark.note)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-            Divider()
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            navigateToBookmark(bookmark)
-        }
-        .hoverHighlight()
+        BookmarksTabView()
     }
 
     // MARK: - Placeholders
@@ -975,38 +822,6 @@ struct InspectorView: View {
         }
     }
 
-    // MARK: - Bookmark Navigation
-
-    private func navigateToBookmark(_ bookmark: Bookmark) {
-        let parts = bookmark.verseId.split(separator: ".")
-        guard parts.count == 3,
-              let chapter = Int(parts[1]),
-              let verse = Int(parts[2]) else { return }
-        let book = String(parts[0])
-        let moduleId = bibleStore.activeModuleId
-        let location = BibleLocation(moduleId: moduleId, book: book, chapter: chapter, verseNumber: verse)
-
-        Task {
-            if let paneId = bibleStore.activePaneId {
-                await bibleStore.navigate(paneId: paneId, to: location)
-            }
-            await MainActor.run {
-                uiStateStore.selectedVerseId = bookmark.verseId
-            }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func colorForBookmark(_ color: BookmarkColor) -> Color {
-        switch color {
-        case .yellow: return .yellow
-        case .blue:   return .blue
-        case .green:  return .green
-        case .orange: return .orange
-        case .purple: return .purple
-        }
-    }
 }
 
 // MARK: - Note Editor Field
@@ -1058,7 +873,7 @@ private struct NoteEditorField: View {
 
 // MARK: - Bookmark Row View
 
-private struct BookmarkRowView: View {
+struct BookmarkRowView: View {
     @Environment(UserDataStore.self) private var userDataStore
     let bookmark: Bookmark
     @State private var noteText: String
