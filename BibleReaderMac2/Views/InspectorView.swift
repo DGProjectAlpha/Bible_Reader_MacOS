@@ -161,10 +161,10 @@ struct InspectorView: View {
                         if let num = tag.strongsNumber {
                             Text(num)
                                 .font(.caption.monospaced())
-                                .foregroundStyle(.accentColor)
+                                .foregroundStyle(Color.accentColor)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 2)
-                                .background(.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
+                                .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
                         }
                     }
 
@@ -237,14 +237,14 @@ struct InspectorView: View {
                     .font(.caption)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(Color.accentColor)
 
                 if let entry = selectedStrongsEntry {
                     // Header: number + lemma
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(entry.number)
                             .font(.title2.bold().monospaced())
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(Color.accentColor)
 
                         if !entry.lemma.isEmpty {
                             Text(entry.lemma)
@@ -321,7 +321,7 @@ struct InspectorView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(ref.displayRef)
                                         .font(.caption.bold())
-                                        .foregroundStyle(.accentColor)
+                                        .foregroundStyle(Color.accentColor)
                                     Text(ref.text)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -356,7 +356,7 @@ struct InspectorView: View {
                                     HStack(spacing: 6) {
                                         Text(similar.number)
                                             .font(.caption.monospaced())
-                                            .foregroundStyle(.accentColor)
+                                            .foregroundStyle(Color.accentColor)
                                         if !similar.lemma.isEmpty {
                                             Text(similar.lemma)
                                                 .font(.caption)
@@ -446,7 +446,7 @@ struct InspectorView: View {
                 // Summary header
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.triangle.branch")
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(Color.accentColor)
                     Text("\(crossRefs.count) cross-reference\(crossRefs.count == 1 ? "" : "s")")
                         .font(.subheadline.bold())
                     Spacer()
@@ -495,7 +495,7 @@ struct InspectorView: View {
             HStack(spacing: 6) {
                 Text(ref.displayRef)
                     .font(.subheadline.bold())
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
 
                 Spacer()
 
@@ -587,7 +587,7 @@ struct InspectorView: View {
             // Header
             HStack(spacing: 6) {
                 Image(systemName: "note.text")
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
                 Text(verseId)
                     .font(.subheadline.bold())
                 Spacer()
@@ -642,7 +642,7 @@ struct InspectorView: View {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         HStack(spacing: 6) {
                             Image(systemName: "note.text")
-                                .foregroundStyle(.accentColor)
+                                .foregroundStyle(Color.accentColor)
                             Text("\(userDataStore.notes.count) note\(userDataStore.notes.count == 1 ? "" : "s")")
                                 .font(.subheadline.bold())
                             Spacer()
@@ -666,7 +666,7 @@ struct InspectorView: View {
             HStack {
                 Text(note.verseId)
                     .font(.subheadline.bold())
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
                 Spacer()
                 Text(note.updatedAt, style: .date)
                     .font(.caption2)
@@ -706,7 +706,7 @@ struct InspectorView: View {
             // Header with add button
             HStack(spacing: 6) {
                 Image(systemName: "bookmark.fill")
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
                 Text(verseId)
                     .font(.subheadline.bold())
                 Spacer()
@@ -724,7 +724,7 @@ struct InspectorView: View {
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.title3)
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(Color.accentColor)
                 }
                 .buttonStyle(.plain)
                 .help("Add bookmark")
@@ -785,7 +785,7 @@ struct InspectorView: View {
                         // Summary header
                         HStack(spacing: 8) {
                             Image(systemName: "bookmark.fill")
-                                .foregroundStyle(.accentColor)
+                                .foregroundStyle(Color.accentColor)
                             Text("\(userDataStore.bookmarks.count) bookmark\(userDataStore.bookmarks.count == 1 ? "" : "s")")
                                 .font(.subheadline.bold())
                             Spacer()
@@ -827,7 +827,7 @@ struct InspectorView: View {
                     .frame(width: 10, height: 10)
                 Text(bookmark.verseId)
                     .font(.subheadline.bold())
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
                 Spacer()
                 Text(bookmark.createdAt, style: .date)
                     .font(.caption2)
