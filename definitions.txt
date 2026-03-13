@@ -1,0 +1,313 @@
+==============================================================
+  BIBLEREADER MAC 2 — ARCHITECTURE REFERENCE
+  Last updated: 2026-03-13
+==============================================================
+
+--------------------------------------------------------------
+SECTION 1: DATA MODEL (Swift Structs)
+--------------------------------------------------------------
+
+All models are value types (struct). Identifiable + Hashable for SwiftUI lists.
+No raw SQLite rows ever leave the database layer — always convert to these types.
+
+-- Bible Content --
+
+struct Verse: Identifiable, Hashable {
+    let id: String          // "GEN.1.1" — book.chapter.verse
+    let book: String        // "GEN"
+    let chapter: Int
+    let verseNumber: Int
+    let text: String
+    let strongsNumbers: [String]   // ["G0001", "H0002"] — empty if none
+}
+
+struct Chapter: Identifiable {
+    let id: String          // "GEN.1"
+    let book: String
+    let number: Int
+    var verses: [Verse]
+}
+
+struct Book: Identifiable {
+    let id: String          // "GEN"
+    let name: String
+    let shortName: String
+    let testament: Testament    // .old / .new
+    let chapterCount: Int
+}
+
+enum Testament { case old, new }
+
+struct Module: Identifiable {
+    let id: String          // filename without extension
+    let name: String
+    let abbreviation: String    // "KJV", "ASV", etc.
+    let language: String
+    let books: [Book]
+}
+
+-- User Data --
+
+struct Bookmark: Identifiable, Codable {
+    let id: UUID
+    let verseId: String     // "GEN.1.1"
+    let color: BookmarkColor
+    let note: String
+    let createdAt: Date
+}
+
+enum BookmarkColor: String, Codable, CaseIterable {
+    case yellow, blue, green, orange, purple
+}
+
+struct Note: Identifiable, Codable {
+    let id: UUID
+    let verseId: String
+    var text: String
+    let createdAt: Date
+    var updatedAt: Date
+}
+
+struct HighlightedVerse: Identifiable, Codable {
+    let id: UUID
+    let verseId: String
+    let color: BookmarkColor
+}
+
+-- Navigation --
+
+struct BibleLocation: Equatable, Hashable {
+    let moduleId: String
+    let book: String
+    let chapter: Int
+    var verseNumber: Int?       // nil = top of chapter
+}
+
+struct ReadingPane: Identifiable {
+    let id: UUID
+    var location: BibleLocation
+}
+
+--------------------------------------------------------------
+SECTION 2: STATE ARCHITECTURE (@Observable)
+--------------------------------------------------------------
+
+THREE stores. Each owns one domain. Views read only what they need — no cascade.
+
+-- BibleStore (@Observable) --
+Owns: loaded modules, active panes, navigation, verse data cache
+Source of truth for all reading state.
+
+@Observable
+final class BibleStore {
+    var modules: [Module] = []
+    var activeModuleId: String = ""
+    var panes: [ReadingPane] = []
+    var activePaneId: UUID? = nil
+    var loadingState: LoadingState = .idle
+
+    // Async load — never blocks main thread
+    func loadModules() async throws
+    func loadChapter(moduleId: String, book: String, chapter: Int) async throws -> [Verse]
+    func navigate(paneId: UUID, to location: BibleLocation) async
+}
+
+enum LoadingState { case idle, loading, loaded, error(String) }
+
+-- UserDataStore (@Observable) --
+Owns: bookmarks, notes, highlights, reading history
+Persisted to JSON in AppSupport. All mutations async to avoid main thread I/O.
+
+@Observable
+final class UserDataStore {
+    var bookmarks: [Bookmark] = []
+    var notes: [Note] = []
+    var highlights: [HighlightedVerse] = []
+    var readingHistory: [BibleLocation] = []
+
+    func addBookmark(_ bookmark: Bookmark) async
+    func deleteBookmark(id: UUID) async
+    func addNote(_ note: Note) async
+    func updateNote(id: UUID, text: String) async
+    func addHighlight(_ highlight: HighlightedVerse) async
+    func removeHighlight(verseId: String) async
+}
+
+-- UIStateStore (@Observable) --
+Owns: sidebar visibility, inspector panel, font size, search state, theme
+Ephemeral — not persisted (except font size + theme via @AppStorage).
+
+@Observable
+final class UIStateStore {
+    var sidebarVisible: Bool = true
+    var inspectorVisible: Bool = false
+    var searchVisible: Bool = false
+    var selectedVerseId: String? = nil
+    var inspectorTab: InspectorTab = .strongs
+    var fontSize: Double = 16.0    // @AppStorage backed
+    var searchQuery: String = ""
+    var searchResults: [Verse] = []
+}
+
+enum InspectorTab { case strongs, crossRef, notes, bookmarks }
+
+-- Environment Injection --
+All three stores injected at app root via .environment():
+
+    ContentView()
+        .environment(bibleStore)
+        .environment(userDataStore)
+        .environment(uiStateStore)
+
+Views declare: @Environment(BibleStore.self) private var bibleStore
+No singletons. No global state.
+
+-- @Bindable --
+Required for two-way bindings to @Observable properties in forms and editable fields.
+@Observable does NOT automatically support $ bindings like @ObservableObject did.
+
+Usage in a view:
+    @Environment(UIStateStore.self) private var uiState
+
+    var body: some View {
+        @Bindable var uiState = uiState   // creates bindable wrapper
+        TextField("Search", text: $uiState.searchQuery)
+        Toggle("Inspector", isOn: $uiState.inspectorVisible)
+    }
+
+Rule: only use @Bindable when you need a $ binding to an @Observable property.
+Read-only access to @Observable properties does NOT require @Bindable.
+
+--------------------------------------------------------------
+SECTION 3: ASYNC SQLITE (DatabaseService)
+--------------------------------------------------------------
+
+Rules:
+- ALL SQLite reads happen off main thread (Task or async func)
+- Use actor isolation — DatabaseService is an actor
+- Cache chapter results in BibleStore — don't re-query on every render
+- Task cancellation: use withTaskCancellationHandler on long queries
+
+actor DatabaseService {
+    private var connections: [String: Connection] = [:]  // moduleId → SQLite.swift Connection
+
+    func openModule(id: String, path: URL) throws
+    func closeModule(id: String)
+
+    func fetchVerses(moduleId: String, book: String, chapter: Int) async throws -> [Verse]
+    func fetchBooks(moduleId: String) async throws -> [Book]
+    func searchVerses(moduleId: String, query: String) async throws -> [Verse]
+}
+
+Usage pattern in BibleStore:
+    func loadChapter(...) async throws -> [Verse] {
+        return try await Task.detached(priority: .userInitiated) {
+            try await DatabaseService.shared.fetchVerses(...)
+        }.value
+    }
+
+SQLite schema expected per module:
+    CREATE TABLE verses (
+        book        TEXT NOT NULL,
+        chapter     INTEGER NOT NULL,
+        verse       INTEGER NOT NULL,
+        text        TEXT NOT NULL,
+        strongs     TEXT,           -- comma-separated or JSON array
+        PRIMARY KEY (book, chapter, verse)
+    )
+
+--------------------------------------------------------------
+SECTION 4: NATIVE GLASS EFFECT (.glassEffect)
+--------------------------------------------------------------
+
+Requires: macOS 15+ (Tahoe). SwiftUI only. Do NOT wrap NSVisualEffectView.
+
+Basic usage:
+    someView
+        .glassEffect()
+
+With shape:
+    someView
+        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+
+With tint:
+    someView
+        .glassEffect(Glass(tint: .blue.opacity(0.15)), in: .rect(cornerRadius: 16))
+
+Rules for correct rendering:
+1. Apply .glassEffect() at the CONTAINER level — not per-row or per-cell
+2. Glass needs a real background behind it (window chrome / wallpaper) — test against varied backgrounds
+3. Don't stack multiple glass layers — one per visual region
+4. Text on glass: use .primary label color, NOT hardcoded white/black
+5. Icons on glass: use SF Symbols with .hierarchical or .palette rendering
+6. Sidebar: use List inside a glass container, not a custom VStack
+7. Sheets/popovers: use .presentationBackground(.glass) — not custom backgrounds
+
+Anti-patterns (do NOT do):
+- NSVisualEffectView wrapped in NSViewRepresentable — wrong rendering path
+- .background(.ultraThinMaterial) stacked under .glassEffect() — double layer
+- Hardcoded colors on glass surfaces — breaks vibrancy
+- .glassEffect() on every List row — kills performance
+
+Toolbar:
+    .toolbar {
+        ToolbarItem { someButton.glassEffect(in: Circle()) }
+    }
+
+Matched glass transitions (.glassEffectID):
+Used when a glass surface should animate smoothly from one position to another
+(e.g. selected verse indicator following selection across panes).
+Requires @Namespace in the parent view.
+
+    @Namespace private var glassNamespace
+
+    // On the moving glass element:
+    .glassEffect(in: RoundedRectangle(cornerRadius: 8))
+    .glassEffectID("selectedVerse", in: glassNamespace)
+
+    // SwiftUI matches elements with the same ID+namespace and interpolates
+    // the glass effect between positions automatically.
+    // Use unique string IDs per logical glass "actor" in the UI.
+
+--------------------------------------------------------------
+SECTION 5: VIEW HIERARCHY (top-down build order)
+--------------------------------------------------------------
+
+Build in this order. Do not build lower layers before upper layers are solid.
+
+1. AppEntry       — @main, inject stores, WindowGroup + .environment()
+2. ContentView    — HSplitView: [Sidebar | ReaderArea | Inspector]
+3. SidebarView    — book/chapter list, module picker, bookmarks tab
+4. ReaderArea     — manages [ReadingPane] array, handles pane add/remove
+5. ReaderView     — single pane: chapter header + ScrollView of verses
+6. VerseRow       — single verse: text, strongs tap, action buttons
+7. InspectorView  — strongs lookup, cross-refs, notes, bookmarks
+8. SearchView     — overlay sheet with results list
+9. SettingsView   — font size, theme, module management
+
+--------------------------------------------------------------
+SECTION 6: ANIMATION CONVENTIONS
+--------------------------------------------------------------
+
+One spring to rule them all — consistent throughout app:
+    .spring(duration: 0.35, bounce: 0.2)
+
+Hover:
+    .scaleEffect(isHovering ? 1.03 : 1.0)
+    .animation(.spring(duration: 0.2, bounce: 0.3), value: isHovering)
+
+Verse selection:
+    .background(isSelected ? Color.accentColor.opacity(0.15) : .clear)
+    .animation(.spring(duration: 0.25, bounce: 0.1), value: isSelected)
+
+Page/chapter transition:
+    .transition(.asymmetric(
+        insertion: .move(edge: .trailing).combined(with: .opacity),
+        removal: .move(edge: .leading).combined(with: .opacity)
+    ))
+
+Loading skeleton: use redacted() modifier on placeholder verse rows.
+
+--------------------------------------------------------------
+END OF DEFINITIONS
+--------------------------------------------------------------

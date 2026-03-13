@@ -1,0 +1,294 @@
+==============================================================
+  BIBLEREADER MAC 2 — FIX & COMPLETE STEPS
+  Reference: /workspace/BibleReaderMac2/definitions.txt
+  Baseline: All 13 build steps complete. This fixes gaps.
+==============================================================
+
+Each step below is one /task prompt. Run them in order.
+Every step must read definitions.txt FIRST.
+Do NOT skip ahead or combine steps.
+
+--------------------------------------------------------------
+STEP 1: BibleStore — Pane Cap + Panel Sync Infrastructure
+--------------------------------------------------------------
+File: Store/BibleStore.swift
+
+1A. Cap panes at 8:
+  - In addPane(), add: guard panes.count < 8 else { return }
+  - Before the existing let location line
+
+1B. Add panel sync properties and logic:
+  - Add property: var syncEnabled: Bool = false
+  - Add property: var syncedLocation: BibleLocation? = nil
+  - Add method: func toggleSync() — flips syncEnabled
+  - Modify navigate(paneId:to:) — when syncEnabled is true, after
+    navigating the requested pane, also navigate ALL other panes to the
+    equivalent location. Use convertPosition() for versification-aware
+    conversion between modules. Only update the book/chapter — keep each
+    pane's own moduleId. Set syncedLocation to the new location.
+  - Add method: func syncScrollPosition(verseId: String) — stores the
+    current scroll target so other panes can follow. Add property:
+    var syncedVerseId: String? = nil
+
+Do NOT touch any views in this step. Store-only changes.
+
+--------------------------------------------------------------
+STEP 2: UIStateStore — Search Module Selector
+--------------------------------------------------------------
+File: Store/UIStateStore.swift
+
+2A. Add property: var searchModuleId: String = ""
+  - This tracks which module the search targets (independent of active pane)
+
+2B. Modify performSearch(using:) to use searchModuleId instead of
+    bibleStore.activeModuleId:
+  - If searchModuleId is empty, fall back to bibleStore.activeModuleId
+  - Otherwise use searchModuleId
+
+Store-only. No view changes.
+
+--------------------------------------------------------------
+STEP 3: ModuleManager — Import Helper
+--------------------------------------------------------------
+File: Services/ModuleManager.swift
+
+Add a static method:
+  static func importModule(from sourceURL: URL) throws -> ModuleInfo
+    - Copies the file from sourceURL to userModulesDirectory()
+    - If a file with the same name already exists, throw an error (don't overwrite)
+    - Returns the new ModuleInfo with source: .user
+    - Uses FileManager.default.copyItem(at:to:)
+    - sourceURL may need security-scoped access: call
+      sourceURL.startAccessingSecurityScopedResource() before copy,
+      sourceURL.stopAccessingSecurityScopedResource() after
+
+Service-only. No view changes.
+
+--------------------------------------------------------------
+STEP 4: ContentView — Sync Toggle Button in Toolbar
+--------------------------------------------------------------
+File: Views/ContentView.swift
+
+Add a toolbar button for panel sync:
+  - Place it in the same ToolbarItemGroup as the split buttons
+  - Icon: "link" when syncEnabled, "link.badge.plus" when not
+  - Toggles bibleStore.syncEnabled via bibleStore.toggleSync()
+  - .help("Sync Panels")
+  - Use withAnimation(.spring(duration: 0.35, bounce: 0.2))
+
+Only touch ContentView toolbar. Nothing else.
+
+--------------------------------------------------------------
+STEP 5: ReaderView — Sync Scroll Support
+--------------------------------------------------------------
+File: Views/ReaderView.swift
+
+5A. Add ScrollViewReader around the ScrollView in verseList:
+  - Wrap the existing ScrollView { LazyVStack { ... } } inside
+    ScrollViewReader { proxy in ... }
+  - Each VerseRow should have .id(verse.id) on it (may already exist
+    via ForEach id)
+
+5B. When bibleStore.syncEnabled is true and bibleStore.syncedVerseId
+    changes, scroll to that verse:
+  - Use .onChange(of: bibleStore.syncedVerseId) to call
+    proxy.scrollTo(verseId, anchor: .top) with animation
+  - Only scroll if this pane is NOT the one that initiated the sync
+    (compare pane.id != bibleStore.activePaneId)
+
+5C. When bibleStore.syncEnabled is true and syncedLocation changes
+    with a different book/chapter than this pane's current location,
+    navigate this pane to the equivalent location:
+  - Use .onChange(of: bibleStore.syncedLocation)
+  - Call bibleStore.navigate(paneId: pane.id, to: convertedLocation)
+    where convertedLocation uses bibleStore.convertPosition() to map
+    from syncedLocation's module to this pane's module
+
+Only touch ReaderView. Nothing else.
+
+--------------------------------------------------------------
+STEP 6: VerseRow — Verse Number as Cross-Ref Trigger
+--------------------------------------------------------------
+File: Views/VerseRow.swift
+
+Change the verse number from plain Text to a Button:
+  - Make Text("\(verse.verseNumber)") a Button
+  - On tap: call onSelect() AND switch inspector to cross-refs tab
+  - Add a new callback parameter: onVerseNumberTap: () -> Void
+  - In the callback (wired from ReaderView): set
+    uiState.selectedVerseId = verse.id,
+    uiState.inspectorTab = .crossReferences,
+    uiState.inspectorVisible = true
+
+Update ReaderView to pass the new onVerseNumberTap callback.
+
+--------------------------------------------------------------
+STEP 7: SearchView — Module Selector
+--------------------------------------------------------------
+File: Views/SearchView.swift
+
+7A. Add a module picker above the search field:
+  - Picker (or Menu) listing all bibleStore.modules by abbreviation
+  - Bound to uiState.searchModuleId (@Bindable)
+  - Default: active module (set searchModuleId to activeModuleId in
+    .onAppear if it's empty)
+
+7B. Update the placeholder text to show the selected module name
+    instead of only the active module.
+
+7C. Results should show which module they came from if searching a
+    different module than the active pane's module.
+
+Only touch SearchView.
+
+--------------------------------------------------------------
+STEP 8: SettingsView — Module Import + Language Picker
+--------------------------------------------------------------
+File: Views/SettingsView.swift
+
+8A. Module import button:
+  - Add "Import Module" button below the module list
+  - Use .fileImporter(isPresented:allowedContentTypes:) modifier
+  - Content type: .data (or create a UTType for .brbmod)
+  - On success: call ModuleManager.importModule(from: url)
+  - After import: refresh installedModules list
+  - Show an alert on error (duplicate file, copy failed, etc.)
+
+8B. Language picker:
+  - Add a new Section("Language") in the form
+  - Picker with two options: English, Russian (Русский)
+  - Store selection in @AppStorage("appLanguage") defaulting to "en"
+  - Add property to UIStateStore: @ObservationIgnored @AppStorage("appLanguage") var appLanguage: String = "en"
+  - The actual string localization is done in Step 9
+
+Only touch SettingsView and UIStateStore (for the appLanguage property).
+
+--------------------------------------------------------------
+STEP 9: Localization — English + Russian
+--------------------------------------------------------------
+Create: Localizable.xcstrings (or Localizable.strings for en + ru)
+
+9A. Extract all hardcoded UI strings from every view file:
+  - Sidebar: "Old Testament", "New Testament", module picker labels
+  - ReaderView: "Chapter", "Previous Chapter", "Next Chapter", "No Verses"
+  - InspectorView: tab labels ("Strong's", "Cross-Refs", "Notes", "Bookmarks"),
+    all button labels, "Definition", "Transliteration", etc.
+  - SearchView: "Search in...", "No Results", etc.
+  - SettingsView: all section headers, labels, about text
+  - ContentView: all toolbar help strings
+  - VerseRow: context menu labels ("Bookmark", "Highlight", "Add Note", etc.)
+
+9B. Replace each string with String(localized:) or LocalizedStringKey:
+  - Example: Text("Old Testament") → Text("sidebar.oldTestament")
+  - For strings with interpolation use String(localized:) with arguments
+
+9C. Create Russian translations for every key.
+
+9D. Book names — add a BibleBooks.localizedName(for:language:) method:
+  - File: Utilities/BibleBooks.swift
+  - Maps canonical book IDs to Russian names (Бытие, Исход, Левит, etc.)
+  - SidebarView and ReaderView header should use this for display
+
+9E. Wire language selection to the app:
+  - Read uiStateStore.appLanguage
+  - Use .environment(\.locale, Locale(identifier: appLanguage)) on the
+    root ContentView in BibleReaderMac2App.swift
+
+This step touches: every view file (string replacements), BibleBooks.swift,
+BibleReaderMac2App.swift, and creates the localization file(s).
+
+--------------------------------------------------------------
+STEP 10: InspectorView — Pane-Aware Navigation
+--------------------------------------------------------------
+File: Views/InspectorView.swift
+
+When the user taps a verse in Strong's results or Cross-References to
+navigate to it:
+
+10A. If bibleStore.syncEnabled — navigate the active pane (sync will
+     handle the rest).
+
+10B. If sync is OFF — show a small pane picker:
+  - If only 1 pane exists, navigate it directly (current behavior)
+  - If 2+ panes exist, show a popover/menu listing panes by their
+    module abbreviation + current location
+  - User picks which pane to navigate
+  - Alternative: always navigate the active pane (simpler). Pick one.
+
+10C. When navigating from Strong's/cross-refs with sync ON, also
+     call bibleStore.syncScrollPosition(verseId:) so all synced panes
+     scroll to the target verse.
+
+Only touch InspectorView.
+
+--------------------------------------------------------------
+STEP 11: PDF Export — ExportNotesView
+--------------------------------------------------------------
+Create: Views/ExportNotesView.swift
+
+11A. New view presented as a sheet from ContentView (add toolbar button
+     with doc.text icon, or menu item under File).
+
+11B. Note selection:
+  - List all notes from userDataStore.notes
+  - Each row: checkbox (Toggle), verse reference, note preview
+  - "Select All" / "Deselect All" buttons
+  - Show total selected count
+
+11C. Sort order:
+  - Picker: "By Book Order", "By Date (Newest)", "By Date (Oldest)"
+  - "By Book Order" uses BibleBooks.sortIndex to order by canonical position
+  - Optionally: drag-to-reorder for custom order (List with .onMove)
+
+11D. Bible quotation source:
+  - Multi-select list of loaded modules (checkboxes)
+  - Selected modules will have their verse text quoted alongside each note
+  - Example output: note text, then KJV quote, then RST quote
+
+11E. Font size:
+  - Slider from 8 to 18 pt for the PDF body text
+  - Preview label showing sample size
+
+11F. Export button:
+  - "Export PDF" button at the bottom
+  - Opens NSSavePanel for destination file selection
+  - Default filename: "Bible Notes Export.pdf"
+
+11G. PDF generation:
+  - Use NSMutableAttributedString + NSTextStorage approach, OR
+  - Core Graphics PDF context (UIGraphicsPDFRenderer is iOS-only, so
+    use CGContext with PDF media box on macOS)
+  - Layout per note:
+    * Verse reference as header (bold, larger)
+    * Note text (body size)
+    * For each selected module: verse quotation in italics with module
+      abbreviation label
+    * Horizontal rule between notes
+  - Page breaks: track Y position, start new page when content exceeds
+    page height minus margins
+  - Page size: US Letter (612 x 792 points)
+  - Margins: 72 pt (1 inch) all sides
+
+11H. Wire into ContentView:
+  - Add toolbar button or menu item to open ExportNotesView
+  - Pass userDataStore and bibleStore via environment (already injected)
+
+--------------------------------------------------------------
+STEP 12: Final Wiring + Polish
+--------------------------------------------------------------
+Review pass across all files touched in Steps 1-11:
+
+12A. Verify all new @AppStorage properties use @ObservationIgnored
+12B. Verify all async calls use Task { await ... } not blocking
+12C. Verify .spring(duration: 0.35, bounce: 0.2) used for all new animations
+12D. Verify no NSVisualEffectView — only .glassEffect() and .presentationBackground(.glass)
+12E. Verify sync toggle state is visually clear in toolbar (highlighted when active)
+12F. Verify search module picker defaults correctly on first open
+12G. Verify PDF export handles empty note selection gracefully (disable button)
+12H. Verify module import refreshes the module list in both SettingsView AND BibleStore
+12I. Add keyboard shortcut for sync toggle: Cmd+L (or similar unused combo)
+12J. Test: open 4 panes with different modules, enable sync, navigate — all should follow
+
+--------------------------------------------------------------
+END — After all 12 steps the app should have all 8 features complete.
+--------------------------------------------------------------
