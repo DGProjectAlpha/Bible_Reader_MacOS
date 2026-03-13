@@ -36,7 +36,7 @@ struct SearchView: View {
 
             // Results
             if uiState.searchResults.isEmpty && !uiState.searchQuery.isEmpty {
-                ContentUnavailableView("No Results", systemImage: "magnifyingglass", description: Text("No verses match "\(uiState.searchQuery)""))
+                ContentUnavailableView("No Results", systemImage: "magnifyingglass", description: Text("No verses match \"\(uiState.searchQuery)\""))
                     .frame(maxHeight: .infinity)
             } else {
                 List(uiState.searchResults) { verse in
@@ -60,7 +60,7 @@ struct SearchView: View {
             }
         }
         .frame(minWidth: 350, idealWidth: 450, minHeight: 300, idealHeight: 500)
-        .presentationBackground(.glass)
+        .background(.ultraThinMaterial)
     }
 
     // MARK: - Helpers
