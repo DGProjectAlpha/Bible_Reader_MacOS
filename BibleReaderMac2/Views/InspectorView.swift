@@ -806,7 +806,7 @@ struct InspectorView: View {
 
                         Divider()
 
-                        ForEach(sorted) { bookmark in
+                        ForEach(userDataStore.bookmarks.sorted(by: { $0.dateAdded > $1.dateAdded })) { bookmark in
                             bookmarkListRow(bookmark)
                         }
                     }
