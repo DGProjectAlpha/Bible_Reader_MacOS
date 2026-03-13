@@ -52,7 +52,7 @@ struct SidebarView: View {
             isExpanded: uiStateStore.bindingForSection(.bookmarks)
         ) {
             if userDataStore.bookmarks.isEmpty {
-                Text("No bookmarks yet")
+                Text("sidebar.noBookmarksYet")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             } else {
@@ -81,13 +81,13 @@ struct SidebarView: View {
                         Button(role: .destructive) {
                             Task { await userDataStore.deleteBookmark(id: bookmark.id) }
                         } label: {
-                            Label("Remove Bookmark", systemImage: "trash")
+                            Label("sidebar.removeBookmark", systemImage: "trash")
                         }
                     }
                 }
             }
         } label: {
-            Label("Bookmarks", systemImage: "bookmark.fill")
+            Label("sidebar.bookmarks", systemImage: "bookmark.fill")
         }
         .padding(.vertical, 2)
 
@@ -101,7 +101,7 @@ struct SidebarView: View {
         ) {
             let grouped = Dictionary(grouping: userDataStore.highlights) { $0.color }
             if grouped.isEmpty {
-                Text("No highlights yet")
+                Text("sidebar.noHighlightsYet")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             } else {
@@ -120,7 +120,7 @@ struct SidebarView: View {
                                     Button(role: .destructive) {
                                         Task { await userDataStore.removeHighlight(verseId: highlight.verseId) }
                                     } label: {
-                                        Label("Remove Highlight", systemImage: "trash")
+                                        Label("sidebar.removeHighlight", systemImage: "trash")
                                     }
                                 }
                             }
@@ -129,7 +129,7 @@ struct SidebarView: View {
                                 Circle()
                                     .fill(swiftColor(for: color))
                                     .frame(width: 8, height: 8)
-                                Text(color.rawValue.capitalized)
+                                Text(String(localized: String.LocalizationValue("color.\(color.rawValue)")))
                                     .font(.caption)
                             }
                         }
@@ -137,7 +137,7 @@ struct SidebarView: View {
                 }
             }
         } label: {
-            Label("Highlights", systemImage: "paintbrush")
+            Label("sidebar.highlights", systemImage: "paintbrush")
         }
         .padding(.vertical, 2)
     }
@@ -149,7 +149,7 @@ struct SidebarView: View {
             isExpanded: uiStateStore.bindingForSection(.notes)
         ) {
             if userDataStore.notes.isEmpty {
-                Text("No notes yet")
+                Text("sidebar.noNotesYet")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             } else {
@@ -165,13 +165,13 @@ struct SidebarView: View {
                                 .background(Color(.textBackgroundColor).opacity(0.5))
                                 .cornerRadius(4)
                             HStack(spacing: 8) {
-                                Button("Save") {
+                                Button("sidebar.save") {
                                     commitNoteEdit(noteId: note.id)
                                 }
                                 .font(.caption)
                                 .buttonStyle(.borderedProminent)
                                 .controlSize(.small)
-                                Button("Cancel") {
+                                Button("sidebar.cancel") {
                                     editingNoteId = nil
                                     editingNoteText = ""
                                 }
@@ -202,19 +202,19 @@ struct SidebarView: View {
                                 editingNoteId = note.id
                                 editingNoteText = note.text
                             } label: {
-                                Label("Edit Note", systemImage: "pencil")
+                                Label("sidebar.editNote", systemImage: "pencil")
                             }
                             Button(role: .destructive) {
                                 Task { await userDataStore.deleteNote(id: note.id) }
                             } label: {
-                                Label("Delete Note", systemImage: "trash")
+                                Label("sidebar.deleteNote", systemImage: "trash")
                             }
                         }
                     }
                 }
             }
         } label: {
-            Label("Notes", systemImage: "note.text")
+            Label("sidebar.notes", systemImage: "note.text")
         }
         .padding(.vertical, 2)
     }
@@ -244,7 +244,7 @@ struct SidebarView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                 } else if wordTags.isEmpty {
-                    Text("No Strong's data for this verse")
+                    Text("sidebar.noStrongsData")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 } else {
@@ -253,12 +253,12 @@ struct SidebarView: View {
                     }
                 }
             } else {
-                Text("Select a verse to view Strong's numbers")
+                Text("sidebar.selectVerseStrongs")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
         } label: {
-            Label("Strong's Numbers", systemImage: "textformat.123")
+            Label("sidebar.strongsNumbers", systemImage: "textformat.123")
         }
         .padding(.vertical, 2)
     }
@@ -308,7 +308,7 @@ struct SidebarView: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "chevron.left")
-                    Text("Back to words")
+                    Text("sidebar.backToWords")
                 }
                 .font(.caption)
             }
@@ -340,7 +340,7 @@ struct SidebarView: View {
                     }
 
                     if let kjvDef = entry.kjvDefinition, !kjvDef.isEmpty {
-                        Text("KJV: \(kjvDef)")
+                        Text("common.kjvPrefix \(kjvDef)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -351,7 +351,7 @@ struct SidebarView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
                 } else if !strongsVerses.isEmpty {
-                    Section("Verses (\(strongsVerses.count))") {
+                    Section("sidebar.versesCount \(strongsVerses.count)") {
                         ForEach(strongsVerses.prefix(15)) { ref in
                             Button {
                                 navigateToStrongsVerse(ref)
@@ -369,7 +369,7 @@ struct SidebarView: View {
                             .buttonStyle(.plain)
                         }
                         if strongsVerses.count > 15 {
-                            Text("+ \(strongsVerses.count - 15) more")
+                            Text("sidebar.moreCount \(strongsVerses.count - 15)")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                         }
@@ -377,7 +377,7 @@ struct SidebarView: View {
                 }
 
                 if !similarEntries.isEmpty {
-                    Section("Related") {
+                    Section("sidebar.related") {
                         ForEach(similarEntries.prefix(6)) { similar in
                             Button {
                                 selectedStrongsEntry = similar
@@ -414,7 +414,7 @@ struct SidebarView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                 } else if crossRefs.isEmpty {
-                    Text("No cross-references for this verse")
+                    Text("sidebar.noCrossReferences")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 } else {
@@ -436,12 +436,12 @@ struct SidebarView: View {
                     }
                 }
             } else {
-                Text("Select a verse to view cross references")
+                Text("sidebar.selectVerseCrossRefs")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
         } label: {
-            Label("Cross References", systemImage: "arrow.triangle.branch")
+            Label("sidebar.crossReferences", systemImage: "arrow.triangle.branch")
         }
         .padding(.vertical, 2)
     }
@@ -459,7 +459,7 @@ struct SidebarView: View {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
                         .font(.caption)
-                    TextField("Search in \(activeModuleName)…", text: $uiState.searchQuery)
+                    TextField("sidebar.searchIn \(activeModuleName)", text: $uiState.searchQuery)
                         .textFieldStyle(.plain)
                         .font(.subheadline)
                         .onSubmit {
@@ -482,29 +482,34 @@ struct SidebarView: View {
             }
 
             if uiStateStore.searchResults.isEmpty && !uiStateStore.searchQuery.isEmpty {
-                Text("No results for \"\(uiStateStore.searchQuery)\"")
+                Text("sidebar.noResultsFor \(uiStateStore.searchQuery)")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
-            } else {
-                ForEach(uiStateStore.searchResults) { verse in
-                    Button {
-                        navigateToSearchResult(verse)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(verseReference(verse))
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.secondary)
-                            Text(verse.text)
-                                .font(.caption)
-                                .lineLimit(2)
+            } else if !uiStateStore.searchResults.isEmpty {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(uiStateStore.searchResults) { verse in
+                            Button {
+                                navigateToSearchResult(verse)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(verseReference(verse))
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.secondary)
+                                    Text(verse.text)
+                                        .font(.caption)
+                                        .lineLimit(2)
+                                }
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .buttonStyle(.plain)
                 }
+                .frame(maxHeight: 300)
             }
         } label: {
-            Label("Search", systemImage: "magnifyingglass")
+            Label("sidebar.search", systemImage: "magnifyingglass")
         }
         .padding(.vertical, 2)
     }
@@ -516,7 +521,7 @@ struct SidebarView: View {
             isExpanded: uiStateStore.bindingForSection(.recentHistory)
         ) {
             if userDataStore.readingHistory.isEmpty {
-                Text("No recent history")
+                Text("sidebar.noRecentHistory")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             } else {
@@ -536,7 +541,7 @@ struct SidebarView: View {
                 }
 
                 if !userDataStore.readingHistory.isEmpty {
-                    Button("Clear History") {
+                    Button("sidebar.clearHistory") {
                         Task { await userDataStore.clearHistory() }
                     }
                     .font(.caption)
@@ -544,7 +549,7 @@ struct SidebarView: View {
                 }
             }
         } label: {
-            Label("Recent History", systemImage: "clock")
+            Label("sidebar.recentHistory", systemImage: "clock")
         }
         .padding(.vertical, 2)
     }
