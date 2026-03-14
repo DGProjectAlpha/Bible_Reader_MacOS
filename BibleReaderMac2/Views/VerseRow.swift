@@ -432,7 +432,7 @@ private extension View {
     @ViewBuilder
     func if_available_glass_background() -> some View {
         if #available(macOS 26.0, *) {
-            self.presentationBackground(.glass)
+            self.presentationBackground(Glass.regular)
         } else {
             self.presentationBackground(.ultraThinMaterial)
         }
