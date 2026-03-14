@@ -18,6 +18,7 @@
 		A10000208 /* Book.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000108 /* Book.swift */; };
 		A10000209 /* HighlightedVerse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000109 /* HighlightedVerse.swift */; };
 		A1000020A /* Verse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010A /* Verse.swift */; };
+		A10000222 /* SearchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000120 /* SearchResult.swift */; };
 		A1000020B /* UserDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010B /* UserDataStore.swift */; };
 		A1000020C /* UIStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010C /* UIStateStore.swift */; };
 		A1000020D /* BibleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010D /* BibleStore.swift */; };
@@ -57,6 +58,7 @@
 		A10000108 /* Book.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Book.swift; sourceTree = "<group>"; };
 		A10000109 /* HighlightedVerse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightedVerse.swift; sourceTree = "<group>"; };
 		A1000010A /* Verse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Verse.swift; sourceTree = "<group>"; };
+		A10000120 /* SearchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResult.swift; sourceTree = "<group>"; };
 		A1000010B /* UserDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDataStore.swift; sourceTree = "<group>"; };
 		A1000010C /* UIStateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIStateStore.swift; sourceTree = "<group>"; };
 		A1000010D /* BibleStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleStore.swift; sourceTree = "<group>"; };
@@ -134,6 +136,7 @@
 				A10000104 /* Note.swift */,
 				A10000103 /* ReadingPane.swift */,
 				A1000010A /* Verse.swift */,
+				A10000120 /* SearchResult.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -311,6 +314,7 @@
 				A1000021D /* PaneToolbar.swift in Sources */,
 				A1000021E /* SelectableVerseText.swift in Sources */,
 				A1000021F /* HighlightBubble.swift in Sources */,
+				A10000222 /* SearchResult.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

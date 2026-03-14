@@ -14,7 +14,9 @@ final class UIStateStore {
     var selectedStrongsId: String? = nil
     var selectedStrongsWord: String? = nil
 
-    @AppStorage("appLanguage") var appLanguage: String = "en"
+    var appLanguage: String = UserDefaults.standard.string(forKey: "appLanguage") ?? "en" {
+        didSet { UserDefaults.standard.set(appLanguage, forKey: "appLanguage") }
+    }
 
     var fontSize: Double = UserDefaults.standard.double(forKey: "fontSize") == 0
         ? 16.0
