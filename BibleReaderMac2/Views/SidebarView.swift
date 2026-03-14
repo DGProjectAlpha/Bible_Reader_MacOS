@@ -1017,19 +1017,6 @@ struct SidebarView: View {
         }
     }
 
-    private func navigateToStrongsVerse(_ ref: StrongsVerseReference) {
-        let moduleId = bibleStore.activeModuleId
-        let location = BibleLocation(moduleId: moduleId, book: ref.book, chapter: ref.chapter, verseNumber: ref.verse)
-        Task {
-            if let paneId = bibleStore.activePaneId {
-                await bibleStore.navigate(paneId: paneId, to: location)
-            }
-            await MainActor.run {
-                uiStateStore.selectedVerseId = "\(ref.book).\(ref.chapter).\(ref.verse)"
-            }
-        }
-    }
-
     private func navigateToSearchResult(_ result: SearchResult) {
         guard let paneId = bibleStore.activePaneId else { return }
         let location = BibleLocation(
