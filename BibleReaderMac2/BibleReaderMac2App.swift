@@ -43,7 +43,6 @@ struct BibleReaderMac2App: App {
 
                 Button(String(localized: "menu.search")) {
                     uiStateStore.sidebarVisible = true
-                    uiStateStore.expandedSidebarSections.insert(SidebarSection.search.rawValue)
                 }
                 .keyboardShortcut("f", modifiers: .command)
             }

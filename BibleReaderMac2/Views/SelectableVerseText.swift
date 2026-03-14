@@ -20,16 +20,27 @@ struct SelectableVerseText: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let textView = VerseNSTextView()
+        // Build an explicit TextKit 1 stack so character-level hit testing
+        // (layoutManager.characterIndex(for:in:…)) works on macOS 14+
+        // where NSTextView defaults to TextKit 2 (layoutManager == nil).
+        let textContainer = NSTextContainer()
+        textContainer.widthTracksTextView = true
+        textContainer.lineFragmentPadding = 0
+
+        let layoutManager = NSLayoutManager()
+        layoutManager.addTextContainer(textContainer)
+
+        let textStorage = NSTextStorage()
+        textStorage.addLayoutManager(layoutManager)
+
+        let textView = VerseNSTextView(frame: .zero, textContainer: textContainer)
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
-        textView.isRichText = false
+        textView.isRichText = true          // preserve custom attrs (.strongsNumber)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.textContainerInset = .zero
-        textView.textContainer?.lineFragmentPadding = 0
-        textView.textContainer?.widthTracksTextView = true
         textView.delegate = context.coordinator
         textView.coordinator = context.coordinator
         context.coordinator.textView = textView
@@ -147,7 +158,6 @@ final class IntrinsicScrollView: NSScrollView {
 /// Also detects single clicks on words with Strong's numbers (vs drag-to-select).
 final class VerseNSTextView: NSTextView {
     weak var coordinator: SelectableVerseText.Coordinator?
-    private var mouseDownLocation: NSPoint?
     /// Maximum distance (pts) between mouseDown and mouseUp to count as a click.
     private let clickThreshold: CGFloat = 3.0
 
@@ -180,32 +190,33 @@ final class VerseNSTextView: NSTextView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        mouseDownLocation = convert(event.locationInWindow, from: nil)
+        let downLocation = convert(event.locationInWindow, from: nil)
+        // super.mouseDown runs an internal tracking loop that consumes the
+        // mouseUp event, so our mouseUp override would never fire.  Instead,
+        // detect clicks here after super returns (tracking loop complete).
         super.mouseDown(with: event)
-    }
 
-    override func mouseUp(with event: NSEvent) {
-        defer { mouseDownLocation = nil }
-        let upLocation = convert(event.locationInWindow, from: nil)
-
-        // Only treat as a click if the mouse barely moved (not a drag/selection).
-        if let downLoc = mouseDownLocation {
-            let dx = upLocation.x - downLoc.x
-            let dy = upLocation.y - downLoc.y
-            let distance = sqrt(dx * dx + dy * dy)
-            if distance <= clickThreshold, selectedRange().length == 0 {
-                handleWordClick(at: upLocation)
-            }
+        // After the tracking loop, check if it was a simple click (no drag).
+        guard selectedRange().length == 0 else { return }
+        let upLocation: NSPoint
+        if let current = NSApp.currentEvent, current.type == .leftMouseUp {
+            upLocation = convert(current.locationInWindow, from: nil)
+        } else {
+            upLocation = downLocation
         }
-
-        super.mouseUp(with: event)
+        let dx = upLocation.x - downLocation.x
+        let dy = upLocation.y - downLocation.y
+        let distance = sqrt(dx * dx + dy * dy)
+        if distance <= clickThreshold {
+            handleWordClick(at: upLocation)
+        }
     }
 
     private func handleWordClick(at point: NSPoint) {
         guard let textStorage = textStorage else { return }
 
         let charIndex = characterIndex(at: point)
-        guard charIndex < textStorage.length else { return }
+        guard charIndex != NSNotFound, charIndex < textStorage.length else { return }
 
         // First try: check for explicit Strong's attribute on the word
         let attrs = textStorage.attributes(at: charIndex, effectiveRange: nil)

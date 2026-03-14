@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct SidebarView: View {
-    let sidebarHeight: CGFloat
-
     @Environment(BibleStore.self) private var bibleStore
     @Environment(UIStateStore.self) private var uiStateStore
     @Environment(UserDataStore.self) private var userDataStore
@@ -36,37 +34,52 @@ struct SidebarView: View {
     // MARK: - Body
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                bookmarksSection
-                highlightsSection
-                notesSection
-                strongsSection
-                crossReferencesSection
+        GeometryReader { geometry in
+            let availableHeight = geometry.size.height
+            VStack(spacing: 0) {
+                // Pinned search bar at top
                 searchSection
-                recentHistorySection
+                    .padding(.horizontal, 8)
+                    .padding(.top, 38)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        bookmarksSection(availableHeight: availableHeight)
+                        highlightsSection(availableHeight: availableHeight)
+                        notesSection(availableHeight: availableHeight)
+                        strongsSection(availableHeight: availableHeight)
+                        crossReferencesSection(availableHeight: availableHeight)
+                        recentHistorySection(availableHeight: availableHeight)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 4)
+                }
             }
-            .padding(.horizontal, 8)
-            .padding(.top, 38)
-            .padding(.bottom, 4)
         }
-        .frame(maxHeight: sidebarHeight - 8)
         .symbolRenderingMode(.hierarchical)
         .onChange(of: uiStateStore.selectedVerseId) {
             loadStrongsData()
             loadCrossRefData()
         }
         .onChange(of: uiStateStore.selectedStrongsId) {
-            autoSelectStrongsEntry()
+            if wordTags.isEmpty {
+                loadStrongsData()
+            } else {
+                autoSelectStrongsEntry()
+            }
         }
         .onChange(of: uiStateStore.selectedStrongsWord) {
-            autoSelectStrongsEntryByWord()
+            if wordTags.isEmpty {
+                loadStrongsData()
+            } else {
+                autoSelectStrongsEntryByWord()
+            }
         }
     }
 
     // MARK: - 1. Bookmarks
 
-    private var bookmarksSection: some View {
+    private func bookmarksSection(availableHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header (always visible)
             Button {
@@ -135,14 +148,14 @@ struct SidebarView: View {
                     }
                     .padding(.leading, 6)
                 }
-                .frame(maxHeight: sidebarHeight * 0.4)
+                .frame(maxHeight: availableHeight * 0.4)
             }
         }
     }
 
     // MARK: - 2. Highlights
 
-    private var highlightsSection: some View {
+    private func highlightsSection(availableHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header (always visible)
             Button {
@@ -200,7 +213,7 @@ struct SidebarView: View {
                     }
                     .padding(.leading, 6)
                 }
-                .frame(maxHeight: sidebarHeight * 0.4)
+                .frame(maxHeight: availableHeight * 0.4)
             }
         }
     }
@@ -266,7 +279,7 @@ struct SidebarView: View {
 
     // MARK: - 3. Notes
 
-    private var notesSection: some View {
+    private func notesSection(availableHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header (always visible)
             Button {
@@ -363,7 +376,7 @@ struct SidebarView: View {
                     }
                     .padding(.leading, 6)
                 }
-                .frame(maxHeight: sidebarHeight * 0.4)
+                .frame(maxHeight: availableHeight * 0.4)
             }
         }
     }
@@ -386,7 +399,7 @@ struct SidebarView: View {
 
     // MARK: - 4. Strong's Numbers
 
-    private var strongsSection: some View {
+    private func strongsSection(availableHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header (always visible)
             Button {
@@ -441,7 +454,7 @@ struct SidebarView: View {
                     }
                     .padding(.leading, 6)
                 }
-                .frame(maxHeight: sidebarHeight * 0.4)
+                .frame(maxHeight: availableHeight * 0.4)
             }
         }
     }
@@ -680,7 +693,6 @@ struct SidebarView: View {
                 // "See all verses" button with glass capsule
                 Button {
                     uiStateStore.searchQuery = entry.number
-                    uiStateStore.expandedSidebarSections.insert(SidebarSection.search.rawValue)
                     Task {
                         await uiStateStore.performSearch(using: bibleStore)
                     }
@@ -712,7 +724,7 @@ struct SidebarView: View {
 
     // MARK: - 5. Cross References
 
-    private var crossReferencesSection: some View {
+    private func crossReferencesSection(availableHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header (always visible)
             Button {
@@ -778,7 +790,7 @@ struct SidebarView: View {
                     }
                     .padding(.leading, 6)
                 }
-                .frame(maxHeight: sidebarHeight * 0.4)
+                .frame(maxHeight: availableHeight * 0.4)
             }
         }
     }
@@ -786,100 +798,72 @@ struct SidebarView: View {
     // MARK: - 6. Search
 
     private var searchSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header (always visible)
-            Button {
-                uiStateStore.toggleSection(.search)
-            } label: {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.primary)
-                    Text("sidebar.search")
-                        .foregroundStyle(.primary)
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
-            .background(
-                uiStateStore.isSectionExpanded(.search)
-                    ? Color.primary.opacity(0.08)
-                    : Color.clear,
-                in: RoundedRectangle(cornerRadius: 8)
-            )
-            .animation(.spring(duration: 0.25, bounce: 0.1), value: uiStateStore.isSectionExpanded(.search))
+        @Bindable var uiState = uiStateStore
 
-            // Content (expandable)
-            if uiStateStore.isSectionExpanded(.search) {
-                @Bindable var uiState = uiStateStore
-
-                VStack(spacing: 6) {
-                    HStack {
-                        Image(systemName: "magnifyingglass")
+        return VStack(alignment: .leading, spacing: 6) {
+            // Always-visible search bar
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                TextField("sidebar.searchIn \(activeModuleName)", text: $uiState.searchQuery)
+                    .textFieldStyle(.plain)
+                    .font(.subheadline)
+                    .onSubmit {
+                        Task { await uiStateStore.performSearch(using: bibleStore) }
+                    }
+                if !uiStateStore.searchQuery.isEmpty {
+                    Button {
+                        uiStateStore.searchQuery = ""
+                        uiStateStore.searchResults = []
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
                             .font(.caption)
-                        TextField("sidebar.searchIn \(activeModuleName)", text: $uiState.searchQuery)
-                            .textFieldStyle(.plain)
-                            .font(.subheadline)
-                            .onSubmit {
-                                Task { await uiStateStore.performSearch(using: bibleStore) }
-                            }
-                        if !uiStateStore.searchQuery.isEmpty {
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(6)
+            .background(Color(.textBackgroundColor).opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+
+            if uiStateStore.searchResults.isEmpty && !uiStateStore.searchQuery.isEmpty {
+                Text("sidebar.noResultsFor \(uiStateStore.searchQuery)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            } else if !uiStateStore.searchResults.isEmpty {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(uiStateStore.searchResults) { verse in
                             Button {
-                                uiStateStore.searchQuery = ""
-                                uiStateStore.searchResults = []
+                                navigateToSearchResult(verse)
                             } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
-                                    .font(.caption)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(verseReference(verse))
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.secondary)
+                                    Text(verse.text)
+                                        .font(.caption)
+                                        .lineLimit(2)
+                                }
                             }
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(6)
-                    .background(Color(.textBackgroundColor).opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
                 }
-                .padding(.leading, 6)
-
-                if uiStateStore.searchResults.isEmpty && !uiStateStore.searchQuery.isEmpty {
-                    Text("sidebar.noResultsFor \(uiStateStore.searchQuery)")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .padding(.leading, 6)
-                } else if !uiStateStore.searchResults.isEmpty {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 4) {
-                            ForEach(uiStateStore.searchResults) { verse in
-                                Button {
-                                    navigateToSearchResult(verse)
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(verseReference(verse))
-                                            .font(.caption)
-                                            .fontWeight(.semibold)
-                                            .foregroundStyle(.secondary)
-                                        Text(verse.text)
-                                            .font(.caption)
-                                            .lineLimit(2)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.leading, 6)
-                    }
-                    .frame(maxHeight: sidebarHeight * 0.4)
-                }
+                .frame(maxHeight: availableHeight * 0.4)
             }
         }
+        .padding(.bottom, 6)
+
+        Divider()
+            .padding(.horizontal, 4)
     }
 
     // MARK: - 7. Recent History
 
-    private var recentHistorySection: some View {
+    private func recentHistorySection(availableHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header (always visible)
             Button {
@@ -941,7 +925,7 @@ struct SidebarView: View {
                     }
                     .padding(.leading, 6)
                 }
-                .frame(maxHeight: sidebarHeight * 0.4)
+                .frame(maxHeight: availableHeight * 0.4)
             }
         }
     }

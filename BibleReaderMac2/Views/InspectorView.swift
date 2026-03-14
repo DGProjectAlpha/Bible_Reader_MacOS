@@ -117,10 +117,18 @@ struct InspectorView: View {
             loadDataForSelectedVerse()
         }
         .onChange(of: uiStateStore.selectedStrongsId) {
-            autoSelectStrongsEntry()
+            if wordTags.isEmpty {
+                loadDataForSelectedVerse()
+            } else {
+                autoSelectStrongsEntry()
+            }
         }
         .onChange(of: uiStateStore.selectedStrongsWord) {
-            autoSelectStrongsEntryByWord()
+            if wordTags.isEmpty {
+                loadDataForSelectedVerse()
+            } else {
+                autoSelectStrongsEntryByWord()
+            }
         }
     }
 
