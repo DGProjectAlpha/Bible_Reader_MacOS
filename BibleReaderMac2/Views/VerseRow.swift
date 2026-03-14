@@ -36,208 +36,225 @@ struct VerseRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Button {
-                let existing = userDataStore.notes.first(where: { $0.verseId == verseId })
-                noteText = existing?.text ?? ""
-                showNoteEditor = true
-            } label: {
-                Image(systemName: hasNote ? "note.text" : "note.text.badge.plus")
-                    .font(.system(size: fontSize * 0.55))
-                    .foregroundStyle(hasNote ? Color.accentColor : Color.secondary.opacity(0.4))
-                    .frame(width: 16, alignment: .center)
-            }
-            .buttonStyle(.plain)
-            .help(hasNote ? String(localized: "verse.editNote") : String(localized: "verse.addNote"))
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.pointingHand.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
-
-            Button {
-                Task {
-                    if isBookmarked {
-                        await removeBookmark()
-                    } else {
-                        await addBookmark(color: .yellow)
-                    }
-                }
-            } label: {
-                Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                    .font(.system(size: fontSize * 0.55))
-                    .foregroundStyle(isBookmarked ? Color.yellow : Color.secondary.opacity(0.4))
-                    .frame(width: 16, alignment: .center)
-                    .animation(.spring(duration: 0.25, bounce: 0.1), value: isBookmarked)
-            }
-            .buttonStyle(.plain)
-            .help(isBookmarked ? String(localized: "verse.removeBookmark") : String(localized: "verse.bookmark"))
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.pointingHand.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
-
-            Button {
-                onSelect()
-                onVerseNumberTap()
-            } label: {
-                Text("\(verse.verseNumber)")
-                    .font(.system(size: fontSize * 0.7, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: 24, alignment: .trailing)
-            }
-            .buttonStyle(.plain)
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.pointingHand.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
-
-            SelectableVerseText(
-                text: verse.text,
-                fontSize: fontSize,
-                attributedText: verse.strongsNumbers.isEmpty ? nil : strongsAttributedString,
-                onSelectionChange: { selected, rect in
-                    hasTextSelection = selected
-                    selectionRect = rect
-                    if selected {
-                        showHighlightBubble = true
-                    }
-                },
-                onWordTap: verse.strongsNumbers.isEmpty ? nil : { strongsId in
-                    onStrongsTap(strongsId)
-                }
-            )
+        verseRowContent
+            .padding(.vertical, 4)
+            .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .fixedSize(horizontal: false, vertical: true)
+            .background(rowBackground)
+            .animation(.spring(duration: 0.25, bounce: 0.1), value: isSelected)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay { selectionOverlay }
+            .overlay(alignment: .top) { highlightBubbleOverlay }
+            .animation(.spring(duration: 0.2, bounce: 0.15), value: showHighlightBubble)
+            .onChange(of: hasTextSelection) { _, newValue in
+                if !newValue { showHighlightBubble = false }
+            }
+            .contextMenu { verseContextMenu }
+            .sheet(isPresented: $showNoteEditor) {
+                noteEditorSheet
+                    .presentationBackground(.glass)
+            }
+    }
+
+    // MARK: - Body Subviews
+
+    private var verseRowContent: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            noteButton
+            bookmarkButton
+            verseNumberButton
+            verseTextContent
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Group {
-                if let color = highlightColor {
-                    color.opacity(0.3)
-                } else if isSelected {
-                    Color.accentColor.opacity(0.15)
-                } else {
-                    Color.clear
-                }
+    }
+
+    private var noteButton: some View {
+        Button {
+            let existing = userDataStore.notes.first(where: { $0.verseId == verseId })
+            noteText = existing?.text ?? ""
+            showNoteEditor = true
+        } label: {
+            Image(systemName: hasNote ? "note.text" : "note.text.badge.plus")
+                .font(.system(size: fontSize * 0.55))
+                .foregroundStyle(hasNote ? Color.accentColor : Color.secondary.opacity(0.4))
+                .frame(width: 16, alignment: .center)
+        }
+        .buttonStyle(.plain)
+        .help(hasNote ? String(localized: "verse.editNote") : String(localized: "verse.addNote"))
+        .onHover { hovering in
+            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+    }
+
+    private var bookmarkButton: some View {
+        Button {
+            Task {
+                if isBookmarked { await removeBookmark() } else { await addBookmark(color: .yellow) }
+            }
+        } label: {
+            Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                .font(.system(size: fontSize * 0.55))
+                .foregroundStyle(isBookmarked ? Color.yellow : Color.secondary.opacity(0.4))
+                .frame(width: 16, alignment: .center)
+                .animation(.spring(duration: 0.25, bounce: 0.1), value: isBookmarked)
+        }
+        .buttonStyle(.plain)
+        .help(isBookmarked ? String(localized: "verse.removeBookmark") : String(localized: "verse.bookmark"))
+        .onHover { hovering in
+            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+    }
+
+    private var verseNumberButton: some View {
+        Button {
+            onSelect()
+            onVerseNumberTap()
+        } label: {
+            Text("\(verse.verseNumber)")
+                .font(.system(size: fontSize * 0.7, weight: .bold))
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 24, alignment: .trailing)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+    }
+
+    private var verseTextContent: some View {
+        SelectableVerseText(
+            text: verse.text,
+            fontSize: fontSize,
+            attributedText: verse.strongsNumbers.isEmpty ? nil : strongsAttributedString,
+            onSelectionChange: { selected, rect in
+                hasTextSelection = selected
+                selectionRect = rect
+                if selected { showHighlightBubble = true }
+            },
+            onWordTap: verse.strongsNumbers.isEmpty ? nil : { strongsId in
+                onStrongsTap(strongsId)
             }
         )
-        .animation(.spring(duration: 0.25, bounce: 0.1), value: isSelected)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .overlay {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
-                    .allowsHitTesting(false)
-            }
-        }
-        .overlay(alignment: .top) {
-            if showHighlightBubble {
-                HighlightBubble(
-                    isHighlighted: isHighlighted,
-                    onColorSelected: { color in
-                        Task { await addHighlight(color: color) }
-                        showHighlightBubble = false
-                        hasTextSelection = false
-                    },
-                    onClear: {
-                        Task { await userDataStore.removeHighlight(verseId: verseId) }
-                        showHighlightBubble = false
-                        hasTextSelection = false
-                    }
-                )
-                .offset(y: -40)
-                .transition(.scale.combined(with: .opacity))
-                .zIndex(100)
-            }
-        }
-        .animation(.spring(duration: 0.2, bounce: 0.15), value: showHighlightBubble)
-        .onChange(of: hasTextSelection) { _, newValue in
-            if !newValue {
-                showHighlightBubble = false
-            }
-        }
-        .contextMenu {
-            // Bookmark
-            if isBookmarked {
-                Button(role: .destructive) {
-                    Task { await removeBookmark() }
-                } label: {
-                    Label(String(localized: "verse.removeBookmark"), systemImage: "bookmark.slash")
-                }
-            } else {
-                Menu {
-                    ForEach(BookmarkColor.allCases, id: \.self) { color in
-                        Button {
-                            Task { await addBookmark(color: color) }
-                        } label: {
-                            Label(String(localized: String.LocalizationValue("color.\(color.rawValue)")), systemImage: "bookmark.fill")
-                        }
-                    }
-                } label: {
-                    Label(String(localized: "verse.bookmark"), systemImage: "bookmark")
-                }
-            }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
 
-            Divider()
+    @ViewBuilder
+    private var rowBackground: some View {
+        if let color = highlightColor {
+            color.opacity(0.3)
+        } else if isSelected {
+            Color.accentColor.opacity(0.15)
+        } else {
+            Color.clear
+        }
+    }
 
-            // Highlight
-            if isHighlighted {
-                Button(role: .destructive) {
+    @ViewBuilder
+    private var selectionOverlay: some View {
+        if isSelected {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
+                .allowsHitTesting(false)
+        }
+    }
+
+    @ViewBuilder
+    private var highlightBubbleOverlay: some View {
+        if showHighlightBubble {
+            HighlightBubble(
+                isHighlighted: isHighlighted,
+                onColorSelected: { color in
+                    Task { await addHighlight(color: color) }
+                    showHighlightBubble = false
+                    hasTextSelection = false
+                },
+                onClear: {
                     Task { await userDataStore.removeHighlight(verseId: verseId) }
-                } label: {
-                    Label(String(localized: "verse.removeHighlight"), systemImage: "highlighter")
+                    showHighlightBubble = false
+                    hasTextSelection = false
                 }
-            } else {
-                Menu {
-                    ForEach(BookmarkColor.allCases, id: \.self) { color in
-                        Button {
-                            Task { await addHighlight(color: color) }
-                        } label: {
-                            Label(String(localized: String.LocalizationValue("color.\(color.rawValue)")), systemImage: "paintbrush.fill")
-                        }
+            )
+            .offset(y: -40)
+            .transition(.scale.combined(with: .opacity))
+            .zIndex(100)
+        }
+    }
+
+    @ViewBuilder
+    private var verseContextMenu: some View {
+        bookmarkContextMenu
+        Divider()
+        highlightContextMenu
+        Divider()
+        noteContextMenuItem
+        Divider()
+        copyContextMenuItem
+    }
+
+    @ViewBuilder
+    private var bookmarkContextMenu: some View {
+        if isBookmarked {
+            Button(role: .destructive) {
+                Task { await removeBookmark() }
+            } label: {
+                Label(String(localized: "verse.removeBookmark"), systemImage: "bookmark.slash")
+            }
+        } else {
+            Menu {
+                ForEach(BookmarkColor.allCases, id: \.self) { color in
+                    Button {
+                        Task { await addBookmark(color: color) }
+                    } label: {
+                        Label(String(localized: String.LocalizationValue("color.\(color.rawValue)")), systemImage: "bookmark.fill")
                     }
-                } label: {
-                    Label(String(localized: "verse.highlight"), systemImage: "highlighter")
                 }
-            }
-
-            Divider()
-
-            // Note
-            Button {
-                let existing = userDataStore.notes.first(where: { $0.verseId == verseId })
-                noteText = existing?.text ?? ""
-                showNoteEditor = true
             } label: {
-                let hasNote = userDataStore.notes.contains { $0.verseId == verseId }
-                Label(hasNote ? String(localized: "verse.editNote") : String(localized: "verse.addNote"), systemImage: "note.text")
-            }
-
-            Divider()
-
-            // Copy
-            Button {
-                let copyText = "\(verse.book) \(verse.chapter):\(verse.verseNumber) — \(verse.text)"
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(copyText, forType: .string)
-            } label: {
-                Label(String(localized: "verse.copyVerse"), systemImage: "doc.on.doc")
+                Label(String(localized: "verse.bookmark"), systemImage: "bookmark")
             }
         }
-        .sheet(isPresented: $showNoteEditor) {
-            noteEditorSheet
-                .presentationBackground(.glass)
+    }
+
+    @ViewBuilder
+    private var highlightContextMenu: some View {
+        if isHighlighted {
+            Button(role: .destructive) {
+                Task { await userDataStore.removeHighlight(verseId: verseId) }
+            } label: {
+                Label(String(localized: "verse.removeHighlight"), systemImage: "highlighter")
+            }
+        } else {
+            Menu {
+                ForEach(BookmarkColor.allCases, id: \.self) { color in
+                    Button {
+                        Task { await addHighlight(color: color) }
+                    } label: {
+                        Label(String(localized: String.LocalizationValue("color.\(color.rawValue)")), systemImage: "paintbrush.fill")
+                    }
+                }
+            } label: {
+                Label(String(localized: "verse.highlight"), systemImage: "highlighter")
+            }
+        }
+    }
+
+    private var noteContextMenuItem: some View {
+        Button {
+            let existing = userDataStore.notes.first(where: { $0.verseId == verseId })
+            noteText = existing?.text ?? ""
+            showNoteEditor = true
+        } label: {
+            let hasNote = userDataStore.notes.contains { $0.verseId == verseId }
+            Label(hasNote ? String(localized: "verse.editNote") : String(localized: "verse.addNote"), systemImage: "note.text")
+        }
+    }
+
+    private var copyContextMenuItem: some View {
+        Button {
+            let copyText = "\(verse.book) \(verse.chapter):\(verse.verseNumber) — \(verse.text)"
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(copyText, forType: .string)
+        } label: {
+            Label(String(localized: "verse.copyVerse"), systemImage: "doc.on.doc")
         }
     }
 
