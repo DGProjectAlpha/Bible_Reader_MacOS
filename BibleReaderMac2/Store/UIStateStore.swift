@@ -3,7 +3,7 @@ import SwiftUI
 
 @MainActor @Observable
 final class UIStateStore {
-    var sidebarVisible: Bool = true
+    var sidebarVisibility: NavigationSplitViewVisibility = .automatic
     var selectedVerseId: String? = nil
     var searchQuery: String = ""
     var searchResults: [Verse] = []

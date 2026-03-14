@@ -24,25 +24,25 @@ struct BibleReaderMac2App: App {
         .commands {
             CommandMenu(String(localized: "menu.sidebar")) {
                 Button(String(localized: "menu.strongsNumbers")) {
-                    uiStateStore.sidebarVisible = true
+                    uiStateStore.sidebarVisibility = .all
                     uiStateStore.expandedSidebarSections.insert(SidebarSection.strongs.rawValue)
                 }
                 .keyboardShortcut("1", modifiers: .command)
 
                 Button(String(localized: "menu.crossReferences")) {
-                    uiStateStore.sidebarVisible = true
+                    uiStateStore.sidebarVisibility = .all
                     uiStateStore.expandedSidebarSections.insert(SidebarSection.crossReferences.rawValue)
                 }
                 .keyboardShortcut("2", modifiers: .command)
 
                 Button(String(localized: "menu.notes")) {
-                    uiStateStore.sidebarVisible = true
+                    uiStateStore.sidebarVisibility = .all
                     uiStateStore.expandedSidebarSections.insert(SidebarSection.notes.rawValue)
                 }
                 .keyboardShortcut("3", modifiers: .command)
 
                 Button(String(localized: "menu.search")) {
-                    uiStateStore.sidebarVisible = true
+                    uiStateStore.sidebarVisibility = .all
                 }
                 .keyboardShortcut("f", modifiers: .command)
             }

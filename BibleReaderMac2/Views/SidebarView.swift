@@ -40,7 +40,7 @@ struct SidebarView: View {
                 // Pinned search bar at top
                 searchSection
                     .padding(.horizontal, 8)
-                    .padding(.top, 38)
+                    .padding(.top, 8)
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {

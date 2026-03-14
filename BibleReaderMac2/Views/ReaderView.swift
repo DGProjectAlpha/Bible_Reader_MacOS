@@ -67,7 +67,7 @@ struct ReaderView: View {
                             onVerseNumberTap: {
                                 uiState.selectedVerseId = verse.id
                                 uiState.inspectorTab = .crossRef
-                                uiState.sidebarVisible = true
+                                uiState.sidebarVisibility = .all
                                 // Collapse strongs, expand cross references only
                                 uiState.expandedSidebarSections.remove(SidebarSection.strongs.rawValue)
                                 uiState.expandedSidebarSections.insert(SidebarSection.crossReferences.rawValue)
@@ -78,8 +78,7 @@ struct ReaderView: View {
                             onStrongsTap: { tappedValue in
                                 uiState.selectedVerseId = verse.id
                                 uiState.inspectorTab = .strongs
-                                uiState.sidebarVisible = true
-                                uiState.inspectorVisible = true
+                                uiState.sidebarVisibility = .all
                                 uiState.expandedSidebarSections.insert(SidebarSection.strongs.rawValue)
                                 if tappedValue.hasPrefix("word:") {
                                     // Clicked a plain word — store for sidebar to match after loading
