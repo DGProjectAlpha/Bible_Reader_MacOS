@@ -99,22 +99,69 @@ actor DatabaseService {
 
     func fetchVerses(moduleId: String, book: String, chapter: Int) throws -> [Verse] {
         let db = try db(for: moduleId)
-        return try query(
+        let verses = try query(
             db: db,
             sql: "SELECT verse, text FROM verses WHERE book = ?1 AND chapter = ?2 ORDER BY verse",
             bindings: [.text(book), .int(chapter)]
         ) { stmt in
             let verseNum = Int(sqlite3_column_int(stmt, 0))
             let text = columnText(stmt, 1)
+            return (verseNum: verseNum, text: text)
+        }
+
+        // Batch-load word_tags for the chapter to populate Strong's numbers
+        let wordTagsByVerse = try fetchChapterWordTags(db: db, book: book, chapter: chapter)
+
+        return verses.map { v in
+            let verseId = "\(book):\(chapter):\(v.verseNum)"
+            let wordCount = v.text.split(separator: " ", omittingEmptySubsequences: false).count
+            var strongsNums = [String](repeating: "", count: wordCount)
+
+            if let tags = wordTagsByVerse[verseId] {
+                for tag in tags {
+                    if tag.wordIndex < wordCount, let num = tag.strongsNumber {
+                        strongsNums[tag.wordIndex] = num
+                    }
+                }
+            }
+
             return Verse(
-                id: "\(book).\(chapter).\(verseNum)",
+                id: "\(book).\(chapter).\(v.verseNum)",
                 book: book,
                 chapter: chapter,
-                verseNumber: verseNum,
-                text: text,
-                strongsNumbers: []
+                verseNumber: v.verseNum,
+                text: v.text,
+                strongsNumbers: strongsNums
             )
         }
+    }
+
+    /// Fetch all word_tags for a chapter at once, grouped by verse_id.
+    private func fetchChapterWordTags(db: OpaquePointer, book: String, chapter: Int) throws -> [String: [WordTag]] {
+        guard try tableExists(db: db, name: "word_tags") else { return [:] }
+
+        let prefix = "\(book):\(chapter):"
+        let rows = try query(
+            db: db,
+            sql: "SELECT verse_id, word_index, word, strongs_number FROM word_tags WHERE verse_id LIKE ?1 ORDER BY verse_id, word_index",
+            bindings: [.text("\(prefix)%")]
+        ) { stmt in
+            let verseId = columnText(stmt, 0)
+            let wordIndex = Int(sqlite3_column_int(stmt, 1))
+            let word = columnText(stmt, 2)
+            let strongsRaw = columnText(stmt, 3)
+            return (verseId: verseId, tag: WordTag(
+                wordIndex: wordIndex,
+                word: word,
+                strongsNumber: strongsRaw.isEmpty ? nil : strongsRaw
+            ))
+        }
+
+        var result: [String: [WordTag]] = [:]
+        for row in rows {
+            result[row.verseId, default: []].append(row.tag)
+        }
+        return result
     }
 
     func fetchBooks(moduleId: String) throws -> [Book] {
