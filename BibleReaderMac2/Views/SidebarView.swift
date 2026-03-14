@@ -56,7 +56,7 @@ struct SidebarView: View {
                 }
             }
         }
-        .background(.sidebar)
+        .background(.ultraThinMaterial)
         .symbolRenderingMode(.hierarchical)
         .onChange(of: uiStateStore.selectedVerseId) {
             loadStrongsData()
