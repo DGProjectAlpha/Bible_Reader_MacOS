@@ -852,13 +852,10 @@ struct SidebarView: View {
                         }
                     }
                 }
-                .frame(maxHeight: availableHeight * 0.4)
+                .frame(maxHeight: 300)
             }
         }
         .padding(.bottom, 6)
-
-        Divider()
-            .padding(.horizontal, 4)
     }
 
     // MARK: - 7. Recent History

@@ -13,12 +13,16 @@ private struct WindowConfigurator: NSViewRepresentable {
             NotificationCenter.default.addObserver(
                 forName: NSWindow.didExitFullScreenNotification,
                 object: window, queue: .main
-            ) { _ in Self.configureWindow(window) }
+            ) { _ in
+                MainActor.assumeIsolated { Self.configureWindow(window) }
+            }
 
             NotificationCenter.default.addObserver(
                 forName: NSWindow.didEnterFullScreenNotification,
                 object: window, queue: .main
-            ) { _ in Self.configureWindow(window) }
+            ) { _ in
+                MainActor.assumeIsolated { Self.configureWindow(window) }
+            }
         }
         return view
     }
