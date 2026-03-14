@@ -47,7 +47,8 @@ struct SidebarView: View {
                 recentHistorySection
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.top, 38)
+            .padding(.bottom, 4)
         }
         .frame(maxHeight: sidebarHeight - 8)
         .symbolRenderingMode(.hierarchical)

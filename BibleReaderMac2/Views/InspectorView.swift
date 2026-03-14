@@ -68,9 +68,14 @@ struct InspectorView: View {
     @State private var selectedStrongsNumber: String? = nil
     @State private var strongsVerses: [StrongsVerseReference] = []
     @State private var similarEntries: [StrongsEntry] = []
+    @State private var wordSynonyms: [StrongsEntry] = []
+    @State private var synonymsExpanded = true
     @State private var isLoadingStrongs = false
     @State private var isLoadingCrossRefs = false
     @State private var isLoadingDetail = false
+    @State private var versesExpanded = false
+    @State private var showAllStrongsVerses = false
+    @State private var clickedWord: String? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -110,6 +115,12 @@ struct InspectorView: View {
         }
         .onChange(of: inspectorTab) {
             loadDataForSelectedVerse()
+        }
+        .onChange(of: uiStateStore.selectedStrongsId) {
+            autoSelectStrongsEntry()
+        }
+        .onChange(of: uiStateStore.selectedStrongsWord) {
+            autoSelectStrongsEntryByWord()
         }
     }
 
@@ -234,6 +245,9 @@ struct InspectorView: View {
                     selectedStrongsNumber = nil
                     strongsVerses = []
                     similarEntries = []
+                    wordSynonyms = []
+                    versesExpanded = false
+                    clickedWord = nil
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
@@ -245,33 +259,63 @@ struct InspectorView: View {
                 .foregroundStyle(Color.accentColor)
 
                 if let entry = selectedStrongsEntry {
-                    // Header: number + lemma
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(entry.number)
-                            .font(.title2.bold().monospaced())
-                            .foregroundStyle(Color.accentColor)
+                    // Exact match header card
+                    VStack(alignment: .leading, spacing: 8) {
+                        // Clicked word display
+                        if let word = clickedWord {
+                            Text(word)
+                                .font(.title3.bold())
+                                .foregroundStyle(.primary)
+                        }
 
+                        // Language badge + Strong's number
+                        HStack(spacing: 8) {
+                            // Greek/Hebrew language badge
+                            Text(entry.number.hasPrefix("G") ? "Greek" : "Hebrew")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    entry.number.hasPrefix("G")
+                                        ? Color.blue
+                                        : Color.orange,
+                                    in: Capsule()
+                                )
+
+                            Text(entry.number)
+                                .font(.title2.bold().monospaced())
+                                .foregroundStyle(Color.accentColor)
+                        }
+
+                        // Lemma (original language word)
                         if !entry.lemma.isEmpty {
                             Text(entry.lemma)
                                 .font(.title3)
                         }
-                    }
 
-                    // Transliteration + pronunciation
-                    if !entry.transliteration.isEmpty || entry.pronunciation != nil {
-                        HStack(spacing: 12) {
-                            if !entry.transliteration.isEmpty {
-                                Label(entry.transliteration, systemImage: "character.textbox")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            if let pron = entry.pronunciation {
-                                Label(pron, systemImage: "speaker.wave.2")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                        // Transliteration + pronunciation
+                        if !entry.transliteration.isEmpty || entry.pronunciation != nil {
+                            HStack(spacing: 12) {
+                                if !entry.transliteration.isEmpty {
+                                    Label(entry.transliteration, systemImage: "character.textbox")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                if let pron = entry.pronunciation {
+                                    Label(pron, systemImage: "speaker.wave.2")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.accentColor.opacity(0.06))
+                    )
 
                     // Derivation
                     if let derivation = entry.derivation, !derivation.isEmpty {
@@ -310,74 +354,116 @@ struct InspectorView: View {
 
                     Divider()
 
-                    // Verses using this Strong's number
+                    // Expandable verses section
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(String(localized: "inspector.versesWith \(entry.number)"))
-                            .font(.subheadline.bold())
-
-                        if isLoadingDetail {
-                            detailSkeletonView
-                        } else if strongsVerses.isEmpty {
-                            Text(String(localized: "inspector.noVersesFound"))
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        } else {
-                            ForEach(strongsVerses.prefix(20)) { ref in
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(ref.displayRef)
-                                        .font(.caption.bold())
-                                        .foregroundStyle(Color.accentColor)
-                                    Text(ref.text)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
-                                }
-                                .padding(.vertical, 2)
+                        Button {
+                            withAnimation(.spring(duration: 0.25, bounce: 0.1)) {
+                                versesExpanded.toggle()
                             }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: versesExpanded ? "chevron.down" : "chevron.right")
+                                    .font(.caption2)
+                                Text(String(localized: "inspector.versesWith \(entry.number)"))
+                                    .font(.subheadline.bold())
+                                if !isLoadingDetail {
+                                    Text("(\(strongsVerses.count))")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                }
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
 
-                            if strongsVerses.count > 20 {
-                                Text(String(localized: "inspector.moreVerses \(strongsVerses.count - 20)"))
+                        if versesExpanded {
+                            if isLoadingDetail {
+                                detailSkeletonView
+                            } else if strongsVerses.isEmpty {
+                                Text(String(localized: "inspector.noVersesFound"))
                                     .font(.caption)
                                     .foregroundStyle(.tertiary)
-                                    .padding(.top, 2)
+                            } else {
+                                let displayLimit = showAllStrongsVerses ? strongsVerses.count : min(20, strongsVerses.count)
+                                ForEach(strongsVerses.prefix(displayLimit)) { ref in
+                                    Button {
+                                        navigateToStrongsVerse(ref)
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(ref.displayRef)
+                                                    .font(.caption.bold())
+                                                    .foregroundStyle(Color.accentColor)
+                                                Text(ref.text)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(2)
+                                                    .multilineTextAlignment(.leading)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "arrow.right.circle")
+                                                .font(.caption2)
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                        .padding(.vertical, 2)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .hoverHighlight()
+                                }
+
+                                if strongsVerses.count > 20 {
+                                    Button {
+                                        withAnimation(.spring(duration: 0.25, bounce: 0.1)) {
+                                            showAllStrongsVerses.toggle()
+                                        }
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: showAllStrongsVerses ? "chevron.up" : "ellipsis.circle")
+                                                .font(.caption)
+                                            Text(showAllStrongsVerses
+                                                ? "Show Less"
+                                                : "Show All \(strongsVerses.count) Verses")
+                                                .font(.caption.bold())
+                                        }
+                                        .foregroundStyle(Color.accentColor)
+                                        .padding(.top, 4)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
                         }
                     }
 
-                    // Similar entries
-                    if !similarEntries.isEmpty {
+                    // Synonyms & Related Words section
+                    if !wordSynonyms.isEmpty || !similarEntries.isEmpty {
                         Divider()
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(String(localized: "inspector.relatedEntries"))
-                                .font(.subheadline.bold())
-
-                            ForEach(similarEntries.prefix(8)) { similar in
-                                Button {
-                                    selectedStrongsEntry = similar
-                                    selectedStrongsNumber = similar.number
-                                    loadStrongsDetail(entry: similar)
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Text(similar.number)
-                                            .font(.caption.monospaced())
-                                            .foregroundStyle(Color.accentColor)
-                                        if !similar.lemma.isEmpty {
-                                            Text(similar.lemma)
-                                                .font(.caption)
-                                        }
-                                        Spacer()
-                                        if let def = similar.kjvDefinition {
-                                            Text(def)
-                                                .font(.caption2)
-                                                .foregroundStyle(.tertiary)
-                                                .lineLimit(1)
-                                                .frame(maxWidth: 120, alignment: .trailing)
-                                        }
-                                    }
+                            Button {
+                                withAnimation(.spring(duration: 0.25, bounce: 0.1)) {
+                                    synonymsExpanded.toggle()
                                 }
-                                .buttonStyle(.plain)
-                                .hoverHighlight()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: synonymsExpanded ? "chevron.down" : "chevron.right")
+                                        .font(.caption2)
+                                    Text("Synonyms & Related Words")
+                                        .font(.subheadline.bold())
+                                    Text("(\(mergedSynonyms.count))")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                    Spacer()
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+
+                            if synonymsExpanded {
+                                ForEach(mergedSynonyms.prefix(15)) { similar in
+                                    synonymRow(similar)
+                                }
                             }
                         }
                     }
@@ -393,20 +479,135 @@ struct InspectorView: View {
         isLoadingDetail = true
         strongsVerses = []
         similarEntries = []
+        wordSynonyms = []
+        showAllStrongsVerses = false
 
         Task {
             async let versesResult = StrongsService.shared.findVersesByStrongs(number, moduleId: moduleId)
             async let similarResult = StrongsService.shared.findSimilarByDefinition(number: number, preferredModule: moduleId)
 
+            // Also search by clicked word for direct word-based synonyms
+            let wordSearch: (exact: StrongsEntry?, similar: [StrongsEntry])
+            if let word = clickedWord, !word.isEmpty {
+                wordSearch = await StrongsService.shared.searchSimilar(word: word, preferredModule: moduleId, limit: 15)
+            } else {
+                wordSearch = (nil, [])
+            }
+
             let verses = await versesResult
             let similar = await similarResult
+            // Word synonyms: exclude the current entry
+            let wordSyns = wordSearch.similar.filter { $0.number != number }
 
             await MainActor.run {
                 strongsVerses = verses
                 similarEntries = similar
+                wordSynonyms = wordSyns
                 isLoadingDetail = false
             }
         }
+    }
+
+    // MARK: - Synonym Helpers
+
+    /// Merge word-based synonyms and definition-based similar entries, deduplicating by number.
+    private var mergedSynonyms: [StrongsEntry] {
+        var seen = Set<String>()
+        if let current = selectedStrongsNumber { seen.insert(current) }
+        var result: [StrongsEntry] = []
+        // Word-based synonyms first (more directly relevant)
+        for entry in wordSynonyms {
+            if seen.insert(entry.number).inserted {
+                result.append(entry)
+            }
+        }
+        // Then definition-based similar entries
+        for entry in similarEntries {
+            if seen.insert(entry.number).inserted {
+                result.append(entry)
+            }
+        }
+        return result
+    }
+
+    /// Extract the primary usage word from a KJV definition string.
+    private func primaryUsageWord(_ entry: StrongsEntry) -> String? {
+        guard let kjv = entry.kjvDefinition, !kjv.isEmpty else { return nil }
+        // KJV definitions are comma-separated; first word is the primary usage
+        let first = kjv.split(separator: ",").first.map(String.init)?.trimmingCharacters(in: .whitespaces)
+        return first
+    }
+
+    private func synonymRow(_ similar: StrongsEntry) -> some View {
+        Button {
+            clickedWord = nil
+            selectedStrongsEntry = similar
+            selectedStrongsNumber = similar.number
+            versesExpanded = false
+            synonymsExpanded = true
+            loadStrongsDetail(entry: similar)
+        } label: {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        // Primary usage word
+                        if let usage = primaryUsageWord(similar) {
+                            Text(usage)
+                                .font(.callout.bold())
+                                .foregroundStyle(.primary)
+                        }
+
+                        Spacer()
+
+                        // Strong's number badge
+                        Text(similar.number)
+                            .font(.caption2.monospaced().bold())
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(
+                                similar.number.hasPrefix("G")
+                                    ? Color.blue.opacity(0.7)
+                                    : Color.orange.opacity(0.7),
+                                in: Capsule()
+                            )
+                    }
+
+                    HStack(spacing: 6) {
+                        if !similar.lemma.isEmpty {
+                            Text(similar.lemma)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if !similar.transliteration.isEmpty {
+                            Text(similar.transliteration)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .italic()
+                        }
+                    }
+
+                    if let def = similar.kjvDefinition ?? similar.strongsDefinition {
+                        Text(def)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 5)
+            .padding(.horizontal, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.secondary.opacity(0.04))
+            )
+        }
+        .buttonStyle(.plain)
+        .hoverHighlight()
     }
 
     // MARK: - Cross-References Tab
@@ -525,6 +726,26 @@ struct InspectorView: View {
             navigateToCrossRef(ref)
         }
         .hoverHighlight()
+    }
+
+    private func navigateToStrongsVerse(_ ref: StrongsVerseReference) {
+        let moduleId = bibleStore.activeModuleId
+        let location = BibleLocation(
+            moduleId: moduleId,
+            book: ref.book,
+            chapter: ref.chapter,
+            verseNumber: ref.verse
+        )
+
+        Task {
+            let paneId = bibleStore.activePaneId ?? bibleStore.panes.first?.id
+            if let paneId {
+                await bibleStore.navigate(paneId: paneId, to: location)
+            }
+            await MainActor.run {
+                uiStateStore.selectedVerseId = "\(ref.book).\(ref.chapter).\(ref.verse)"
+            }
+        }
     }
 
     private func navigateToCrossRef(_ ref: ResolvedCrossReference) {
@@ -781,6 +1002,7 @@ struct InspectorView: View {
             selectedStrongsNumber = nil
             strongsVerses = []
             similarEntries = []
+            wordSynonyms = []
             return
         }
 
@@ -789,6 +1011,9 @@ struct InspectorView: View {
         selectedStrongsNumber = nil
         strongsVerses = []
         similarEntries = []
+        wordSynonyms = []
+        versesExpanded = false
+        clickedWord = nil
 
         let parts = verseId.split(separator: ".")
         guard parts.count == 3,
@@ -810,6 +1035,8 @@ struct InspectorView: View {
                 await MainActor.run {
                     wordTags = tags
                     isLoadingStrongs = false
+                    autoSelectStrongsEntry()
+                    autoSelectStrongsEntryByWord()
                 }
             }
         case .crossRef:
@@ -843,6 +1070,37 @@ struct InspectorView: View {
             }
         case .notes, .bookmarks:
             break
+        }
+    }
+
+    // MARK: - Auto-Select Strong's Entry
+
+    private func autoSelectStrongsEntry() {
+        guard let strongsId = uiStateStore.selectedStrongsId else { return }
+        if let tag = wordTags.first(where: { $0.strongsNumber == strongsId }),
+           let entry = tag.entry {
+            clickedWord = tag.word
+            selectedStrongsNumber = strongsId
+            selectedStrongsEntry = entry
+            versesExpanded = false
+            loadStrongsDetail(entry: entry)
+            uiStateStore.selectedStrongsId = nil
+        }
+    }
+
+    private func autoSelectStrongsEntryByWord() {
+        guard let word = uiStateStore.selectedStrongsWord else { return }
+        let lowered = word.lowercased()
+        if let tag = wordTags.first(where: { $0.word.lowercased() == lowered }),
+           let entry = tag.entry {
+            clickedWord = tag.word
+            selectedStrongsNumber = tag.strongsNumber
+            selectedStrongsEntry = entry
+            versesExpanded = false
+            loadStrongsDetail(entry: entry)
+            uiStateStore.selectedStrongsWord = nil
+        } else if !wordTags.isEmpty {
+            uiStateStore.selectedStrongsWord = nil
         }
     }
 

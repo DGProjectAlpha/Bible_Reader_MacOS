@@ -57,14 +57,26 @@ struct ContentView: View {
             .animation(.spring(duration: 0.35, bounce: 0.2), value: uiStateStore.sidebarVisible)
             .zIndex(2)
         }
+        .navigationTitle("Bible Reader")
+        .toolbarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Button {
-                    uiStateStore.sidebarVisible.toggle()
-                } label: {
-                    Image(systemName: "sidebar.leading")
+                HStack(spacing: 8) {
+                    Button {
+                        uiStateStore.sidebarVisible.toggle()
+                    } label: {
+                        Image(systemName: "sidebar.leading")
+                    }
+                    .help(String(localized: "toolbar.toggleSidebar"))
+
+                    if uiStateStore.sidebarVisible {
+                        Text("Bible Reader")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                            .transition(.opacity)
+                    }
                 }
-                .help(String(localized: "toolbar.toggleSidebar"))
+                .animation(.easeInOut(duration: 0.25), value: uiStateStore.sidebarVisible)
             }
 
             ToolbarItemGroup(placement: .automatic) {
