@@ -56,6 +56,7 @@ struct SidebarView: View {
                 }
             }
         }
+        .background(.sidebar)
         .symbolRenderingMode(.hierarchical)
         .onChange(of: uiStateStore.selectedVerseId) {
             loadStrongsData()
@@ -592,84 +593,44 @@ struct SidebarView: View {
                     }
                 }
 
-                // Verses section
+                // Similar / synonym entries (shown first)
                 if isLoadingDetail {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
-                } else if !strongsVerses.isEmpty {
+                } else if !similarEntries.isEmpty {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("sidebar.versesCount \(strongsVerses.count)")
+                        Text("sidebar.similar")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.top, 2)
-                        ForEach(strongsVerses.prefix(15)) { ref in
-                            let isRefHovered = hoveredVerseRef == ref.id
-                            Button {
-                                navigateToStrongsVerse(ref)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(ref.displayRef)
-                                        .font(.caption.bold())
-                                        .foregroundStyle(Color.accentColor)
-                                    Text(ref.text)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
-                                }
-                                .padding(.vertical, 3)
-                                .padding(.horizontal, 6)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background {
-                                    if #available(macOS 26.0, *) {
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .fill(.clear)
-                                            .glassEffect(.regular.tint(Color.accentColor.opacity(isRefHovered ? 0.10 : 0)), in: RoundedRectangle(cornerRadius: 6))
-                                    } else {
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .fill(isRefHovered ? Color.accentColor.opacity(0.06) : Color.clear)
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .onHover { hovering in
-                                hoveredVerseRef = hovering ? ref.id : nil
-                            }
-                            .animation(.easeInOut(duration: 0.15), value: isRefHovered)
-                        }
-                        if strongsVerses.count > 15 {
-                            Text("sidebar.moreCount \(strongsVerses.count - 15)")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                }
-
-                // Related entries
-                if !similarEntries.isEmpty {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("sidebar.related")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 2)
-                        ForEach(similarEntries.prefix(6)) { similar in
+                        ForEach(similarEntries.prefix(10)) { similar in
                             let isSimilarHovered = hoveredSimilar == similar.number
                             Button {
                                 selectedStrongsEntry = similar
                                 selectedStrongsNumber = similar.number
                                 loadStrongsDetail(entry: similar)
                             } label: {
-                                HStack(spacing: 4) {
-                                    Text(similar.number)
-                                        .font(.caption.monospaced())
-                                        .foregroundStyle(Color.accentColor)
-                                    if !similar.lemma.isEmpty {
-                                        Text(similar.lemma)
-                                            .font(.caption)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 4) {
+                                        Text(similar.number)
+                                            .font(.caption.monospaced())
+                                            .foregroundStyle(Color.accentColor)
+                                        if !similar.lemma.isEmpty {
+                                            Text(similar.lemma)
+                                                .font(.caption)
+                                        }
+                                    }
+                                    if let def = similar.kjvDefinition ?? similar.strongsDefinition {
+                                        Text(def)
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                            .lineLimit(1)
                                     }
                                 }
                                 .padding(.vertical, 3)
                                 .padding(.horizontal, 6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .background {
                                     if #available(macOS 26.0, *) {
                                         RoundedRectangle(cornerRadius: 6)
@@ -690,7 +651,7 @@ struct SidebarView: View {
                     }
                 }
 
-                // "See all verses" button with glass capsule
+                // "See all verses" button — shows verses using this Strong's number
                 Button {
                     uiStateStore.searchQuery = entry.number
                     Task {
@@ -698,8 +659,8 @@ struct SidebarView: View {
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: "magnifyingglass")
-                        Text("sidebar.seeAllVerses")
+                        Image(systemName: "text.book.closed")
+                        Text("sidebar.versesCount \(strongsVerses.count)")
                     }
                     .font(.caption)
                     .foregroundStyle(Color.accentColor)

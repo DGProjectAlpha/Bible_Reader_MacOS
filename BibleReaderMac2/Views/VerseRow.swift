@@ -342,7 +342,6 @@ struct VerseRow: View {
         let words = verse.text.split(separator: " ", omittingEmptySubsequences: false)
         let normalFont = NSFont.systemFont(ofSize: fontSize)
         let normalColor = NSColor.labelColor
-        let accentNSColor = NSColor.controlAccentColor
 
         for (i, word) in words.enumerated() {
             if i > 0 {
@@ -353,9 +352,7 @@ struct VerseRow: View {
                 let strongsNum = verse.strongsNumbers[i]
                 let attrs: [NSAttributedString.Key: Any] = [
                     .font: normalFont,
-                    .foregroundColor: accentNSColor,
-                    .underlineStyle: NSUnderlineStyle.single.rawValue,
-                    .underlineColor: accentNSColor.withAlphaComponent(0.4),
+                    .foregroundColor: normalColor,
                     .strongsNumber: strongsNum
                 ]
                 result.append(NSAttributedString(string: String(word), attributes: attrs))

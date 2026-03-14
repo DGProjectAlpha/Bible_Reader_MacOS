@@ -54,19 +54,12 @@ struct ReaderArea: View {
 private struct PaneContainer: View {
     @Environment(BibleStore.self) private var bibleStore
     let pane: ReadingPane
-    @State private var isHovering = false
 
     var body: some View {
         VStack(spacing: 0) {
             ReaderView(pane: pane)
         }
-        .background(isHovering ? Color.primary.opacity(0.03) : .clear)
-        .overlay(
-            RoundedRectangle(cornerRadius: 0)
-                .stroke(isHovering ? Color.primary.opacity(0.12) : .clear, lineWidth: 1)
-        )
         .contentShape(Rectangle())
-        .onHover { hovering in isHovering = hovering }
         .onTapGesture {
             bibleStore.setActivePane(id: pane.id)
         }
