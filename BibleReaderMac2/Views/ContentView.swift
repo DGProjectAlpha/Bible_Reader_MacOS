@@ -6,7 +6,7 @@ private struct SidebarGlassModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {
-            content.glassEffect(Glass(tint: Color.accentColor.opacity(0.08)), in: shape)
+            content.glassEffect(.regular.tint(Color.accentColor.opacity(0.08)), in: shape)
         } else {
             content.background(.ultraThinMaterial, in: shape)
         }
