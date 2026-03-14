@@ -58,6 +58,9 @@ struct SidebarView: View {
         .onChange(of: uiStateStore.selectedStrongsId) {
             autoSelectStrongsEntry()
         }
+        .onChange(of: uiStateStore.selectedStrongsWord) {
+            autoSelectStrongsEntryByWord()
+        }
     }
 
     // MARK: - 1. Bookmarks
@@ -1077,7 +1080,9 @@ struct SidebarView: View {
     // MARK: - Data Loading
 
     private func loadStrongsData() {
-        guard uiStateStore.isSectionExpanded(.strongs) else { return }
+        // Always load if strongs section is expanded OR if a word/strongs was just tapped
+        let hasPendingLookup = uiStateStore.selectedStrongsId != nil || uiStateStore.selectedStrongsWord != nil
+        guard uiStateStore.isSectionExpanded(.strongs) || hasPendingLookup else { return }
 
         selectedStrongsEntry = nil
         selectedStrongsNumber = nil
@@ -1110,6 +1115,7 @@ struct SidebarView: View {
                 wordTags = tags
                 isLoadingStrongs = false
                 autoSelectStrongsEntry()
+                autoSelectStrongsEntryByWord()
             }
         }
     }
@@ -1169,6 +1175,23 @@ struct SidebarView: View {
             selectedStrongsEntry = entry
             loadStrongsDetail(entry: entry)
             uiStateStore.selectedStrongsId = nil
+        }
+        // If word tags aren't loaded yet, loadStrongsData will call us after loading
+    }
+
+    private func autoSelectStrongsEntryByWord() {
+        guard let word = uiStateStore.selectedStrongsWord else { return }
+        // Match the clicked word (case-insensitive) against loaded word tags
+        let lowered = word.lowercased()
+        if let tag = wordTags.first(where: { $0.word.lowercased() == lowered }),
+           let entry = tag.entry {
+            selectedStrongsNumber = tag.strongsNumber
+            selectedStrongsEntry = entry
+            loadStrongsDetail(entry: entry)
+            uiStateStore.selectedStrongsWord = nil
+        } else if !wordTags.isEmpty {
+            // Word tags loaded but no match — clear the pending word
+            uiStateStore.selectedStrongsWord = nil
         }
         // If word tags aren't loaded yet, loadStrongsData will call us after loading
     }

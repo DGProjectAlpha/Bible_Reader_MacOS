@@ -103,7 +103,12 @@ struct SelectableVerseText: NSViewRepresentable {
                 selectionRect = boundingRect(for: range, in: textView)
             }
 
-            onSelectionChange(hasSelection, selectionRect)
+            // Defer to avoid "Modifying state during view update" when called
+            // from makeNSView → setAttributedString → delegate callback chain.
+            let callback = onSelectionChange
+            DispatchQueue.main.async {
+                callback(hasSelection, selectionRect)
+            }
         }
 
         /// Computes bounding rect for a character range using TextKit1.
@@ -202,9 +207,23 @@ final class VerseNSTextView: NSTextView {
         let charIndex = characterIndex(at: point)
         guard charIndex < textStorage.length else { return }
 
+        // First try: check for explicit Strong's attribute on the word
         let attrs = textStorage.attributes(at: charIndex, effectiveRange: nil)
         if let strongsNumber = attrs[.strongsNumber] as? String, !strongsNumber.isEmpty {
             coordinator?.onWordTap?(strongsNumber)
+            return
+        }
+
+        // Fallback: extract the clicked word and pass it prefixed with "word:"
+        // so the receiver can distinguish it from a Strong's number
+        let fullText = textStorage.string as NSString
+        let wordRange = fullText.rangeOfWord(at: charIndex)
+        if wordRange.location != NSNotFound, wordRange.length > 0 {
+            let word = fullText.substring(with: wordRange)
+            let trimmed = word.trimmingCharacters(in: .punctuationCharacters)
+            if !trimmed.isEmpty {
+                coordinator?.onWordTap?("word:\(trimmed)")
+            }
         }
     }
 
@@ -225,14 +244,17 @@ final class VerseNSTextView: NSTextView {
         return NSNotFound
     }
 
-    // Show pointing hand cursor when hovering over Strong's-attributed words.
+    // Show pointing hand cursor when hovering over clickable words.
+    // If onWordTap is set, ALL words are clickable (Strong's lookup on demand).
     override func mouseMoved(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        if let textStorage = textStorage {
+        if coordinator?.onWordTap != nil, let textStorage = textStorage {
             let charIndex = characterIndex(at: point)
             if charIndex < textStorage.length, charIndex != NSNotFound {
-                let attrs = textStorage.attributes(at: charIndex, effectiveRange: nil)
-                if let sn = attrs[.strongsNumber] as? String, !sn.isEmpty {
+                // Check if hovering over a word (not whitespace)
+                let ch = (textStorage.string as NSString).character(at: charIndex)
+                if let scalar = Unicode.Scalar(ch),
+                   !CharacterSet.whitespacesAndNewlines.contains(scalar) {
                     NSCursor.pointingHand.set()
                     return
                 }
@@ -253,5 +275,35 @@ final class VerseNSTextView: NSTextView {
             userInfo: nil
         )
         addTrackingArea(area)
+    }
+}
+
+// MARK: - NSString Word Extraction Helper
+
+private extension NSString {
+    /// Returns the range of the word surrounding the given character index.
+    func rangeOfWord(at index: Int) -> NSRange {
+        guard index < length else { return NSRange(location: NSNotFound, length: 0) }
+
+        let letters = CharacterSet.letters.union(.decimalDigits).union(CharacterSet(charactersIn: "''-"))
+        var start = index
+        var end = index
+
+        // Walk backwards to find word start
+        while start > 0 {
+            let ch = character(at: start - 1)
+            guard let scalar = Unicode.Scalar(ch), letters.contains(scalar) else { break }
+            start -= 1
+        }
+
+        // Walk forwards to find word end
+        while end < length {
+            let ch = character(at: end)
+            guard let scalar = Unicode.Scalar(ch), letters.contains(scalar) else { break }
+            end += 1
+        }
+
+        guard end > start else { return NSRange(location: NSNotFound, length: 0) }
+        return NSRange(location: start, length: end - start)
     }
 }

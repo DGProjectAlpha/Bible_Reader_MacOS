@@ -70,12 +70,17 @@ struct ReaderView: View {
                                 uiState.sidebarVisible = true
                                 uiState.expandedSidebarSections.insert(SidebarSection.crossReferences.rawValue)
                             },
-                            onStrongsTap: { strongsId in
+                            onStrongsTap: { tappedValue in
                                 uiState.selectedVerseId = verse.id
                                 uiState.inspectorTab = .strongs
                                 uiState.sidebarVisible = true
                                 uiState.expandedSidebarSections.insert(SidebarSection.strongs.rawValue)
-                                uiState.selectedStrongsId = strongsId
+                                if tappedValue.hasPrefix("word:") {
+                                    // Clicked a plain word — store for sidebar to match after loading
+                                    uiState.selectedStrongsWord = String(tappedValue.dropFirst(5))
+                                } else {
+                                    uiState.selectedStrongsId = tappedValue
+                                }
                             }
                         )
                         .id(verse.verseNumber)

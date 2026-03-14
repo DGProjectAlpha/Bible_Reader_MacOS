@@ -184,8 +184,8 @@ struct VerseRow: View {
                 hasTextSelection = selected
                 selectionRect = rect
             },
-            onWordTap: verse.strongsNumbers.isEmpty ? nil : { strongsId in
-                onStrongsTap(strongsId)
+            onWordTap: { tappedValue in
+                onStrongsTap(tappedValue)
             }
         )
         .frame(maxWidth: .infinity, alignment: .leading)

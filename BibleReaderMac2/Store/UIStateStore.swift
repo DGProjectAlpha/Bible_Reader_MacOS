@@ -12,6 +12,7 @@ final class UIStateStore {
     var inspectorTab: InspectorTab = .strongs
     var inspectorVisible: Bool = false
     var selectedStrongsId: String? = nil
+    var selectedStrongsWord: String? = nil
 
     @ObservationIgnored @AppStorage("appLanguage") var appLanguage: String = "en"
 
