@@ -103,37 +103,15 @@ struct SelectableVerseText: NSViewRepresentable {
             onSelectionChange(hasSelection, selectionRect)
         }
 
-        /// Computes bounding rect for a character range using TextKit2 if available,
-        /// falling back to TextKit1 on older systems.
+        /// Computes bounding rect for a character range using TextKit1.
+        @MainActor
         private func boundingRect(for range: NSRange, in textView: NSTextView) -> CGRect {
-            // TextKit2 path (macOS 14+)
-            if let textLayoutManager = textView.textLayoutManager,
-               let contentManager = textLayoutManager.textContentManager,
-               let start = contentManager.location(contentManager.documentRange.location, offsetBy: range.location),
-               let end = contentManager.location(start, offsetBy: range.length) {
-                let textRange = NSTextRange(location: start, end: end)
-                var rect = CGRect.zero
-                textLayoutManager.enumerateTextSegments(in: textRange!, type: .standard, options: []) { _, segmentRect, _, _ in
-                    if rect == .zero {
-                        rect = segmentRect
-                    } else {
-                        rect = rect.union(segmentRect)
-                    }
-                    return true
-                }
-                if rect != .zero {
-                    return textView.convert(rect, to: nil)
-                }
-            }
-
-            // TextKit1 fallback (macOS 13 and earlier)
             if let layoutManager = textView.layoutManager,
                let textContainer = textView.textContainer {
                 let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
                 let rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
                 return textView.convert(rect, to: nil)
             }
-
             return .zero
         }
     }
@@ -210,22 +188,12 @@ final class VerseNSTextView: NSTextView {
         }
     }
 
-    /// Resolves a point to a character index using TextKit2 or TextKit1.
+    /// Resolves a point to a character index using TextKit1.
     private func characterIndex(at point: NSPoint) -> Int {
         let textContainerOrigin = self.textContainerOrigin
         let adjusted = NSPoint(x: point.x - textContainerOrigin.x,
                                y: point.y - textContainerOrigin.y)
 
-        // TextKit2 path
-        if let textLayoutManager = textLayoutManager,
-           let contentManager = textLayoutManager.textContentManager {
-            let location = textLayoutManager.location(interactingAt: adjusted, inContainerAt: textLayoutManager.documentRange.location)
-            if let loc = location {
-                return contentManager.offset(from: contentManager.documentRange.location, to: loc)
-            }
-        }
-
-        // TextKit1 fallback
         if let layoutManager = layoutManager, let textContainer = textContainer {
             return layoutManager.characterIndex(
                 for: adjusted,

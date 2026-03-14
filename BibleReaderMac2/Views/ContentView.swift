@@ -1,5 +1,18 @@
 import SwiftUI
 
+/// Applies .glassEffect on macOS 26+, falls back to ultraThinMaterial on older versions.
+private struct SidebarGlassModifier: ViewModifier {
+    private let shape = UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: 16, topTrailingRadius: 16)
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.glassEffect(Glass(tint: Color.accentColor.opacity(0.08)), in: shape)
+        } else {
+            content.background(.ultraThinMaterial, in: shape)
+        }
+    }
+}
+
 struct ContentView: View {
     @Environment(BibleStore.self) private var bibleStore
     @Environment(UserDataStore.self) private var userDataStore
@@ -18,7 +31,7 @@ struct ContentView: View {
             SidebarView(sidebarHeight: geometry.size.height)
                 .frame(width: sidebarWidth)
                 .frame(maxHeight: .infinity)
-                .glassEffect(Glass(tint: Color.accentColor.opacity(0.08)), in: UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: 16, topTrailingRadius: 16))
+                .modifier(SidebarGlassModifier())
                 .clipShape(UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: 16, topTrailingRadius: 16))
                 .offset(x: uiStateStore.sidebarVisible ? 0 : -sidebarWidth)
                 .allowsHitTesting(uiStateStore.sidebarVisible)
