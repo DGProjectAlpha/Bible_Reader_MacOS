@@ -52,7 +52,7 @@ struct VerseRow: View {
             .contextMenu { verseContextMenu }
             .sheet(isPresented: $showNoteEditor) {
                 noteEditorSheet
-                    .presentationBackground(.glass)
+                    .if_available_glass_background()
             }
     }
 
@@ -422,6 +422,19 @@ struct VerseRow: View {
         case .green: return .green
         case .orange: return .orange
         case .purple: return .purple
+        }
+    }
+}
+
+// MARK: - Glass Background Availability Helper
+
+private extension View {
+    @ViewBuilder
+    func if_available_glass_background() -> some View {
+        if #available(macOS 26.0, *) {
+            self.presentationBackground(.glass)
+        } else {
+            self.presentationBackground(.ultraThinMaterial)
         }
     }
 }
