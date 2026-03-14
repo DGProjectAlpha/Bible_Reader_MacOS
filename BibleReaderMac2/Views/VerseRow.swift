@@ -238,7 +238,7 @@ struct VerseRow: View {
                     Button {
                         Task { await addBookmark(color: color) }
                     } label: {
-                        Label(String(localized: String.LocalizationValue("color.\(color.rawValue)")), systemImage: "bookmark.fill")
+                        Label(color.displayName, systemImage: "bookmark.fill")
                     }
                 }
             } label: {
@@ -261,7 +261,7 @@ struct VerseRow: View {
                     Button {
                         Task { await addHighlight(color: color) }
                     } label: {
-                        Label(String(localized: String.LocalizationValue("color.\(color.rawValue)")), systemImage: "paintbrush.fill")
+                        Label(color.displayName, systemImage: "paintbrush.fill")
                     }
                 }
             } label: {

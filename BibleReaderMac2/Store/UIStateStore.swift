@@ -59,27 +59,29 @@ final class UIStateStore {
             searchResults = []
             return
         }
-        if searchModuleId.isEmpty {
-            // Search all modules
-            searchResults = await bibleStore.searchAllModules(query: searchQuery)
-        } else {
+        // Search only modules that are currently open in panes
+        let openModuleIds = Set(bibleStore.panes.map { $0.location.moduleId })
+        var allResults: [SearchResult] = []
+        for moduleId in openModuleIds {
             do {
                 let verses = try await bibleStore.searchVerses(
-                    moduleId: searchModuleId,
+                    moduleId: moduleId,
                     query: searchQuery
                 )
-                let module = bibleStore.modules.first(where: { $0.id == searchModuleId })
-                searchResults = verses.map { verse in
+                let module = bibleStore.modules.first(where: { $0.id == moduleId })
+                let results = verses.map { verse in
                     SearchResult(
-                        id: "\(searchModuleId):\(verse.id)",
-                        moduleId: searchModuleId,
-                        moduleName: module?.abbreviation ?? searchModuleId,
+                        id: "\(moduleId):\(verse.id)",
+                        moduleId: moduleId,
+                        moduleName: module?.abbreviation ?? moduleId,
                         verse: verse
                     )
                 }
+                allResults.append(contentsOf: results)
             } catch {
-                searchResults = []
+                // skip failed module
             }
         }
+        searchResults = allResults
     }
 }

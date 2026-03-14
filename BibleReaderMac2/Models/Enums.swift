@@ -17,6 +17,10 @@ enum BookmarkColor: String, Codable, CaseIterable {
         case .purple: return .purple
         }
     }
+
+    var displayName: String {
+        rawValue.capitalized
+    }
 }
 
 enum LoadingState {

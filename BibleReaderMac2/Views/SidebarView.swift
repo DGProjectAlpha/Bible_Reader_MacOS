@@ -188,12 +188,16 @@ struct SidebarView: View {
             // Content (expandable)
             if uiStateStore.isSectionExpanded(.highlights) {
                 // Sort picker
-                Picker("Sort", selection: $highlightSortMode) {
+                Picker(selection: $highlightSortMode) {
                     ForEach(HighlightSortMode.allCases) { mode in
                         Text(mode.label).tag(mode)
                     }
+                } label: {
+                    EmptyView()
                 }
+                .labelsHidden()
                 .pickerStyle(.segmented)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 6)
                 .padding(.top, 4)
 
@@ -230,7 +234,7 @@ struct SidebarView: View {
                         Circle()
                             .fill(swiftColor(for: color))
                             .frame(width: 8, height: 8)
-                        Text(String(localized: String.LocalizationValue("color.\(color.rawValue)")))
+                        Text(color.displayName)
                             .font(.caption)
                     }
                     .padding(.top, 4)
@@ -812,17 +816,6 @@ struct SidebarView: View {
         @Bindable var uiState = uiStateStore
 
         return VStack(alignment: .leading, spacing: 6) {
-            // Module filter picker
-            Picker("", selection: $uiState.searchModuleId) {
-                Text(String(localized: "sidebar.allModules")).tag("")
-                ForEach(bibleStore.modules) { module in
-                    Text(module.abbreviation).tag(module.id)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .font(.caption2)
-
             // Search bar
             HStack {
                 Image(systemName: "magnifyingglass")
