@@ -19,9 +19,11 @@ struct SidebarView: View {
     @State private var selectedStrongsNumber: String? = nil
     @State private var strongsVerses: [StrongsVerseReference] = []
     @State private var similarEntries: [StrongsEntry] = []
+    @State private var viewingVersesForEntry: StrongsEntry? = nil
     @State private var isLoadingStrongs = false
     @State private var isLoadingCrossRefs = false
     @State private var isLoadingDetail = false
+    @State private var isLoadingVerses = false
     @State private var strongsTask: Task<Void, Never>?
     @State private var crossRefTask: Task<Void, Never>?
 
@@ -517,168 +519,216 @@ struct SidebarView: View {
 
     @State private var hoveredVerseRef: UUID? = nil
     @State private var hoveredSimilar: String? = nil
+    @State private var hoveredStrongsEntry: String? = nil
 
     private var strongsDetailContent: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Back button
-            Button {
-                selectedStrongsEntry = nil
-                selectedStrongsNumber = nil
-                strongsVerses = []
-                similarEntries = []
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.left")
-                        .imageScale(.small)
-                    Text("sidebar.backToWords")
-                }
-                .font(.caption)
-                .padding(.vertical, 3)
-                .padding(.horizontal, 8)
-                .background {
-                    if #available(macOS 26.0, *) {
-                        Capsule()
-                            .fill(.clear)
-                            .glassEffect(.regular.tint(Color.accentColor.opacity(0.1)), in: Capsule())
-                    } else {
-                        Capsule()
-                            .fill(Color.accentColor.opacity(0.08))
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.accentColor)
+            if let versesEntry = viewingVersesForEntry {
+                // VERSES VIEW — showing verses for a specific Strong's entry
+                strongsVersesView(for: versesEntry)
+            } else if let entry = selectedStrongsEntry {
+                // DETAIL VIEW — exact entry + similar entries
+                strongsEntryCard(entry)
 
-            if let entry = selectedStrongsEntry {
-                // Entry header card
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(entry.number)
-                            .font(.headline.monospaced())
-                            .foregroundStyle(Color.accentColor)
-                        if !entry.lemma.isEmpty {
-                            Text(entry.lemma)
-                                .font(.subheadline)
-                        }
-                    }
-
-                    if !entry.transliteration.isEmpty {
-                        Text(entry.transliteration)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .italic()
-                    }
-
-                    if let strongsDef = entry.strongsDefinition, !strongsDef.isEmpty {
-                        Text(strongsDef)
-                            .font(.caption)
-                    }
-
-                    if let kjvDef = entry.kjvDefinition, !kjvDef.isEmpty {
-                        Text("common.kjvPrefix \(kjvDef)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background {
-                    if #available(macOS 26.0, *) {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(.clear)
-                            .glassEffect(.regular.tint(Color.accentColor.opacity(0.06)), in: RoundedRectangle(cornerRadius: 10))
-                    } else {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.accentColor.opacity(0.05))
-                    }
-                }
-
-                // Similar / synonym entries (shown first)
+                // Similar / synonym entries
                 if isLoadingDetail {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                 } else if !similarEntries.isEmpty {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("sidebar.similar")
+                        Text("sidebar.related")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.top, 2)
                         ForEach(similarEntries.prefix(10)) { similar in
-                            let isSimilarHovered = hoveredSimilar == similar.number
-                            Button {
-                                selectedStrongsEntry = similar
-                                selectedStrongsNumber = similar.number
-                                loadStrongsDetail(entry: similar)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 4) {
-                                        Text(similar.number)
-                                            .font(.caption.monospaced())
-                                            .foregroundStyle(Color.accentColor)
-                                        if !similar.lemma.isEmpty {
-                                            Text(similar.lemma)
-                                                .font(.caption)
-                                        }
-                                    }
-                                    if let def = similar.kjvDefinition ?? similar.strongsDefinition {
-                                        Text(def)
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                            .lineLimit(1)
-                                    }
-                                }
-                                .padding(.vertical, 3)
-                                .padding(.horizontal, 6)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background {
-                                    if #available(macOS 26.0, *) {
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .fill(.clear)
-                                            .glassEffect(.regular.tint(Color.accentColor.opacity(isSimilarHovered ? 0.10 : 0)), in: RoundedRectangle(cornerRadius: 6))
-                                    } else {
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .fill(isSimilarHovered ? Color.accentColor.opacity(0.06) : Color.clear)
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .onHover { hovering in
-                                hoveredSimilar = hovering ? similar.number : nil
-                            }
-                            .animation(.easeInOut(duration: 0.15), value: isSimilarHovered)
+                            strongsEntryRow(similar)
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // Card showing a Strong's entry (number, lemma, definition) — clickable to see verses
+    private func strongsEntryCard(_ entry: StrongsEntry) -> some View {
+        let isHovered = hoveredStrongsEntry == entry.number
+        return Button {
+            loadVersesForEntry(entry)
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(entry.number)
+                        .font(.headline.monospaced())
+                        .foregroundStyle(Color.accentColor)
+                    if !entry.lemma.isEmpty {
+                        Text(entry.lemma)
+                            .font(.subheadline)
                     }
                 }
 
-                // "See all verses" button — shows verses using this Strong's number
-                Button {
-                    uiStateStore.searchQuery = entry.number
-                    Task {
-                        await uiStateStore.performSearch(using: bibleStore)
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "text.book.closed")
-                        Text("sidebar.versesCount \(strongsVerses.count)")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(Color.accentColor)
-                    .padding(.vertical, 5)
-                    .padding(.horizontal, 10)
-                    .background {
-                        if #available(macOS 26.0, *) {
-                            Capsule()
-                                .fill(.clear)
-                                .glassEffect(.regular.tint(Color.accentColor.opacity(0.1)), in: Capsule())
-                        } else {
-                            Capsule()
-                                .fill(Color.accentColor.opacity(0.08))
-                        }
+                if !entry.transliteration.isEmpty {
+                    Text(entry.transliteration)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .italic()
+                }
+
+                if let strongsDef = entry.strongsDefinition, !strongsDef.isEmpty {
+                    Text(strongsDef)
+                        .font(.caption)
+                }
+
+                if let kjvDef = entry.kjvDefinition, !kjvDef.isEmpty {
+                    Text("common.kjvPrefix \(kjvDef)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                if #available(macOS 26.0, *) {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(.clear)
+                        .glassEffect(.regular.tint(Color.accentColor.opacity(isHovered ? 0.10 : 0.06)), in: RoundedRectangle(cornerRadius: 10))
+                } else {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.accentColor.opacity(isHovered ? 0.08 : 0.05))
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in hoveredStrongsEntry = hovering ? entry.number : nil }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+    }
+
+    // Row for a similar/synonym entry — clickable to see its verses
+    private func strongsEntryRow(_ entry: StrongsEntry) -> some View {
+        let isHovered = hoveredSimilar == entry.number
+        return Button {
+            loadVersesForEntry(entry)
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(entry.number)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(Color.accentColor)
+                    if !entry.lemma.isEmpty {
+                        Text(entry.lemma)
+                            .font(.caption)
                     }
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 2)
+                if let def = entry.kjvDefinition ?? entry.strongsDefinition {
+                    Text(def)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(2)
+                }
+            }
+            .padding(.vertical, 3)
+            .padding(.horizontal, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                if #available(macOS 26.0, *) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(.clear)
+                        .glassEffect(.regular.tint(Color.accentColor.opacity(isHovered ? 0.10 : 0)), in: RoundedRectangle(cornerRadius: 6))
+                } else {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isHovered ? Color.accentColor.opacity(0.06) : Color.clear)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in hoveredSimilar = hovering ? entry.number : nil }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+    }
+
+    // Verses view — shows list of verses using a specific Strong's number
+    private func strongsVersesView(for entry: StrongsEntry) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Back button
+            Button {
+                viewingVersesForEntry = nil
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left")
+                        .imageScale(.small)
+                    Text("sidebar.back")
+                }
+                .font(.caption)
+                .foregroundStyle(Color.accentColor)
+            }
+            .buttonStyle(.plain)
+
+            // Entry summary
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(entry.number)
+                    .font(.subheadline.monospaced().bold())
+                    .foregroundStyle(Color.accentColor)
+                if !entry.lemma.isEmpty {
+                    Text(entry.lemma)
+                        .font(.caption)
+                }
+            }
+
+            if isLoadingVerses {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            } else if strongsVerses.isEmpty {
+                Text("sidebar.noVersesFound")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            } else {
+                Text("\(strongsVerses.count) verses")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                ForEach(strongsVerses.prefix(100)) { ref in
+                    Button {
+                        navigateToStrongsVerse(ref)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(ref.displayRef)
+                                .font(.caption.bold())
+                                .foregroundStyle(Color.accentColor)
+                            Text(ref.text)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func loadVersesForEntry(_ entry: StrongsEntry) {
+        viewingVersesForEntry = entry
+        isLoadingVerses = true
+        strongsVerses = []
+        let moduleId = bibleStore.activeModuleId
+        let number = entry.number
+        Task {
+            let verses = await StrongsService.shared.findVersesByStrongs(number, moduleId: moduleId)
+            await MainActor.run {
+                strongsVerses = verses
+                isLoadingVerses = false
+            }
+        }
+    }
+
+    private func navigateToStrongsVerse(_ ref: StrongsVerseReference) {
+        let moduleId = bibleStore.activeModuleId
+        let location = BibleLocation(moduleId: moduleId, book: ref.book, chapter: ref.chapter, verseNumber: ref.verse)
+        Task {
+            if let paneId = bibleStore.activePaneId {
+                await bibleStore.navigate(paneId: paneId, to: location)
+            }
+            await MainActor.run {
+                uiStateStore.selectedVerseId = "\(ref.book).\(ref.chapter).\(ref.verse)"
             }
         }
     }
@@ -1061,6 +1111,7 @@ struct SidebarView: View {
         selectedStrongsNumber = nil
         strongsVerses = []
         similarEntries = []
+        viewingVersesForEntry = nil
 
         guard let verseId = uiStateStore.selectedVerseId else {
             wordTags = []
@@ -1154,8 +1205,9 @@ struct SidebarView: View {
 
     private func autoSelectStrongsEntryByWord() {
         guard let word = uiStateStore.selectedStrongsWord else { return }
-        // Match the clicked word (case-insensitive) against loaded word tags
         let lowered = word.lowercased()
+
+        // Try matching the clicked word against loaded word tags first
         if let tag = wordTags.first(where: { $0.word.lowercased() == lowered }),
            let entry = tag.entry {
             selectedStrongsNumber = tag.strongsNumber
@@ -1163,8 +1215,24 @@ struct SidebarView: View {
             loadStrongsDetail(entry: entry)
             uiStateStore.selectedStrongsWord = nil
         } else if !wordTags.isEmpty {
-            // Word tags loaded but no match — clear the pending word
+            // Word tags loaded but no match — do a reverse-index search by word text
+            // so we never fall back to showing the full verse word list
             uiStateStore.selectedStrongsWord = nil
+            let moduleId = bibleStore.activeModuleId
+            isLoadingDetail = true
+            Task {
+                let result = await StrongsService.shared.searchSimilar(word: word, preferredModule: moduleId)
+                await MainActor.run {
+                    if let exact = result.exact {
+                        selectedStrongsNumber = exact.number
+                        selectedStrongsEntry = exact
+                        similarEntries = result.similar
+                        isLoadingDetail = false
+                    } else {
+                        isLoadingDetail = false
+                    }
+                }
+            }
         }
         // If word tags aren't loaded yet, loadStrongsData will call us after loading
     }
@@ -1173,18 +1241,13 @@ struct SidebarView: View {
         let moduleId = bibleStore.activeModuleId
         let number = entry.number
         isLoadingDetail = true
-        strongsVerses = []
         similarEntries = []
+        viewingVersesForEntry = nil
 
         Task {
-            async let versesResult = StrongsService.shared.findVersesByStrongs(number, moduleId: moduleId)
-            async let similarResult = StrongsService.shared.findSimilarByDefinition(number: number, preferredModule: moduleId)
-
-            let verses = await versesResult
-            let similar = await similarResult
+            let similar = await StrongsService.shared.findSimilarByDefinition(number: number, preferredModule: moduleId)
 
             await MainActor.run {
-                strongsVerses = verses
                 similarEntries = similar
                 isLoadingDetail = false
             }

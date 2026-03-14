@@ -22,8 +22,8 @@
 
 "sidebar.noStrongsData" = "Нет данных Стронга для этого стиха";
 "sidebar.selectVerseStrongs" = "Выберите стих для просмотра чисел Стронга";
-"sidebar.backToWords" = "Назад к словам";
-"sidebar.versesCount %lld" = "Стихи (%lld)";
+"sidebar.back" = "Назад";
+"sidebar.noVersesFound" = "Стихи не найдены";
 "sidebar.moreCount %lld" = "ещё %lld";
 "sidebar.related" = "Связанные";
 "sidebar.seeAllVerses" = "Смотреть все стихи";

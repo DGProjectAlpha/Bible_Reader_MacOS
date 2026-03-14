@@ -22,8 +22,8 @@
 
 "sidebar.noStrongsData" = "No Strong's data for this verse";
 "sidebar.selectVerseStrongs" = "Select a verse to view Strong's numbers";
-"sidebar.backToWords" = "Back to words";
-"sidebar.versesCount %lld" = "Verses (%lld)";
+"sidebar.back" = "Back";
+"sidebar.noVersesFound" = "No verses found";
 "sidebar.moreCount %lld" = "+ %lld more";
 "sidebar.related" = "Related";
 "sidebar.seeAllVerses" = "See All Verses";
