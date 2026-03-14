@@ -431,10 +431,6 @@ struct VerseRow: View {
 private extension View {
     @ViewBuilder
     func if_available_glass_background() -> some View {
-        if #available(macOS 26.0, *) {
-            self.presentationBackground(.regularGlass)
-        } else {
-            self.presentationBackground(.ultraThinMaterial)
-        }
+        self.presentationBackground(.ultraThinMaterial)
     }
 }
