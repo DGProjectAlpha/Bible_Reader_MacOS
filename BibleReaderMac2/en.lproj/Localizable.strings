@@ -26,6 +26,7 @@
 "sidebar.versesCount %lld" = "Verses (%lld)";
 "sidebar.moreCount %lld" = "+ %lld more";
 "sidebar.related" = "Related";
+"sidebar.seeAllVerses" = "See All Verses";
 
 "sidebar.noCrossReferences" = "No cross-references for this verse";
 "sidebar.selectVerseCrossRefs" = "Select a verse to view cross references";

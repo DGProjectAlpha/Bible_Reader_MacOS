@@ -26,6 +26,7 @@
 "sidebar.versesCount %lld" = "Стихи (%lld)";
 "sidebar.moreCount %lld" = "ещё %lld";
 "sidebar.related" = "Связанные";
+"sidebar.seeAllVerses" = "Смотреть все стихи";
 
 "sidebar.noCrossReferences" = "Нет перекрёстных ссылок для этого стиха";
 "sidebar.selectVerseCrossRefs" = "Выберите стих для просмотра перекрёстных ссылок";

@@ -175,7 +175,7 @@ struct PaneToolbar: View {
         }
         .disabled(pane.location.chapter <= 1)
         .opacity(pane.location.chapter <= 1 ? 0.3 : 1.0)
-        .help(String(localized: "pane.previousChapter"))
+        .help(String(localized: "toolbar.previousChapter"))
     }
 
     private var nextChapterButton: some View {
@@ -191,7 +191,7 @@ struct PaneToolbar: View {
         }
         .disabled(pane.location.chapter >= (currentBook?.chapterCount ?? 1))
         .opacity(pane.location.chapter >= (currentBook?.chapterCount ?? 1) ? 0.3 : 1.0)
-        .help(String(localized: "pane.nextChapter"))
+        .help(String(localized: "toolbar.nextChapter"))
     }
 
     // MARK: - Split Buttons

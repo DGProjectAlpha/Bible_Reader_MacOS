@@ -34,7 +34,7 @@ struct SelectableVerseText: NSViewRepresentable {
         textView.coordinator = context.coordinator
         context.coordinator.textView = textView
 
-        let scrollView = NSScrollView()
+        let scrollView = IntrinsicScrollView()
         scrollView.documentView = textView
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
@@ -74,6 +74,9 @@ struct SelectableVerseText: NSViewRepresentable {
                 NSAttributedString(string: text, attributes: attrs)
             )
         }
+        // setAttributedString doesn't trigger didChangeText, so manually invalidate sizes
+        textView.invalidateIntrinsicContentSize()
+        textView.enclosingScrollView?.invalidateIntrinsicContentSize()
     }
 
     // MARK: - Coordinator
@@ -117,6 +120,21 @@ struct SelectableVerseText: NSViewRepresentable {
     }
 }
 
+// MARK: - Custom NSScrollView that forwards intrinsic size from its document view
+
+/// NSScrollView subclass that reports its document view's intrinsic content size
+/// so SwiftUI can size the view correctly (otherwise NSScrollView returns zero height).
+final class IntrinsicScrollView: NSScrollView {
+    override var intrinsicContentSize: NSSize {
+        guard let docView = documentView else { return super.intrinsicContentSize }
+        let size = docView.intrinsicContentSize
+        return NSSize(
+            width: NSView.noIntrinsicMetric,
+            height: size.height > 0 ? size.height : super.intrinsicContentSize.height
+        )
+    }
+}
+
 // MARK: - Custom NSTextView subclass for intrinsic sizing + word tap
 
 /// Custom NSTextView that reports its intrinsic content size so it integrates
@@ -147,11 +165,13 @@ final class VerseNSTextView: NSTextView {
     override func didChangeText() {
         super.didChangeText()
         invalidateIntrinsicContentSize()
+        enclosingScrollView?.invalidateIntrinsicContentSize()
     }
 
     override func layout() {
         super.layout()
         invalidateIntrinsicContentSize()
+        enclosingScrollView?.invalidateIntrinsicContentSize()
     }
 
     override func mouseDown(with event: NSEvent) {

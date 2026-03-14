@@ -23,7 +23,7 @@ struct BookmarksTabView: View {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Bookmarks")
+                    Text("bookmarks.title")
                         .font(.headline)
                     Text(verseId)
                         .font(.caption)
@@ -47,7 +47,7 @@ struct BookmarksTabView: View {
                         .foregroundStyle(Color.accentColor)
                 }
                 .buttonStyle(.plain)
-                .help("Add bookmark")
+                .help(String(localized: "bookmarks.addBookmark"))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -59,10 +59,10 @@ struct BookmarksTabView: View {
                     Image(systemName: "bookmark")
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)
-                    Text("No bookmarks for this verse")
+                    Text("bookmarks.noBookmarksForVerse")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    Text("Tap + to add one")
+                    Text("bookmarks.tapToAdd")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -89,10 +89,10 @@ struct BookmarksTabView: View {
                     Image(systemName: "bookmark")
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)
-                    Text("No bookmarks yet")
+                    Text("bookmarks.noBookmarksYet")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    Text("Select a verse to add a bookmark")
+                    Text("bookmarks.selectVerseToAdd")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -104,7 +104,9 @@ struct BookmarksTabView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "bookmark.fill")
                                 .foregroundStyle(Color.accentColor)
-                            Text("\(userDataStore.bookmarks.count) bookmark\(userDataStore.bookmarks.count == 1 ? "" : "s")")
+                            Text(userDataStore.bookmarks.count == 1
+                                ? String(localized: "bookmarks.count \(userDataStore.bookmarks.count)")
+                                : String(localized: "bookmarks.countPlural \(userDataStore.bookmarks.count)"))
                                 .font(.subheadline.bold())
                             Spacer()
 
