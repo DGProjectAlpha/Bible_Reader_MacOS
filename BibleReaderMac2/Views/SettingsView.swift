@@ -132,7 +132,7 @@ struct SettingsView: View {
             guard panel.runModal() == .OK, let url = panel.url else { return }
 
             do {
-                try ModuleManager.importModule(from: url)
+                _ = try ModuleManager.importModule(from: url)
                 try await bibleStore.loadModules()
                 installedModules = ModuleManager.discoverModules()
             } catch {
