@@ -33,6 +33,7 @@
 
 "sidebar.searchIn %@" = "Search in %@…";
 "sidebar.noResultsFor %@" = "No results for \"%@\"";
+"sidebar.allModules" = "All";
 
 "sidebar.noRecentHistory" = "No recent history";
 "sidebar.clearHistory" = "Clear History";

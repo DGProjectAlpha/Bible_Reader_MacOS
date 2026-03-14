@@ -155,6 +155,24 @@ final class BibleStore {
         return try await databaseService.searchVerses(moduleId: moduleId, query: query)
     }
 
+    func searchAllModules(query: String) async -> [SearchResult] {
+        guard !query.isEmpty else { return [] }
+        var results: [SearchResult] = []
+        for module in modules {
+            if let verses = try? await databaseService.searchVerses(moduleId: module.id, query: query) {
+                for verse in verses {
+                    results.append(SearchResult(
+                        id: "\(module.id):\(verse.id)",
+                        moduleId: module.id,
+                        moduleName: module.abbreviation,
+                        verse: verse
+                    ))
+                }
+            }
+        }
+        return results
+    }
+
     // MARK: - Versification
 
     private let versificationService = VersificationService.shared

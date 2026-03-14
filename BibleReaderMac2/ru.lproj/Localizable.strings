@@ -33,6 +33,7 @@
 
 "sidebar.searchIn %@" = "Искать в %@…";
 "sidebar.noResultsFor %@" = "Нет результатов для «%@»";
+"sidebar.allModules" = "Все";
 
 "sidebar.noRecentHistory" = "Нет недавней истории";
 "sidebar.clearHistory" = "Очистить историю";

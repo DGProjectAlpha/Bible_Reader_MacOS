@@ -801,12 +801,23 @@ struct SidebarView: View {
         @Bindable var uiState = uiStateStore
 
         return VStack(alignment: .leading, spacing: 6) {
-            // Always-visible search bar
+            // Module filter picker
+            Picker("", selection: $uiState.searchModuleId) {
+                Text(String(localized: "sidebar.allModules")).tag("")
+                ForEach(bibleStore.modules) { module in
+                    Text(module.abbreviation).tag(module.id)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .font(.caption2)
+
+            // Search bar
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .font(.caption)
-                TextField("sidebar.searchIn \(activeModuleName)", text: $uiState.searchQuery)
+                TextField(String(localized: "sidebar.search"), text: $uiState.searchQuery)
                     .textFieldStyle(.plain)
                     .font(.subheadline)
                     .onSubmit {
@@ -834,16 +845,24 @@ struct SidebarView: View {
             } else if !uiStateStore.searchResults.isEmpty {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(uiStateStore.searchResults) { verse in
+                        ForEach(uiStateStore.searchResults) { result in
                             Button {
-                                navigateToSearchResult(verse)
+                                navigateToSearchResult(result)
                             } label: {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(verseReference(verse))
-                                        .font(.caption)
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(.secondary)
-                                    Text(verse.text)
+                                    HStack(spacing: 4) {
+                                        Text(result.moduleName)
+                                            .font(.caption2)
+                                            .padding(.horizontal, 4)
+                                            .padding(.vertical, 1)
+                                            .background(Color.accentColor.opacity(0.15))
+                                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                                        Text(searchVerseReference(result))
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Text(result.verse.text)
                                         .font(.caption)
                                         .lineLimit(2)
                                 }
@@ -1000,18 +1019,22 @@ struct SidebarView: View {
         }
     }
 
-    private func navigateToSearchResult(_ verse: Verse) {
+    private func navigateToSearchResult(_ result: SearchResult) {
         guard let paneId = bibleStore.activePaneId else { return }
         let location = BibleLocation(
-            moduleId: bibleStore.activeModuleId,
-            book: verse.book,
-            chapter: verse.chapter,
-            verseNumber: verse.verseNumber
+            moduleId: result.moduleId,
+            book: result.verse.book,
+            chapter: result.verse.chapter,
+            verseNumber: result.verse.verseNumber
         )
         Task {
+            // Switch active module if needed
+            if bibleStore.activeModuleId != result.moduleId {
+                bibleStore.activeModuleId = result.moduleId
+            }
             await bibleStore.navigate(paneId: paneId, to: location)
             await MainActor.run {
-                uiStateStore.selectedVerseId = verse.id
+                uiStateStore.selectedVerseId = result.verse.id
             }
         }
     }
@@ -1047,6 +1070,13 @@ struct SidebarView: View {
             .first(where: { $0.id == bibleStore.activeModuleId })?
             .books.first(where: { $0.id == verse.book })?.name ?? verse.book
         return "\(bookName) \(verse.chapter):\(verse.verseNumber)"
+    }
+
+    private func searchVerseReference(_ result: SearchResult) -> String {
+        let bookName = bibleStore.modules
+            .first(where: { $0.id == result.moduleId })?
+            .books.first(where: { $0.id == result.verse.book })?.name ?? result.verse.book
+        return "\(bookName) \(result.verse.chapter):\(result.verse.verseNumber)"
     }
 
     private func swiftColor(for color: BookmarkColor) -> Color {

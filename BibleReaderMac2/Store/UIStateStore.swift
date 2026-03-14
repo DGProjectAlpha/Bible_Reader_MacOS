@@ -6,15 +6,15 @@ final class UIStateStore {
     var sidebarVisibility: NavigationSplitViewVisibility = .automatic
     var selectedVerseId: String? = nil
     var searchQuery: String = ""
-    var searchResults: [Verse] = []
-    var searchModuleId: String = ""
+    var searchResults: [SearchResult] = []
+    var searchModuleId: String = ""  // empty = all modules
     var expandedSidebarSections: Set<String> = []
     var inspectorTab: InspectorTab = .strongs
     var inspectorVisible: Bool = false
     var selectedStrongsId: String? = nil
     var selectedStrongsWord: String? = nil
 
-    @ObservationIgnored @AppStorage("appLanguage") var appLanguage: String = "en"
+    @AppStorage("appLanguage") var appLanguage: String = "en"
 
     var fontSize: Double = UserDefaults.standard.double(forKey: "fontSize") == 0
         ? 16.0
@@ -57,14 +57,27 @@ final class UIStateStore {
             searchResults = []
             return
         }
-        do {
-            let moduleId = searchModuleId.isEmpty ? bibleStore.activeModuleId : searchModuleId
-            searchResults = try await bibleStore.searchVerses(
-                moduleId: moduleId,
-                query: searchQuery
-            )
-        } catch {
-            searchResults = []
+        if searchModuleId.isEmpty {
+            // Search all modules
+            searchResults = await bibleStore.searchAllModules(query: searchQuery)
+        } else {
+            do {
+                let verses = try await bibleStore.searchVerses(
+                    moduleId: searchModuleId,
+                    query: searchQuery
+                )
+                let module = bibleStore.modules.first(where: { $0.id == searchModuleId })
+                searchResults = verses.map { verse in
+                    SearchResult(
+                        id: "\(searchModuleId):\(verse.id)",
+                        moduleId: searchModuleId,
+                        moduleName: module?.abbreviation ?? searchModuleId,
+                        verse: verse
+                    )
+                }
+            } catch {
+                searchResults = []
+            }
         }
     }
 }
