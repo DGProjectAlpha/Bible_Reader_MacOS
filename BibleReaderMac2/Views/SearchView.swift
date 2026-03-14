@@ -39,16 +39,16 @@ struct SearchView: View {
                 ContentUnavailableView(String(localized: "search.noResults"), systemImage: "magnifyingglass", description: Text(String(localized: "search.noVersesMatch \(uiState.searchQuery)")))
                     .frame(maxHeight: .infinity)
             } else {
-                List(uiState.searchResults) { verse in
+                List(uiState.searchResults) { result in
                     Button {
-                        navigateToVerse(verse)
+                        navigateToVerse(result)
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(verseReference(verse))
+                            Text(verseReference(result))
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(.secondary)
-                            Text(verse.text)
+                            Text(result.verse.text)
                                 .font(.body)
                                 .lineLimit(2)
                         }
@@ -69,20 +69,22 @@ struct SearchView: View {
         bibleStore.modules.first(where: { $0.id == bibleStore.activeModuleId })?.abbreviation ?? "Bible"
     }
 
-    private func verseReference(_ verse: Verse) -> String {
+    private func verseReference(_ result: SearchResult) -> String {
+        let v = result.verse
         let bookName = bibleStore.modules
-            .first(where: { $0.id == bibleStore.activeModuleId })?
-            .books.first(where: { $0.id == verse.book })?.name ?? verse.book
-        return "\(bookName) \(verse.chapter):\(verse.verseNumber)"
+            .first(where: { $0.id == result.moduleId })?
+            .books.first(where: { $0.id == v.book })?.name ?? v.book
+        return "\(result.moduleName) — \(bookName) \(v.chapter):\(v.verseNumber)"
     }
 
-    private func navigateToVerse(_ verse: Verse) {
+    private func navigateToVerse(_ result: SearchResult) {
+        let v = result.verse
         guard let paneId = bibleStore.activePaneId else { return }
         let location = BibleLocation(
-            moduleId: bibleStore.activeModuleId,
-            book: verse.book,
-            chapter: verse.chapter,
-            verseNumber: verse.verseNumber
+            moduleId: result.moduleId,
+            book: v.book,
+            chapter: v.chapter,
+            verseNumber: v.verseNumber
         )
         Task {
             await bibleStore.navigate(paneId: paneId, to: location)
