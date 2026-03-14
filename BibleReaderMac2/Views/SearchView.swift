@@ -12,7 +12,7 @@ struct SearchView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search in \(activeModuleName)…", text: $uiState.searchQuery)
+                TextField(String(localized: "search.searchIn \(activeModuleName)"), text: $uiState.searchQuery)
                     .textFieldStyle(.plain)
                     .onSubmit {
                         Task {
@@ -36,7 +36,7 @@ struct SearchView: View {
 
             // Results
             if uiState.searchResults.isEmpty && !uiState.searchQuery.isEmpty {
-                ContentUnavailableView("No Results", systemImage: "magnifyingglass", description: Text("No verses match \"\(uiState.searchQuery)\""))
+                ContentUnavailableView(String(localized: "search.noResults"), systemImage: "magnifyingglass", description: Text(String(localized: "search.noVersesMatch \(uiState.searchQuery)")))
                     .frame(maxHeight: .infinity)
             } else {
                 List(uiState.searchResults) { verse in

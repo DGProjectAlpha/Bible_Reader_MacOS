@@ -23,6 +23,9 @@ struct PaneToolbar: View {
             chapterPicker
             versePicker
 
+            previousChapterButton
+            nextChapterButton
+
             Spacer()
 
             splitHorizontalButton
@@ -74,7 +77,7 @@ struct PaneToolbar: View {
             let otBooks = books.filter { $0.testament == .old }
             let ntBooks = books.filter { $0.testament == .new }
 
-            Section("Old Testament") {
+            Section(String(localized: "pane.oldTestament")) {
                 ForEach(otBooks) { book in
                     Button(book.name) {
                         Task {
@@ -88,7 +91,7 @@ struct PaneToolbar: View {
                     }
                 }
             }
-            Section("New Testament") {
+            Section(String(localized: "pane.newTestament")) {
                 ForEach(ntBooks) { book in
                     Button(book.name) {
                         Task {
@@ -129,7 +132,7 @@ struct PaneToolbar: View {
                 }
             }
         } label: {
-            Text("Ch \(pane.location.chapter)")
+            Text("pane.chapter \(pane.location.chapter)")
                 .font(.callout)
                 .fontWeight(.medium)
         }
@@ -143,7 +146,7 @@ struct PaneToolbar: View {
         Menu {
             if verseCount > 0 {
                 ForEach(1...verseCount, id: \.self) { v in
-                    Button("Verse \(v)") {
+                    Button(String(localized: "pane.verse \(v)")) {
                         onScrollToVerse?(v)
                     }
                 }
@@ -157,6 +160,40 @@ struct PaneToolbar: View {
         .fixedSize()
     }
 
+    // MARK: - Chapter Navigation
+
+    private var previousChapterButton: some View {
+        PaneToolbarButton(systemImage: "chevron.left") {
+            Task {
+                let loc = BibleLocation(
+                    moduleId: pane.location.moduleId,
+                    book: pane.location.book,
+                    chapter: pane.location.chapter - 1
+                )
+                await bibleStore.navigate(paneId: pane.id, to: loc)
+            }
+        }
+        .disabled(pane.location.chapter <= 1)
+        .opacity(pane.location.chapter <= 1 ? 0.3 : 1.0)
+        .help(String(localized: "pane.previousChapter"))
+    }
+
+    private var nextChapterButton: some View {
+        PaneToolbarButton(systemImage: "chevron.right") {
+            Task {
+                let loc = BibleLocation(
+                    moduleId: pane.location.moduleId,
+                    book: pane.location.book,
+                    chapter: pane.location.chapter + 1
+                )
+                await bibleStore.navigate(paneId: pane.id, to: loc)
+            }
+        }
+        .disabled(pane.location.chapter >= (currentBook?.chapterCount ?? 1))
+        .opacity(pane.location.chapter >= (currentBook?.chapterCount ?? 1) ? 0.3 : 1.0)
+        .help(String(localized: "pane.nextChapter"))
+    }
+
     // MARK: - Split Buttons
 
     private var splitHorizontalButton: some View {
@@ -166,7 +203,7 @@ struct PaneToolbar: View {
                 bibleStore.addPane(direction: .horizontal)
             }
         }
-        .help("Split Horizontal")
+        .help(String(localized: "pane.splitHorizontal"))
     }
 
     private var splitVerticalButton: some View {
@@ -176,7 +213,7 @@ struct PaneToolbar: View {
                 bibleStore.addPane(direction: .vertical)
             }
         }
-        .help("Split Vertical")
+        .help(String(localized: "pane.splitVertical"))
     }
 
     private var closePaneButton: some View {
@@ -185,7 +222,7 @@ struct PaneToolbar: View {
                 bibleStore.removePane(id: pane.id)
             }
         }
-        .help("Close Pane")
+        .help(String(localized: "pane.closePane"))
     }
 
 }

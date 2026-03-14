@@ -13,7 +13,7 @@ final class UserDataStore {
         let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
-        ).first!
+        ).first ?? FileManager.default.temporaryDirectory
         dataDirectory = appSupport
             .appendingPathComponent("BibleReaderMac2", isDirectory: true)
         try? FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
@@ -29,10 +29,18 @@ final class UserDataStore {
     // MARK: - Load
 
     func load() async {
-        bookmarks = (try? loadJSON(from: bookmarksURL)) ?? []
-        notes = (try? loadJSON(from: notesURL)) ?? []
-        highlights = (try? loadJSON(from: highlightsURL)) ?? []
-        readingHistory = (try? loadJSON(from: historyURL)) ?? []
+        let bURL = bookmarksURL, nURL = notesURL, hURL = highlightsURL, rURL = historyURL
+        let loaded: ([Bookmark], [Note], [HighlightedVerse], [BibleLocation]) = await Task.detached {
+            let b: [Bookmark] = (try? Self.loadJSONFromDisk(from: bURL)) ?? []
+            let n: [Note] = (try? Self.loadJSONFromDisk(from: nURL)) ?? []
+            let h: [HighlightedVerse] = (try? Self.loadJSONFromDisk(from: hURL)) ?? []
+            let r: [BibleLocation] = (try? Self.loadJSONFromDisk(from: rURL)) ?? []
+            return (b, n, h, r)
+        }.value
+        bookmarks = loaded.0
+        notes = loaded.1
+        highlights = loaded.2
+        readingHistory = loaded.3
     }
 
     // MARK: - Bookmarks
@@ -110,10 +118,14 @@ final class UserDataStore {
     // MARK: - Save
 
     func save() async {
-        try? saveJSON(bookmarks, to: bookmarksURL)
-        try? saveJSON(notes, to: notesURL)
-        try? saveJSON(highlights, to: highlightsURL)
-        try? saveJSON(readingHistory, to: historyURL)
+        let b = bookmarks, n = notes, h = highlights, r = readingHistory
+        let bURL = bookmarksURL, nURL = notesURL, hURL = highlightsURL, rURL = historyURL
+        Task.detached {
+            try? Self.saveJSONToDisk(b, to: bURL)
+            try? Self.saveJSONToDisk(n, to: nURL)
+            try? Self.saveJSONToDisk(h, to: hURL)
+            try? Self.saveJSONToDisk(r, to: rURL)
+        }
     }
 
     // MARK: - JSON Helpers
@@ -124,6 +136,16 @@ final class UserDataStore {
     }
 
     private func saveJSON<T: Encodable>(_ value: T, to url: URL) throws {
+        let data = try JSONEncoder().encode(value)
+        try data.write(to: url, options: .atomic)
+    }
+
+    nonisolated private static func loadJSONFromDisk<T: Decodable>(from url: URL) throws -> T {
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    nonisolated private static func saveJSONToDisk<T: Encodable>(_ value: T, to url: URL) throws {
         let data = try JSONEncoder().encode(value)
         try data.write(to: url, options: .atomic)
     }

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct SidebarView: View {
+    let sidebarHeight: CGFloat
+
     @Environment(BibleStore.self) private var bibleStore
     @Environment(UIStateStore.self) private var uiStateStore
     @Environment(UserDataStore.self) private var userDataStore
@@ -8,6 +10,9 @@ struct SidebarView: View {
     // Notes inline editing
     @State private var editingNoteId: UUID? = nil
     @State private var editingNoteText: String = ""
+
+    // Highlights sort
+    @State private var highlightSortMode: HighlightSortMode = .byColor
 
     // Strong's & cross-ref state
     @State private var wordTags: [ResolvedWordTag] = []
@@ -19,6 +24,8 @@ struct SidebarView: View {
     @State private var isLoadingStrongs = false
     @State private var isLoadingCrossRefs = false
     @State private var isLoadingDetail = false
+    @State private var strongsTask: Task<Void, Never>?
+    @State private var crossRefTask: Task<Void, Never>?
 
     // MARK: - Computed
 
@@ -29,194 +36,337 @@ struct SidebarView: View {
     // MARK: - Body
 
     var body: some View {
-        List {
-            bookmarksSection
-            highlightsSection
-            notesSection
-            strongsSection
-            crossReferencesSection
-            searchSection
-            recentHistorySection
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                bookmarksSection
+                highlightsSection
+                notesSection
+                strongsSection
+                crossReferencesSection
+                searchSection
+                recentHistorySection
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
         }
-        .listStyle(.sidebar)
+        .frame(maxHeight: sidebarHeight - 8)
+        .symbolRenderingMode(.hierarchical)
         .onChange(of: uiStateStore.selectedVerseId) {
             loadStrongsData()
             loadCrossRefData()
+        }
+        .onChange(of: uiStateStore.selectedStrongsId) {
+            autoSelectStrongsEntry()
         }
     }
 
     // MARK: - 1. Bookmarks
 
     private var bookmarksSection: some View {
-        DisclosureGroup(
-            isExpanded: uiStateStore.bindingForSection(.bookmarks)
-        ) {
-            if userDataStore.bookmarks.isEmpty {
-                Text("sidebar.noBookmarksYet")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            } else {
-                ForEach(userDataStore.bookmarks.sorted(by: { $0.createdAt > $1.createdAt })) { bookmark in
-                    Button {
-                        navigateToBookmark(bookmark)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(swiftColor(for: bookmark.color))
-                                .frame(width: 10, height: 10)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(bookmark.verseId)
-                                    .font(.subheadline)
-                                if !bookmark.note.isEmpty {
-                                    Text(bookmark.note)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
+        VStack(alignment: .leading, spacing: 0) {
+            // Header (always visible)
+            Button {
+                uiStateStore.toggleSection(.bookmarks)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "bookmark.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.accentColor)
+                    Text("sidebar.bookmarks")
+                        .foregroundStyle(Color.accentColor)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(
+                uiStateStore.isSectionExpanded(.bookmarks)
+                    ? Color.accentColor.opacity(0.15)
+                    : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .animation(.spring(duration: 0.25, bounce: 0.1), value: uiStateStore.isSectionExpanded(.bookmarks))
+
+            // Content (expandable)
+            if uiStateStore.isSectionExpanded(.bookmarks) {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        if userDataStore.bookmarks.isEmpty {
+                            Text("sidebar.noBookmarksYet")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        } else {
+                            ForEach(userDataStore.bookmarks.sorted(by: { $0.createdAt > $1.createdAt })) { bookmark in
+                                Button {
+                                    navigateToBookmark(bookmark)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Circle()
+                                            .fill(swiftColor(for: bookmark.color))
+                                            .frame(width: 10, height: 10)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(bookmark.verseId)
+                                                .font(.subheadline)
+                                            if !bookmark.note.isEmpty {
+                                                Text(bookmark.note)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        Task { await userDataStore.deleteBookmark(id: bookmark.id) }
+                                    } label: {
+                                        Label("sidebar.removeBookmark", systemImage: "trash")
+                                    }
                                 }
                             }
                         }
                     }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            Task { await userDataStore.deleteBookmark(id: bookmark.id) }
-                        } label: {
-                            Label("sidebar.removeBookmark", systemImage: "trash")
-                        }
-                    }
+                    .padding(.leading, 6)
                 }
+                .frame(maxHeight: sidebarHeight * 0.4)
             }
-        } label: {
-            Label("sidebar.bookmarks", systemImage: "bookmark.fill")
         }
-        .padding(.vertical, 2)
-
     }
 
     // MARK: - 2. Highlights
 
     private var highlightsSection: some View {
-        DisclosureGroup(
-            isExpanded: uiStateStore.bindingForSection(.highlights)
-        ) {
-            let grouped = Dictionary(grouping: userDataStore.highlights) { $0.color }
-            if grouped.isEmpty {
-                Text("sidebar.noHighlightsYet")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            } else {
-                ForEach(BookmarkColor.allCases, id: \.self) { color in
-                    if let items = grouped[color], !items.isEmpty {
-                        Section {
-                            ForEach(items) { highlight in
-                                Button {
-                                    navigateToVerseId(highlight.verseId)
-                                } label: {
-                                    Text(highlight.verseId)
-                                        .font(.subheadline)
-                                }
-                                .buttonStyle(.plain)
-                                .contextMenu {
-                                    Button(role: .destructive) {
-                                        Task { await userDataStore.removeHighlight(verseId: highlight.verseId) }
-                                    } label: {
-                                        Label("sidebar.removeHighlight", systemImage: "trash")
-                                    }
-                                }
-                            }
-                        } header: {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(swiftColor(for: color))
-                                    .frame(width: 8, height: 8)
-                                Text(String(localized: String.LocalizationValue("color.\(color.rawValue)")))
-                                    .font(.caption)
+        VStack(alignment: .leading, spacing: 0) {
+            // Header (always visible)
+            Button {
+                uiStateStore.toggleSection(.highlights)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "highlighter")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.accentColor)
+                    Text("sidebar.highlights")
+                        .foregroundStyle(Color.accentColor)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(
+                uiStateStore.isSectionExpanded(.highlights)
+                    ? Color.accentColor.opacity(0.15)
+                    : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .animation(.spring(duration: 0.25, bounce: 0.1), value: uiStateStore.isSectionExpanded(.highlights))
+
+            // Content (expandable)
+            if uiStateStore.isSectionExpanded(.highlights) {
+                // Sort picker
+                Picker("Sort", selection: $highlightSortMode) {
+                    ForEach(HighlightSortMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 6)
+                .padding(.top, 4)
+
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        if userDataStore.highlights.isEmpty {
+                            Text("sidebar.noHighlightsYet")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        } else {
+                            switch highlightSortMode {
+                            case .byColor:
+                                highlightsByColorContent
+                            case .newestFirst:
+                                highlightsListContent(highlights: userDataStore.highlights.reversed())
+                            case .oldestFirst:
+                                highlightsListContent(highlights: Array(userDataStore.highlights))
                             }
                         }
                     }
+                    .padding(.leading, 6)
+                }
+                .frame(maxHeight: sidebarHeight * 0.4)
+            }
+        }
+    }
+
+    private var highlightsByColorContent: some View {
+        let grouped = Dictionary(grouping: userDataStore.highlights) { $0.color }
+        return ForEach(BookmarkColor.allCases, id: \.self) { color in
+            if let items = grouped[color], !items.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(swiftColor(for: color))
+                            .frame(width: 8, height: 8)
+                        Text(String(localized: String.LocalizationValue("color.\(color.rawValue)")))
+                            .font(.caption)
+                    }
+                    .padding(.top, 4)
+                    ForEach(items) { highlight in
+                        highlightRow(highlight)
+                    }
                 }
             }
-        } label: {
-            Label("sidebar.highlights", systemImage: "paintbrush")
         }
-        .padding(.vertical, 2)
+    }
+
+    private func highlightsListContent(highlights: [HighlightedVerse]) -> some View {
+        ForEach(highlights) { highlight in
+            highlightRow(highlight)
+        }
+    }
+
+    private func highlightRow(_ highlight: HighlightedVerse) -> some View {
+        Button {
+            navigateToVerseId(highlight.verseId)
+        } label: {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(swiftColor(for: highlight.color))
+                    .frame(width: 10, height: 10)
+                Text(displayReference(for: highlight.verseId))
+                    .font(.subheadline)
+            }
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(role: .destructive) {
+                Task { await userDataStore.removeHighlight(verseId: highlight.verseId) }
+            } label: {
+                Label("sidebar.removeHighlight", systemImage: "trash")
+            }
+        }
+    }
+
+    private func displayReference(for verseId: String) -> String {
+        let parts = verseId.split(separator: ".")
+        guard parts.count == 3,
+              let chapter = Int(parts[1]),
+              let verse = Int(parts[2]) else { return verseId }
+        let book = String(parts[0])
+        let bookName = activeModule?.books.first(where: { $0.id == book })?.shortName ?? book
+        return "\(bookName) \(chapter):\(verse)"
     }
 
     // MARK: - 3. Notes
 
     private var notesSection: some View {
-        DisclosureGroup(
-            isExpanded: uiStateStore.bindingForSection(.notes)
-        ) {
-            if userDataStore.notes.isEmpty {
-                Text("sidebar.noNotesYet")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            } else {
-                ForEach(userDataStore.notes.sorted(by: { $0.updatedAt > $1.updatedAt })) { note in
-                    if editingNoteId == note.id {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(note.verseId)
-                                .font(.subheadline.bold())
-                            TextEditor(text: $editingNoteText)
+        VStack(alignment: .leading, spacing: 0) {
+            // Header (always visible)
+            Button {
+                uiStateStore.toggleSection(.notes)
+            } label: {
+                HStack {
+                    Image(systemName: "note.text")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.accentColor)
+                    Text("sidebar.notes")
+                        .foregroundStyle(Color.accentColor)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(
+                uiStateStore.isSectionExpanded(.notes)
+                    ? Color.accentColor.opacity(0.15)
+                    : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .animation(.spring(duration: 0.25, bounce: 0.1), value: uiStateStore.isSectionExpanded(.notes))
+
+            // Content (expandable)
+            if uiStateStore.isSectionExpanded(.notes) {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        if userDataStore.notes.isEmpty {
+                            Text("sidebar.noNotesYet")
                                 .font(.caption)
-                                .frame(minHeight: 60, maxHeight: 120)
-                                .scrollContentBackground(.hidden)
-                                .background(Color(.textBackgroundColor).opacity(0.5))
-                                .cornerRadius(4)
-                            HStack(spacing: 8) {
-                                Button("sidebar.save") {
-                                    commitNoteEdit(noteId: note.id)
+                                .foregroundStyle(.tertiary)
+                        } else {
+                            ForEach(userDataStore.notes.sorted(by: { $0.createdAt < $1.createdAt })) { note in
+                                if editingNoteId == note.id {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(displayReference(for: note.verseId))
+                                            .font(.subheadline.bold())
+                                        TextEditor(text: $editingNoteText)
+                                            .font(.caption)
+                                            .frame(minHeight: 60, maxHeight: 120)
+                                            .scrollContentBackground(.hidden)
+                                            .background(Color(.textBackgroundColor).opacity(0.5))
+                                            .cornerRadius(4)
+                                        HStack(spacing: 8) {
+                                            Button("sidebar.save") {
+                                                commitNoteEdit(noteId: note.id)
+                                            }
+                                            .font(.caption)
+                                            .buttonStyle(.borderedProminent)
+                                            .controlSize(.small)
+                                            Button("sidebar.cancel") {
+                                                editingNoteId = nil
+                                                editingNoteText = ""
+                                            }
+                                            .font(.caption)
+                                            .buttonStyle(.bordered)
+                                            .controlSize(.small)
+                                        }
+                                    }
+                                    .padding(.vertical, 2)
+                                } else {
+                                    Button {
+                                        navigateToVerseId(note.verseId)
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(displayReference(for: note.verseId))
+                                                .font(.subheadline.bold())
+                                            Text(truncateNoteText(note.text))
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(2)
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                    .contextMenu {
+                                        Button {
+                                            editingNoteId = note.id
+                                            editingNoteText = note.text
+                                        } label: {
+                                            Label("sidebar.editNote", systemImage: "pencil")
+                                        }
+                                        Button(role: .destructive) {
+                                            Task { await userDataStore.deleteNote(id: note.id) }
+                                        } label: {
+                                            Label("sidebar.deleteNote", systemImage: "trash")
+                                        }
+                                    }
                                 }
-                                .font(.caption)
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.small)
-                                Button("sidebar.cancel") {
-                                    editingNoteId = nil
-                                    editingNoteText = ""
-                                }
-                                .font(.caption)
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            }
-                        }
-                        .padding(.vertical, 2)
-                    } else {
-                        Button {
-                            navigateToVerseId(note.verseId)
-                            editingNoteId = note.id
-                            editingNoteText = note.text
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(note.verseId)
-                                    .font(.subheadline.bold())
-                                Text(note.text)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button {
-                                editingNoteId = note.id
-                                editingNoteText = note.text
-                            } label: {
-                                Label("sidebar.editNote", systemImage: "pencil")
-                            }
-                            Button(role: .destructive) {
-                                Task { await userDataStore.deleteNote(id: note.id) }
-                            } label: {
-                                Label("sidebar.deleteNote", systemImage: "trash")
                             }
                         }
                     }
+                    .padding(.leading, 6)
                 }
+                .frame(maxHeight: sidebarHeight * 0.4)
             }
-        } label: {
-            Label("sidebar.notes", systemImage: "note.text")
         }
-        .padding(.vertical, 2)
+    }
+
+    private func truncateNoteText(_ text: String) -> String {
+        if text.count <= 60 { return text }
+        return String(text.prefix(60)) + "..."
     }
 
     private func commitNoteEdit(noteId: UUID) {
@@ -233,34 +383,63 @@ struct SidebarView: View {
     // MARK: - 4. Strong's Numbers
 
     private var strongsSection: some View {
-        DisclosureGroup(
-            isExpanded: uiStateStore.bindingForSection(.strongs)
-        ) {
-            if selectedStrongsEntry != nil {
-                strongsDetailContent
-            } else if uiStateStore.selectedVerseId != nil {
-                if isLoadingStrongs {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                } else if wordTags.isEmpty {
-                    Text("sidebar.noStrongsData")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                } else {
-                    ForEach(wordTags) { tag in
-                        sidebarWordTagRow(tag)
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            // Header (always visible)
+            Button {
+                uiStateStore.toggleSection(.strongs)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "character.book.closed")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.accentColor)
+                    Text("sidebar.strongsNumbers")
+                        .foregroundStyle(Color.accentColor)
+                    Spacer()
                 }
-            } else {
-                Text("sidebar.selectVerseStrongs")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                .contentShape(Rectangle())
             }
-        } label: {
-            Label("sidebar.strongsNumbers", systemImage: "textformat.123")
+            .buttonStyle(.plain)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(
+                uiStateStore.isSectionExpanded(.strongs)
+                    ? Color.accentColor.opacity(0.15)
+                    : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .animation(.spring(duration: 0.25, bounce: 0.1), value: uiStateStore.isSectionExpanded(.strongs))
+
+            // Content (expandable)
+            if uiStateStore.isSectionExpanded(.strongs) {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        if selectedStrongsEntry != nil {
+                            strongsDetailContent
+                        } else if uiStateStore.selectedVerseId != nil {
+                            if isLoadingStrongs {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                            } else if wordTags.isEmpty {
+                                Text("sidebar.noStrongsData")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            } else {
+                                ForEach(wordTags) { tag in
+                                    sidebarWordTagRow(tag)
+                                }
+                            }
+                        } else {
+                            Text("sidebar.selectVerseStrongs")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .padding(.leading, 6)
+                }
+                .frame(maxHeight: sidebarHeight * 0.4)
+            }
         }
-        .padding(.vertical, 2)
     }
 
     private func sidebarWordTagRow(_ tag: ResolvedWordTag) -> some View {
@@ -299,7 +478,7 @@ struct SidebarView: View {
     }
 
     private var strongsDetailContent: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 4) {
             Button {
                 selectedStrongsEntry = nil
                 selectedStrongsNumber = nil
@@ -351,7 +530,11 @@ struct SidebarView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
                 } else if !strongsVerses.isEmpty {
-                    Section("sidebar.versesCount \(strongsVerses.count)") {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("sidebar.versesCount \(strongsVerses.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 4)
                         ForEach(strongsVerses.prefix(15)) { ref in
                             Button {
                                 navigateToStrongsVerse(ref)
@@ -377,7 +560,11 @@ struct SidebarView: View {
                 }
 
                 if !similarEntries.isEmpty {
-                    Section("sidebar.related") {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("sidebar.related")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 4)
                         ForEach(similarEntries.prefix(6)) { similar in
                             Button {
                                 selectedStrongsEntry = similar
@@ -398,6 +585,25 @@ struct SidebarView: View {
                         }
                     }
                 }
+
+                // "See all verses" button — triggers search filtered by Strong's number
+                Button {
+                    uiStateStore.searchQuery = entry.number
+                    uiStateStore.expandedSidebarSections.insert(SidebarSection.search.rawValue)
+                    Task {
+                        await uiStateStore.performSearch(using: bibleStore)
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "magnifyingglass")
+                        Text("sidebar.seeAllVerses")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
             }
         }
     }
@@ -405,153 +611,237 @@ struct SidebarView: View {
     // MARK: - 5. Cross References
 
     private var crossReferencesSection: some View {
-        DisclosureGroup(
-            isExpanded: uiStateStore.bindingForSection(.crossReferences)
-        ) {
-            if uiStateStore.selectedVerseId != nil {
-                if isLoadingCrossRefs {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                } else if crossRefs.isEmpty {
-                    Text("sidebar.noCrossReferences")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                } else {
-                    ForEach(crossRefs) { ref in
-                        Button {
-                            navigateToCrossRef(ref)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(ref.displayRef)
-                                    .font(.subheadline.bold())
-                                    .foregroundStyle(Color.accentColor)
-                                Text(ref.targetText)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            // Header (always visible)
+            Button {
+                uiStateStore.toggleSection(.crossReferences)
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.triangle.branch")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.accentColor)
+                    Text("sidebar.crossReferences")
+                        .foregroundStyle(Color.accentColor)
+                    Spacer()
                 }
-            } else {
-                Text("sidebar.selectVerseCrossRefs")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                .contentShape(Rectangle())
             }
-        } label: {
-            Label("sidebar.crossReferences", systemImage: "arrow.triangle.branch")
+            .buttonStyle(.plain)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(
+                uiStateStore.isSectionExpanded(.crossReferences)
+                    ? Color.accentColor.opacity(0.15)
+                    : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .animation(.spring(duration: 0.25, bounce: 0.1), value: uiStateStore.isSectionExpanded(.crossReferences))
+
+            // Content (expandable)
+            if uiStateStore.isSectionExpanded(.crossReferences) {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        if uiStateStore.selectedVerseId != nil {
+                            if isLoadingCrossRefs {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                            } else if crossRefs.isEmpty {
+                                Text("sidebar.noCrossReferences")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            } else {
+                                ForEach(crossRefs) { ref in
+                                    Button {
+                                        navigateToCrossRef(ref)
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(ref.displayRef)
+                                                .font(.subheadline.bold())
+                                                .foregroundStyle(Color.accentColor)
+                                            Text(ref.targetText)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(2)
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        } else {
+                            Text("sidebar.selectVerseCrossRefs")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .padding(.leading, 6)
+                }
+                .frame(maxHeight: sidebarHeight * 0.4)
+            }
         }
-        .padding(.vertical, 2)
     }
 
     // MARK: - 6. Search
 
     private var searchSection: some View {
-        DisclosureGroup(
-            isExpanded: uiStateStore.bindingForSection(.search)
-        ) {
-            @Bindable var uiState = uiStateStore
-
-            VStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header (always visible)
+            Button {
+                uiStateStore.toggleSection(.search)
+            } label: {
                 HStack {
                     Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                    TextField("sidebar.searchIn \(activeModuleName)", text: $uiState.searchQuery)
-                        .textFieldStyle(.plain)
-                        .font(.subheadline)
-                        .onSubmit {
-                            Task { await uiStateStore.performSearch(using: bibleStore) }
-                        }
-                    if !uiStateStore.searchQuery.isEmpty {
-                        Button {
-                            uiStateStore.searchQuery = ""
-                            uiStateStore.searchResults = []
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                                .font(.caption)
-                        }
-                        .buttonStyle(.plain)
-                    }
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.accentColor)
+                    Text("sidebar.search")
+                        .foregroundStyle(Color.accentColor)
+                    Spacer()
                 }
-                .padding(6)
-                .background(Color(.textBackgroundColor).opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(
+                uiStateStore.isSectionExpanded(.search)
+                    ? Color.accentColor.opacity(0.15)
+                    : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .animation(.spring(duration: 0.25, bounce: 0.1), value: uiStateStore.isSectionExpanded(.search))
 
-            if uiStateStore.searchResults.isEmpty && !uiStateStore.searchQuery.isEmpty {
-                Text("sidebar.noResultsFor \(uiStateStore.searchQuery)")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            } else if !uiStateStore.searchResults.isEmpty {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(uiStateStore.searchResults) { verse in
+            // Content (expandable)
+            if uiStateStore.isSectionExpanded(.search) {
+                @Bindable var uiState = uiStateStore
+
+                VStack(spacing: 6) {
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                        TextField("sidebar.searchIn \(activeModuleName)", text: $uiState.searchQuery)
+                            .textFieldStyle(.plain)
+                            .font(.subheadline)
+                            .onSubmit {
+                                Task { await uiStateStore.performSearch(using: bibleStore) }
+                            }
+                        if !uiStateStore.searchQuery.isEmpty {
                             Button {
-                                navigateToSearchResult(verse)
+                                uiStateStore.searchQuery = ""
+                                uiStateStore.searchResults = []
                             } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(verseReference(verse))
-                                        .font(.caption)
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(.secondary)
-                                    Text(verse.text)
-                                        .font(.caption)
-                                        .lineLimit(2)
-                                }
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                                    .font(.caption)
                             }
                             .buttonStyle(.plain)
                         }
                     }
+                    .padding(6)
+                    .background(Color(.textBackgroundColor).opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
                 }
-                .frame(maxHeight: 300)
+                .padding(.leading, 6)
+
+                if uiStateStore.searchResults.isEmpty && !uiStateStore.searchQuery.isEmpty {
+                    Text("sidebar.noResultsFor \(uiStateStore.searchQuery)")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .padding(.leading, 6)
+                } else if !uiStateStore.searchResults.isEmpty {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 4) {
+                            ForEach(uiStateStore.searchResults) { verse in
+                                Button {
+                                    navigateToSearchResult(verse)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(verseReference(verse))
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                            .foregroundStyle(.secondary)
+                                        Text(verse.text)
+                                            .font(.caption)
+                                            .lineLimit(2)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.leading, 6)
+                    }
+                    .frame(maxHeight: sidebarHeight * 0.4)
+                }
             }
-        } label: {
-            Label("sidebar.search", systemImage: "magnifyingglass")
         }
-        .padding(.vertical, 2)
     }
 
     // MARK: - 7. Recent History
 
     private var recentHistorySection: some View {
-        DisclosureGroup(
-            isExpanded: uiStateStore.bindingForSection(.recentHistory)
-        ) {
-            if userDataStore.readingHistory.isEmpty {
-                Text("sidebar.noRecentHistory")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            } else {
-                ForEach(Array(userDataStore.readingHistory.prefix(15).enumerated()), id: \.offset) { _, location in
-                    Button {
-                        navigateToHistory(location)
-                    } label: {
-                        Label {
-                            Text(historyLabel(for: location))
-                                .font(.subheadline)
-                        } icon: {
-                            Image(systemName: "clock")
+        VStack(alignment: .leading, spacing: 0) {
+            // Header (always visible)
+            Button {
+                uiStateStore.toggleSection(.recentHistory)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "clock")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.accentColor)
+                    Text("sidebar.recentHistory")
+                        .foregroundStyle(Color.accentColor)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(
+                uiStateStore.isSectionExpanded(.recentHistory)
+                    ? Color.accentColor.opacity(0.15)
+                    : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .animation(.spring(duration: 0.25, bounce: 0.1), value: uiStateStore.isSectionExpanded(.recentHistory))
+
+            // Content (expandable)
+            if uiStateStore.isSectionExpanded(.recentHistory) {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        if userDataStore.readingHistory.isEmpty {
+                            Text("sidebar.noRecentHistory")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        } else {
+                            ForEach(Array(userDataStore.readingHistory.prefix(15).enumerated()), id: \.offset) { _, location in
+                                Button {
+                                    navigateToHistory(location)
+                                } label: {
+                                    Label {
+                                        Text(historyLabel(for: location))
+                                            .font(.subheadline)
+                                    } icon: {
+                                        Image(systemName: "clock")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            if !userDataStore.readingHistory.isEmpty {
+                                Button("sidebar.clearHistory") {
+                                    Task { await userDataStore.clearHistory() }
+                                }
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
+                            }
                         }
                     }
-                    .buttonStyle(.plain)
+                    .padding(.leading, 6)
                 }
-
-                if !userDataStore.readingHistory.isEmpty {
-                    Button("sidebar.clearHistory") {
-                        Task { await userDataStore.clearHistory() }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
+                .frame(maxHeight: sidebarHeight * 0.4)
             }
-        } label: {
-            Label("sidebar.recentHistory", systemImage: "clock")
         }
-        .padding(.vertical, 2)
     }
 
     // MARK: - Navigation Helpers
@@ -604,7 +894,8 @@ struct SidebarView: View {
         )
 
         Task {
-            if let paneId = bibleStore.activePaneId {
+            let paneId = bibleStore.activePaneId ?? bibleStore.panes.first?.id
+            if let paneId {
                 await bibleStore.navigate(paneId: paneId, to: location)
             }
             await MainActor.run {
@@ -688,7 +979,7 @@ struct SidebarView: View {
     // MARK: - Data Loading
 
     private func loadStrongsData() {
-        guard uiStateStore.isSectionExpanded(.strongs) || true else { return }
+        guard uiStateStore.isSectionExpanded(.strongs) else { return }
 
         selectedStrongsEntry = nil
         selectedStrongsNumber = nil
@@ -708,16 +999,19 @@ struct SidebarView: View {
         let moduleId = bibleStore.activeModuleId
 
         isLoadingStrongs = true
-        Task {
+        strongsTask?.cancel()
+        strongsTask = Task {
             let tags = await StrongsService.shared.resolvedWordTags(
                 moduleId: moduleId,
                 book: book,
                 chapter: chapter,
                 verse: verse
             )
+            guard !Task.isCancelled else { return }
             await MainActor.run {
                 wordTags = tags
                 isLoadingStrongs = false
+                autoSelectStrongsEntry()
             }
         }
     }
@@ -738,17 +1032,47 @@ struct SidebarView: View {
         let scheme = bibleStore.modules.first(where: { $0.id == moduleId })?.versificationScheme ?? .kjv
 
         isLoadingCrossRefs = true
-        Task {
-            let refs = await CrossReferenceService.shared.loadResolvedBidirectional(
+        crossRefTask?.cancel()
+        crossRefTask = Task {
+            async let moduleRefs = CrossReferenceService.shared.loadResolvedBidirectional(
                 moduleId: moduleId,
                 verseId: crossVerseId,
                 scheme: scheme
             )
+            async let tskRefs = CrossReferenceService.shared.loadTSKResolved(
+                moduleId: moduleId,
+                book: book,
+                chapter: chapter,
+                verse: verse
+            )
+
+            let modResults = await moduleRefs
+            let tskResults = await tskRefs
+
+            guard !Task.isCancelled else { return }
+
+            // Merge, deduplicating by target verse
+            let existingTargets = Set(modResults.map { "\($0.targetBook):\($0.targetChapter):\($0.targetVerse)" })
+            let uniqueTsk = tskResults.filter { !existingTargets.contains("\($0.targetBook):\($0.targetChapter):\($0.targetVerse)") }
+
             await MainActor.run {
-                crossRefs = refs
+                crossRefs = modResults + uniqueTsk
                 isLoadingCrossRefs = false
             }
         }
+    }
+
+    private func autoSelectStrongsEntry() {
+        guard let strongsId = uiStateStore.selectedStrongsId else { return }
+        // Try to find the matching entry in already-loaded word tags
+        if let tag = wordTags.first(where: { $0.strongsNumber == strongsId }),
+           let entry = tag.entry {
+            selectedStrongsNumber = strongsId
+            selectedStrongsEntry = entry
+            loadStrongsDetail(entry: entry)
+            uiStateStore.selectedStrongsId = nil
+        }
+        // If word tags aren't loaded yet, loadStrongsData will call us after loading
     }
 
     private func loadStrongsDetail(entry: StrongsEntry) {

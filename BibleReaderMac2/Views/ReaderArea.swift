@@ -11,7 +11,7 @@ private struct CloseButton: View {
                 .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
-        .help("Close Pane")
+        .help(String(localized: "reader.closePane"))
         .scaleEffect(isHovering ? 1.2 : 1.0)
         .animation(.spring(duration: 0.2, bounce: 0.3), value: isHovering)
         .onHover { hovering in isHovering = hovering }
@@ -24,9 +24,9 @@ struct ReaderArea: View {
     var body: some View {
         if bibleStore.panes.isEmpty {
             ContentUnavailableView(
-                "No Module Loaded",
+                String(localized: "reader.noModuleLoaded"),
                 systemImage: "book.closed",
-                description: Text("Import a .brbmod module to get started")
+                description: Text("reader.importModuleHint")
             )
         } else {
             HSplitView {

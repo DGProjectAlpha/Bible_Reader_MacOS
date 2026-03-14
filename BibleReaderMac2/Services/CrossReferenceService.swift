@@ -131,6 +131,48 @@ actor CrossReferenceService {
         return results
     }
 
+    /// Load and resolve TSK cross-references for a verse, merging them into ResolvedCrossReference objects.
+    /// The TSK refs come as dot-separated IDs like "Psalms.96.5".
+    func loadTSKResolved(moduleId: String, book: String, chapter: Int, verse: Int) async -> [ResolvedCrossReference] {
+        let refIds: [String]
+        do {
+            refIds = try await databaseService.fetchTSKCrossReferences(book: book, chapter: chapter, verse: verse)
+        } catch {
+            return []
+        }
+        guard !refIds.isEmpty else { return [] }
+
+        var results: [ResolvedCrossReference] = []
+        for refId in refIds {
+            let parts = refId.split(separator: ".")
+            guard parts.count >= 3,
+                  let ch = Int(parts[parts.count - 2]),
+                  let vs = Int(parts[parts.count - 1]) else { continue }
+            let bk = parts.dropLast(2).joined(separator: ".")
+
+            let text = (try? await databaseService.fetchVerseText(
+                moduleId: moduleId,
+                book: bk,
+                chapter: ch,
+                verse: vs
+            )) ?? ""
+
+            let crossRef = CrossReference(
+                fromVerseId: "\(book):\(chapter):\(verse)",
+                toVerseId: "\(bk):\(ch):\(vs)",
+                referenceType: "related"
+            )
+            results.append(ResolvedCrossReference(
+                reference: crossRef,
+                targetBook: bk,
+                targetChapter: ch,
+                targetVerse: vs,
+                targetText: text
+            ))
+        }
+        return results
+    }
+
     // MARK: - Helpers
 
     /// Parse "Book:Chapter:Verse" into components.

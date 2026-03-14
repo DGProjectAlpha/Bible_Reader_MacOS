@@ -49,4 +49,49 @@ enum BibleBooks {
         guard let index = all.firstIndex(of: bookName) else { return nil }
         return index < 39 ? .old : .new
     }
+
+    // MARK: - Localized Book Names
+
+    private static let russianNames: [String: String] = [
+        "Genesis": "Бытие", "Exodus": "Исход", "Leviticus": "Левит",
+        "Numbers": "Числа", "Deuteronomy": "Второзаконие",
+        "Joshua": "Иисус Навин", "Judges": "Судей", "Ruth": "Руфь",
+        "1 Samuel": "1 Царств", "2 Samuel": "2 Царств",
+        "1 Kings": "3 Царств", "2 Kings": "4 Царств",
+        "1 Chronicles": "1 Паралипоменон", "2 Chronicles": "2 Паралипоменон",
+        "Ezra": "Ездра", "Nehemiah": "Неемия", "Esther": "Есфирь",
+        "Job": "Иов", "Psalms": "Псалтирь",
+        "Proverbs": "Притчи", "Ecclesiastes": "Екклесиаст",
+        "Song of Solomon": "Песня Песней", "Isaiah": "Исаия",
+        "Jeremiah": "Иеремия", "Lamentations": "Плач Иеремии",
+        "Ezekiel": "Иезекииль", "Daniel": "Даниил",
+        "Hosea": "Осия", "Joel": "Иоиль", "Amos": "Амос",
+        "Obadiah": "Авдий", "Jonah": "Иона", "Micah": "Михей",
+        "Nahum": "Наум", "Habakkuk": "Аввакум", "Zephaniah": "Софония",
+        "Haggai": "Аггей", "Zechariah": "Захария", "Malachi": "Малахия",
+        "Matthew": "Матфея", "Mark": "Марка", "Luke": "Луки",
+        "John": "Иоанна", "Acts": "Деяния",
+        "Romans": "Римлянам", "1 Corinthians": "1 Коринфянам",
+        "2 Corinthians": "2 Коринфянам", "Galatians": "Галатам",
+        "Ephesians": "Ефесянам", "Philippians": "Филиппийцам",
+        "Colossians": "Колоссянам", "1 Thessalonians": "1 Фессалоникийцам",
+        "2 Thessalonians": "2 Фессалоникийцам",
+        "1 Timothy": "1 Тимофею", "2 Timothy": "2 Тимофею",
+        "Titus": "Титу", "Philemon": "Филимону", "Hebrews": "Евреям",
+        "James": "Иакова", "1 Peter": "1 Петра", "2 Peter": "2 Петра",
+        "1 John": "1 Иоанна", "2 John": "2 Иоанна", "3 John": "3 Иоанна",
+        "Jude": "Иуды", "Revelation": "Откровение"
+    ]
+
+    /// Returns the localized display name for a book.
+    /// - Parameters:
+    ///   - canonicalName: The English canonical book name (e.g. "Genesis")
+    ///   - language: Language code ("en", "ru", etc.)
+    /// - Returns: The localized name, or the canonical name as fallback.
+    static func localizedName(for canonicalName: String, language: String) -> String {
+        if language.hasPrefix("ru") {
+            return russianNames[canonicalName] ?? canonicalName
+        }
+        return canonicalName
+    }
 }

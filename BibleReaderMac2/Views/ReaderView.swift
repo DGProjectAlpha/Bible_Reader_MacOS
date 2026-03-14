@@ -40,7 +40,7 @@ struct ReaderView: View {
             if isLoading {
                 loadingSkeleton
             } else if verses.isEmpty {
-                ContentUnavailableView("No Verses", systemImage: "book.closed")
+                ContentUnavailableView(String(localized: "reader.noVerses"), systemImage: "book.closed")
             } else {
                 verseList
                     .id(chapterId)
@@ -64,10 +64,17 @@ struct ReaderView: View {
                                     uiState.selectedVerseId = verse.id
                                 }
                             },
+                            onVerseNumberTap: {
+                                uiState.selectedVerseId = verse.id
+                                uiState.inspectorTab = .crossRef
+                                uiState.sidebarVisible = true
+                            },
                             onStrongsTap: { strongsId in
                                 uiState.selectedVerseId = verse.id
+                                uiState.inspectorTab = .strongs
                                 uiState.sidebarVisible = true
                                 uiState.expandedSidebarSections.insert(SidebarSection.strongs.rawValue)
+                                uiState.selectedStrongsId = strongsId
                             }
                         )
                         .id(verse.verseNumber)

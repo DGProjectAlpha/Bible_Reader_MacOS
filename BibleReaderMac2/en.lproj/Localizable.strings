@@ -1,0 +1,188 @@
+/* Localizable.strings (English) — BibleReaderMac2 */
+
+// MARK: - SidebarView
+
+"sidebar.bookmarks" = "Bookmarks";
+"sidebar.highlights" = "Highlights";
+"sidebar.notes" = "Notes";
+"sidebar.strongsNumbers" = "Strong's Numbers";
+"sidebar.crossReferences" = "Cross References";
+"sidebar.search" = "Search";
+"sidebar.recentHistory" = "Recent History";
+
+"sidebar.noBookmarksYet" = "No bookmarks yet";
+"sidebar.removeBookmark" = "Remove Bookmark";
+"sidebar.noHighlightsYet" = "No highlights yet";
+"sidebar.removeHighlight" = "Remove Highlight";
+"sidebar.noNotesYet" = "No notes yet";
+"sidebar.editNote" = "Edit Note";
+"sidebar.deleteNote" = "Delete Note";
+"sidebar.save" = "Save";
+"sidebar.cancel" = "Cancel";
+
+"sidebar.noStrongsData" = "No Strong's data for this verse";
+"sidebar.selectVerseStrongs" = "Select a verse to view Strong's numbers";
+"sidebar.backToWords" = "Back to words";
+"sidebar.versesCount %lld" = "Verses (%lld)";
+"sidebar.moreCount %lld" = "+ %lld more";
+"sidebar.related" = "Related";
+
+"sidebar.noCrossReferences" = "No cross-references for this verse";
+"sidebar.selectVerseCrossRefs" = "Select a verse to view cross references";
+
+"sidebar.searchIn %@" = "Search in %@…";
+"sidebar.noResultsFor %@" = "No results for \"%@\"";
+
+"sidebar.noRecentHistory" = "No recent history";
+"sidebar.clearHistory" = "Clear History";
+
+// MARK: - ReaderView
+
+"reader.noVerses" = "No Verses";
+
+// MARK: - ReaderArea
+
+"reader.noModuleLoaded" = "No Module Loaded";
+"reader.importModuleHint" = "Import a .brbmod module to get started";
+"reader.closePane" = "Close Pane";
+
+// MARK: - PaneToolbar
+
+"pane.oldTestament" = "Old Testament";
+"pane.newTestament" = "New Testament";
+"pane.chapter %lld" = "Ch %lld";
+"pane.verse %lld" = "Verse %lld";
+"pane.splitHorizontal" = "Split Horizontal";
+"pane.splitVertical" = "Split Vertical";
+"pane.closePane" = "Close Pane";
+
+// MARK: - InspectorView
+
+"inspector.strongs" = "Strong's";
+"inspector.crossRefs" = "Cross-Refs";
+"inspector.notes" = "Notes";
+"inspector.bookmarks" = "Bookmarks";
+
+"inspector.noStrongsData" = "No Strong's data";
+"inspector.selectVerse" = "Select a verse";
+"inspector.tapVerseDetails" = "Tap a verse to see details";
+
+"inspector.backToWords" = "Back to words";
+"inspector.derivation" = "Derivation";
+"inspector.strongsDefinition" = "Strong's Definition";
+"inspector.kjvUsage" = "KJV Usage";
+"inspector.versesWith %@" = "Verses with %@";
+"inspector.noVersesFound" = "No verses found";
+"inspector.moreVerses %lld" = "+ %lld more verses";
+"inspector.relatedEntries" = "Related Entries";
+
+"inspector.noCrossReferences" = "No cross-references";
+"inspector.noLinkedReferences" = "This verse has no linked references";
+"inspector.crossRefCount %lld" = "%lld cross-reference";
+"inspector.crossRefCountPlural %lld" = "%lld cross-references";
+"inspector.parallelPassages" = "Parallel Passages";
+"inspector.quotations" = "Quotations";
+"inspector.allusions" = "Allusions";
+"inspector.related" = "Related";
+
+"inspector.noNotesYet" = "No notes yet";
+"inspector.selectVerseStartTyping" = "Select a verse and start typing";
+"inspector.noteCount %lld" = "%lld note";
+"inspector.noteCountPlural %lld" = "%lld notes";
+"inspector.deleteNote" = "Delete note";
+
+"inspector.writeNoteHint" = "Write a note about this verse...";
+"inspector.willAutoSave" = "Will auto-save...";
+"inspector.saved" = "Saved";
+"inspector.typing" = "Typing...";
+
+// MARK: - BookmarksTabView
+
+"bookmarks.title" = "Bookmarks";
+"bookmarks.addBookmark" = "Add bookmark";
+"bookmarks.noBookmarksForVerse" = "No bookmarks for this verse";
+"bookmarks.tapToAdd" = "Tap + to add one";
+"bookmarks.noBookmarksYet" = "No bookmarks yet";
+"bookmarks.selectVerseToAdd" = "Select a verse to add a bookmark";
+"bookmarks.count %lld" = "%lld bookmark";
+"bookmarks.countPlural %lld" = "%lld bookmarks";
+"bookmarks.deleteBookmark" = "Delete bookmark";
+"bookmarks.addNote" = "Add a note...";
+
+// MARK: - SearchView
+
+"search.searchIn %@" = "Search in %@…";
+"search.noResults" = "No Results";
+"search.noVersesMatch %@" = "No verses match \"%@\"";
+
+// MARK: - SettingsView
+
+"settings.appearance" = "Appearance";
+"settings.fontSize" = "Font Size";
+"settings.fontSizeValue %lld" = "%lld pt";
+"settings.sampleText" = "The quick brown fox jumps over the lazy dog.";
+"settings.installedModules" = "Installed Modules";
+"settings.noModulesFound" = "No modules found";
+"settings.bundled" = "Bundled";
+"settings.user" = "User";
+"settings.userModulesFolder" = "User modules folder:";
+"settings.importModule" = "Import Module…";
+"settings.language" = "Language";
+"settings.english" = "English";
+"settings.russian" = "Русский";
+"settings.about" = "About";
+"settings.app" = "App";
+"settings.appName" = "Bible Reader";
+"settings.version" = "Version";
+"settings.build" = "Build";
+"settings.platform" = "Platform";
+"settings.platformValue" = "macOS (SwiftUI)";
+"settings.aboutDescription" = "A fast, offline Bible reader with Strong's concordance support.";
+"settings.importError" = "Import Error";
+"settings.ok" = "OK";
+"settings.unknownError" = "Unknown error";
+
+// MARK: - ContentView (Toolbar)
+
+"toolbar.toggleSidebar" = "Toggle Sidebar";
+"toolbar.previousChapter" = "Previous Chapter";
+"toolbar.nextChapter" = "Next Chapter";
+"toolbar.decreaseFontSize" = "Decrease Font Size";
+"toolbar.increaseFontSize" = "Increase Font Size";
+"toolbar.splitRight" = "Split Right";
+"toolbar.splitDown" = "Split Down";
+"toolbar.settings" = "Settings";
+
+// MARK: - VerseRow
+
+"verse.removeBookmark" = "Remove Bookmark";
+"verse.bookmark" = "Bookmark";
+"verse.removeHighlight" = "Remove Highlight";
+"verse.highlight" = "Highlight";
+"verse.editNote" = "Edit Note";
+"verse.addNote" = "Add Note";
+"verse.copyVerse" = "Copy Verse";
+"verse.delete" = "Delete";
+"verse.cancel" = "Cancel";
+"verse.save" = "Save";
+"verse.noteFor %@ %lld %lld" = "Note for %@ %lld:%lld";
+
+// MARK: - BibleReaderMac2App (Command Menu)
+
+"menu.sidebar" = "Sidebar";
+"menu.strongsNumbers" = "Strong's Numbers";
+"menu.crossReferences" = "Cross-References";
+"menu.notes" = "Notes";
+"menu.search" = "Search";
+
+// MARK: - Bookmark Colors
+
+"color.yellow" = "Yellow";
+"color.blue" = "Blue";
+"color.green" = "Green";
+"color.orange" = "Orange";
+"color.purple" = "Purple";
+
+// MARK: - Common
+
+"common.kjvPrefix %@" = "KJV: %@";

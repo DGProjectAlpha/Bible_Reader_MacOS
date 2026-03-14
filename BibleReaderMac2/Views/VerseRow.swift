@@ -6,14 +6,21 @@ struct VerseRow: View {
     let fontSize: Double
     let glassNamespace: Namespace.ID
     let onSelect: () -> Void
+    let onVerseNumberTap: () -> Void
     let onStrongsTap: (String) -> Void
 
     @Environment(UserDataStore.self) private var userDataStore
-    @State private var isHovering = false
     @State private var showNoteEditor = false
     @State private var noteText = ""
+    @State private var hasTextSelection = false
+    @State private var selectionRect: CGRect = .zero
+    @State private var showHighlightBubble = false
 
     private var verseId: String { verse.id }
+
+    private var hasNote: Bool {
+        userDataStore.notes.contains { $0.verseId == verseId }
+    }
 
     private var isBookmarked: Bool {
         userDataStore.bookmarks.contains { $0.verseId == verseId }
@@ -25,24 +32,91 @@ struct VerseRow: View {
 
     private var highlightColor: Color? {
         guard let highlight = userDataStore.highlights.first(where: { $0.verseId == verseId }) else { return nil }
-        return swiftColor(for: highlight.color)
+        return highlight.color.swiftUIColor
     }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("\(verse.verseNumber)")
-                .font(.system(size: fontSize * 0.7, weight: .bold))
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 24, alignment: .trailing)
-
-            if verse.strongsNumbers.isEmpty {
-                Text(verse.text)
-                    .font(.system(size: fontSize))
-                    .foregroundStyle(.primary)
-                    .textSelection(.enabled)
-            } else {
-                strongsTextView
+            Button {
+                let existing = userDataStore.notes.first(where: { $0.verseId == verseId })
+                noteText = existing?.text ?? ""
+                showNoteEditor = true
+            } label: {
+                Image(systemName: hasNote ? "note.text" : "note.text.badge.plus")
+                    .font(.system(size: fontSize * 0.55))
+                    .foregroundStyle(hasNote ? Color.accentColor : Color.secondary.opacity(0.4))
+                    .frame(width: 16, alignment: .center)
             }
+            .buttonStyle(.plain)
+            .help(hasNote ? String(localized: "verse.editNote") : String(localized: "verse.addNote"))
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.pointingHand.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+
+            Button {
+                Task {
+                    if isBookmarked {
+                        await removeBookmark()
+                    } else {
+                        await addBookmark(color: .yellow)
+                    }
+                }
+            } label: {
+                Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                    .font(.system(size: fontSize * 0.55))
+                    .foregroundStyle(isBookmarked ? Color.yellow : Color.secondary.opacity(0.4))
+                    .frame(width: 16, alignment: .center)
+                    .animation(.spring(duration: 0.25, bounce: 0.1), value: isBookmarked)
+            }
+            .buttonStyle(.plain)
+            .help(isBookmarked ? String(localized: "verse.removeBookmark") : String(localized: "verse.bookmark"))
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.pointingHand.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+
+            Button {
+                onSelect()
+                onVerseNumberTap()
+            } label: {
+                Text("\(verse.verseNumber)")
+                    .font(.system(size: fontSize * 0.7, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 24, alignment: .trailing)
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.pointingHand.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+
+            SelectableVerseText(
+                text: verse.text,
+                fontSize: fontSize,
+                attributedText: verse.strongsNumbers.isEmpty ? nil : strongsAttributedString,
+                onSelectionChange: { selected, rect in
+                    hasTextSelection = selected
+                    selectionRect = rect
+                    if selected {
+                        showHighlightBubble = true
+                    }
+                },
+                onWordTap: verse.strongsNumbers.isEmpty ? nil : { strongsId in
+                    onStrongsTap(strongsId)
+                }
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 12)
@@ -50,7 +124,7 @@ struct VerseRow: View {
         .background(
             Group {
                 if let color = highlightColor {
-                    color.opacity(0.2)
+                    color.opacity(0.3)
                 } else if isSelected {
                     Color.accentColor.opacity(0.15)
                 } else {
@@ -67,13 +141,31 @@ struct VerseRow: View {
                     .allowsHitTesting(false)
             }
         }
-        .scaleEffect(isHovering ? 1.03 : 1.0)
-        .animation(.spring(duration: 0.2, bounce: 0.3), value: isHovering)
-        .onHover { hovering in
-            isHovering = hovering
+        .overlay(alignment: .top) {
+            if showHighlightBubble {
+                HighlightBubble(
+                    isHighlighted: isHighlighted,
+                    onColorSelected: { color in
+                        Task { await addHighlight(color: color) }
+                        showHighlightBubble = false
+                        hasTextSelection = false
+                    },
+                    onClear: {
+                        Task { await userDataStore.removeHighlight(verseId: verseId) }
+                        showHighlightBubble = false
+                        hasTextSelection = false
+                    }
+                )
+                .offset(y: -40)
+                .transition(.scale.combined(with: .opacity))
+                .zIndex(100)
+            }
         }
-        .onTapGesture {
-            onSelect()
+        .animation(.spring(duration: 0.2, bounce: 0.15), value: showHighlightBubble)
+        .onChange(of: hasTextSelection) { _, newValue in
+            if !newValue {
+                showHighlightBubble = false
+            }
         }
         .contextMenu {
             // Bookmark
@@ -81,7 +173,7 @@ struct VerseRow: View {
                 Button(role: .destructive) {
                     Task { await removeBookmark() }
                 } label: {
-                    Label("Remove Bookmark", systemImage: "bookmark.slash")
+                    Label(String(localized: "verse.removeBookmark"), systemImage: "bookmark.slash")
                 }
             } else {
                 Menu {
@@ -89,11 +181,11 @@ struct VerseRow: View {
                         Button {
                             Task { await addBookmark(color: color) }
                         } label: {
-                            Label(color.rawValue.capitalized, systemImage: "bookmark.fill")
+                            Label(String(localized: String.LocalizationValue("color.\(color.rawValue)")), systemImage: "bookmark.fill")
                         }
                     }
                 } label: {
-                    Label("Bookmark", systemImage: "bookmark")
+                    Label(String(localized: "verse.bookmark"), systemImage: "bookmark")
                 }
             }
 
@@ -104,7 +196,7 @@ struct VerseRow: View {
                 Button(role: .destructive) {
                     Task { await userDataStore.removeHighlight(verseId: verseId) }
                 } label: {
-                    Label("Remove Highlight", systemImage: "highlighter")
+                    Label(String(localized: "verse.removeHighlight"), systemImage: "highlighter")
                 }
             } else {
                 Menu {
@@ -112,11 +204,11 @@ struct VerseRow: View {
                         Button {
                             Task { await addHighlight(color: color) }
                         } label: {
-                            Label(color.rawValue.capitalized, systemImage: "paintbrush.fill")
+                            Label(String(localized: String.LocalizationValue("color.\(color.rawValue)")), systemImage: "paintbrush.fill")
                         }
                     }
                 } label: {
-                    Label("Highlight", systemImage: "highlighter")
+                    Label(String(localized: "verse.highlight"), systemImage: "highlighter")
                 }
             }
 
@@ -129,7 +221,7 @@ struct VerseRow: View {
                 showNoteEditor = true
             } label: {
                 let hasNote = userDataStore.notes.contains { $0.verseId == verseId }
-                Label(hasNote ? "Edit Note" : "Add Note", systemImage: "note.text")
+                Label(hasNote ? String(localized: "verse.editNote") : String(localized: "verse.addNote"), systemImage: "note.text")
             }
 
             Divider()
@@ -140,12 +232,12 @@ struct VerseRow: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(copyText, forType: .string)
             } label: {
-                Label("Copy Verse", systemImage: "doc.on.doc")
+                Label(String(localized: "verse.copyVerse"), systemImage: "doc.on.doc")
             }
         }
         .sheet(isPresented: $showNoteEditor) {
             noteEditorSheet
-                .presentationBackground(.ultraThinMaterial)
+                .presentationBackground(.glass)
         }
     }
 
@@ -153,7 +245,7 @@ struct VerseRow: View {
 
     private var noteEditorSheet: some View {
         VStack(spacing: 16) {
-            Text("Note for \(verse.book) \(verse.chapter):\(verse.verseNumber)")
+            Text("verse.noteFor \(verse.book) \(verse.chapter) \(verse.verseNumber)")
                 .font(.headline)
 
             TextEditor(text: $noteText)
@@ -169,13 +261,13 @@ struct VerseRow: View {
                             showNoteEditor = false
                         }
                     } label: {
-                        Text("Delete")
+                        Text("verse.delete")
                     }
                 }
 
                 Spacer()
 
-                Button("Cancel") {
+                Button(String(localized: "verse.cancel")) {
                     showNoteEditor = false
                 }
                 .keyboardShortcut(.cancelAction)
@@ -183,7 +275,7 @@ struct VerseRow: View {
                 Button {
                     Task { await saveNote() }
                 } label: {
-                    Text("Save")
+                    Text("verse.save")
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -193,7 +285,43 @@ struct VerseRow: View {
         .frame(minWidth: 360, minHeight: 240)
     }
 
-    // MARK: - Strong's Text
+    // MARK: - Strong's Attributed String (for NSTextView)
+
+    private var strongsAttributedString: NSAttributedString {
+        let result = NSMutableAttributedString()
+        let words = verse.text.split(separator: " ", omittingEmptySubsequences: false)
+        let normalFont = NSFont.systemFont(ofSize: fontSize)
+        let normalColor = NSColor.labelColor
+        let accentNSColor = NSColor.controlAccentColor
+
+        for (i, word) in words.enumerated() {
+            if i > 0 {
+                result.append(NSAttributedString(string: " ", attributes: [.font: normalFont]))
+            }
+
+            if i < verse.strongsNumbers.count, !verse.strongsNumbers[i].isEmpty {
+                let strongsNum = verse.strongsNumbers[i]
+                let attrs: [NSAttributedString.Key: Any] = [
+                    .font: normalFont,
+                    .foregroundColor: accentNSColor,
+                    .underlineStyle: NSUnderlineStyle.single.rawValue,
+                    .underlineColor: accentNSColor.withAlphaComponent(0.4),
+                    .strongsNumber: strongsNum
+                ]
+                result.append(NSAttributedString(string: String(word), attributes: attrs))
+            } else {
+                let attrs: [NSAttributedString.Key: Any] = [
+                    .font: normalFont,
+                    .foregroundColor: normalColor
+                ]
+                result.append(NSAttributedString(string: String(word), attributes: attrs))
+            }
+        }
+
+        return result
+    }
+
+    // MARK: - Strong's Text (legacy, kept for reference)
 
     private var strongsTextView: some View {
         var result = Text("")

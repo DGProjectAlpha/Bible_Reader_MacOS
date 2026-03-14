@@ -1,0 +1,269 @@
+import SwiftUI
+import AppKit
+
+/// Custom attribute key to store Strong's number on individual words.
+extension NSAttributedString.Key {
+    static let strongsNumber = NSAttributedString.Key("com.biblereader.strongsNumber")
+}
+
+/// NSViewRepresentable wrapping NSTextView to detect text selection in a verse.
+/// Reports selection state changes via `onSelectionChange` callback.
+struct SelectableVerseText: NSViewRepresentable {
+    let text: String
+    let fontSize: Double
+    let attributedText: NSAttributedString?
+    let onSelectionChange: (_ hasSelection: Bool, _ selectionRect: CGRect) -> Void
+    var onWordTap: ((_ strongsNumber: String) -> Void)?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onSelectionChange: onSelectionChange, onWordTap: onWordTap)
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let textView = VerseNSTextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.drawsBackground = false
+        textView.isRichText = false
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.textContainerInset = .zero
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.textContainer?.widthTracksTextView = true
+        textView.delegate = context.coordinator
+        textView.coordinator = context.coordinator
+        context.coordinator.textView = textView
+
+        let scrollView = NSScrollView()
+        scrollView.documentView = textView
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
+        scrollView.drawsBackground = false
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .noBorder
+
+        // Disable scroll view's own scrolling — parent SwiftUI ScrollView handles it
+        scrollView.verticalScrollElasticity = .none
+        scrollView.horizontalScrollElasticity = .none
+
+        updateTextContent(textView)
+
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? VerseNSTextView else { return }
+        context.coordinator.onSelectionChange = onSelectionChange
+        context.coordinator.onWordTap = onWordTap
+        updateTextContent(textView)
+    }
+
+    private func updateTextContent(_ textView: NSTextView) {
+        if let attributed = attributedText {
+            textView.textStorage?.setAttributedString(attributed)
+        } else {
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.lineBreakMode = .byWordWrapping
+
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: fontSize),
+                .foregroundColor: NSColor.labelColor,
+                .paragraphStyle: paragraphStyle
+            ]
+            textView.textStorage?.setAttributedString(
+                NSAttributedString(string: text, attributes: attrs)
+            )
+        }
+    }
+
+    // MARK: - Coordinator
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var onSelectionChange: (_ hasSelection: Bool, _ selectionRect: CGRect) -> Void
+        var onWordTap: ((_ strongsNumber: String) -> Void)?
+        weak var textView: NSTextView?
+
+        init(onSelectionChange: @escaping (_ hasSelection: Bool, _ selectionRect: CGRect) -> Void,
+             onWordTap: ((_ strongsNumber: String) -> Void)?) {
+            self.onSelectionChange = onSelectionChange
+            self.onWordTap = onWordTap
+            super.init()
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            let range = textView.selectedRange()
+            let hasSelection = range.length > 0
+
+            var selectionRect: CGRect = .zero
+            if hasSelection {
+                selectionRect = boundingRect(for: range, in: textView)
+            }
+
+            onSelectionChange(hasSelection, selectionRect)
+        }
+
+        /// Computes bounding rect for a character range using TextKit2 if available,
+        /// falling back to TextKit1 on older systems.
+        private func boundingRect(for range: NSRange, in textView: NSTextView) -> CGRect {
+            // TextKit2 path (macOS 14+)
+            if let textLayoutManager = textView.textLayoutManager,
+               let contentManager = textLayoutManager.textContentManager,
+               let start = contentManager.location(contentManager.documentRange.location, offsetBy: range.location),
+               let end = contentManager.location(start, offsetBy: range.length) {
+                let textRange = NSTextRange(location: start, end: end)
+                var rect = CGRect.zero
+                textLayoutManager.enumerateTextSegments(in: textRange!, type: .standard, options: []) { _, segmentRect, _, _ in
+                    if rect == .zero {
+                        rect = segmentRect
+                    } else {
+                        rect = rect.union(segmentRect)
+                    }
+                    return true
+                }
+                if rect != .zero {
+                    return textView.convert(rect, to: nil)
+                }
+            }
+
+            // TextKit1 fallback (macOS 13 and earlier)
+            if let layoutManager = textView.layoutManager,
+               let textContainer = textView.textContainer {
+                let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+                let rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+                return textView.convert(rect, to: nil)
+            }
+
+            return .zero
+        }
+    }
+}
+
+// MARK: - Custom NSTextView subclass for intrinsic sizing + word tap
+
+/// Custom NSTextView that reports its intrinsic content size so it integrates
+/// correctly with SwiftUI layout (no fixed height needed).
+/// Also detects single clicks on words with Strong's numbers (vs drag-to-select).
+final class VerseNSTextView: NSTextView {
+    weak var coordinator: SelectableVerseText.Coordinator?
+    private var mouseDownLocation: NSPoint?
+    /// Maximum distance (pts) between mouseDown and mouseUp to count as a click.
+    private let clickThreshold: CGFloat = 3.0
+
+    override var intrinsicContentSize: NSSize {
+        // TextKit2 path
+        if let textLayoutManager = textLayoutManager {
+            textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
+            let rect = textLayoutManager.usageBoundsForTextContainer
+            return NSSize(width: NSView.noIntrinsicMetric, height: rect.height)
+        }
+        // TextKit1 fallback
+        if let layoutManager = layoutManager, let textContainer = textContainer {
+            layoutManager.ensureLayout(for: textContainer)
+            let usedRect = layoutManager.usedRect(for: textContainer)
+            return NSSize(width: NSView.noIntrinsicMetric, height: usedRect.height)
+        }
+        return super.intrinsicContentSize
+    }
+
+    override func didChangeText() {
+        super.didChangeText()
+        invalidateIntrinsicContentSize()
+    }
+
+    override func layout() {
+        super.layout()
+        invalidateIntrinsicContentSize()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        mouseDownLocation = convert(event.locationInWindow, from: nil)
+        super.mouseDown(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer { mouseDownLocation = nil }
+        let upLocation = convert(event.locationInWindow, from: nil)
+
+        // Only treat as a click if the mouse barely moved (not a drag/selection).
+        if let downLoc = mouseDownLocation {
+            let dx = upLocation.x - downLoc.x
+            let dy = upLocation.y - downLoc.y
+            let distance = sqrt(dx * dx + dy * dy)
+            if distance <= clickThreshold, selectedRange().length == 0 {
+                handleWordClick(at: upLocation)
+            }
+        }
+
+        super.mouseUp(with: event)
+    }
+
+    private func handleWordClick(at point: NSPoint) {
+        guard let textStorage = textStorage else { return }
+
+        let charIndex = characterIndex(at: point)
+        guard charIndex < textStorage.length else { return }
+
+        let attrs = textStorage.attributes(at: charIndex, effectiveRange: nil)
+        if let strongsNumber = attrs[.strongsNumber] as? String, !strongsNumber.isEmpty {
+            coordinator?.onWordTap?(strongsNumber)
+        }
+    }
+
+    /// Resolves a point to a character index using TextKit2 or TextKit1.
+    private func characterIndex(at point: NSPoint) -> Int {
+        let textContainerOrigin = self.textContainerOrigin
+        let adjusted = NSPoint(x: point.x - textContainerOrigin.x,
+                               y: point.y - textContainerOrigin.y)
+
+        // TextKit2 path
+        if let textLayoutManager = textLayoutManager,
+           let contentManager = textLayoutManager.textContentManager {
+            let location = textLayoutManager.location(interactingAt: adjusted, inContainerAt: textLayoutManager.documentRange.location)
+            if let loc = location {
+                return contentManager.offset(from: contentManager.documentRange.location, to: loc)
+            }
+        }
+
+        // TextKit1 fallback
+        if let layoutManager = layoutManager, let textContainer = textContainer {
+            return layoutManager.characterIndex(
+                for: adjusted,
+                in: textContainer,
+                fractionOfDistanceBetweenInsertionPoints: nil
+            )
+        }
+
+        return NSNotFound
+    }
+
+    // Show pointing hand cursor when hovering over Strong's-attributed words.
+    override func mouseMoved(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if let textStorage = textStorage {
+            let charIndex = characterIndex(at: point)
+            if charIndex < textStorage.length, charIndex != NSNotFound {
+                let attrs = textStorage.attributes(at: charIndex, effectiveRange: nil)
+                if let sn = attrs[.strongsNumber] as? String, !sn.isEmpty {
+                    NSCursor.pointingHand.set()
+                    return
+                }
+            }
+        }
+        super.mouseMoved(with: event)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas where area.owner === self {
+            removeTrackingArea(area)
+        }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+    }
+}

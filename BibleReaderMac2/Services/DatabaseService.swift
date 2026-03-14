@@ -89,6 +89,10 @@ actor DatabaseService {
             sqlite3_close(db)
         }
         connections.removeAll()
+        if let h = tskHandle {
+            sqlite3_close(h)
+            tskHandle = nil
+        }
     }
 
     // MARK: - Queries
@@ -247,7 +251,47 @@ actor DatabaseService {
         return result
     }
 
-    // MARK: - Cross-References
+    // MARK: - TSK Cross-References
+
+    /// Opens tsk.sqlite from the app bundle (lazy, kept open for the session).
+    private var tskHandle: OpaquePointer?
+
+    private func tskDB() throws -> OpaquePointer {
+        if let h = tskHandle { return h }
+        guard let url = Bundle.main.url(forResource: "tsk", withExtension: "sqlite", subdirectory: "BundledModules") else {
+            throw DatabaseServiceError.cannotOpenDatabase("tsk.sqlite not found in bundle")
+        }
+        var handle: OpaquePointer?
+        let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
+        guard sqlite3_open_v2(url.path, &handle, flags, nil) == SQLITE_OK, let handle else {
+            if let handle { sqlite3_close(handle) }
+            throw DatabaseServiceError.cannotOpenDatabase(url.path)
+        }
+        sqlite3_busy_timeout(handle, 5000)
+        tskHandle = handle
+        return handle
+    }
+
+    /// Fetch cross-reference verse IDs from the TSK database for a given verse.
+    /// - Parameters:
+    ///   - book: Full book name, e.g. "Genesis"
+    ///   - chapter: Chapter number
+    ///   - verse: Verse number
+    /// - Returns: Array of verse ID strings like "Psalms.96.5", "Isaiah.40.26"
+    func fetchTSKCrossReferences(book: String, chapter: Int, verse: Int) throws -> [String] {
+        let db = try tskDB()
+        let rows = try query(
+            db: db,
+            sql: "SELECT references_list FROM cross_references WHERE book = ?1 AND chapter = ?2 AND verse = ?3 LIMIT 1",
+            bindings: [.text(book), .int(chapter), .int(verse)]
+        ) { stmt in
+            columnText(stmt, 0)
+        }
+        guard let refList = rows.first, !refList.isEmpty else { return [] }
+        return refList.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    // MARK: - Cross-References (module-based)
 
     func fetchCrossReferences(moduleId: String, verseId: String) throws -> [CrossReference] {
         let db = try db(for: moduleId)
@@ -406,7 +450,7 @@ actor DatabaseService {
             case .text(let s):
                 sqlite3_bind_text(stmt, idx, s, -1, SQLITE_TRANSIENT)
             case .int(let n):
-                sqlite3_bind_int(stmt, idx, Int32(n))
+                sqlite3_bind_int64(stmt, idx, Int64(n))
             }
         }
 

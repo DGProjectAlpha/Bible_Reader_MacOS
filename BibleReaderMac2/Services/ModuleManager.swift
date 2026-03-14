@@ -27,12 +27,34 @@ struct ModuleManager {
         let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
-        ).first!
+        ).first ?? FileManager.default.temporaryDirectory
         let dir = appSupport
             .appendingPathComponent("BibleReaderMac2", isDirectory: true)
             .appendingPathComponent("Modules", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
+    }
+
+    // MARK: - Import
+
+    /// Copies a .brbmod file from sourceURL into the user modules directory.
+    /// Throws if a file with the same name already exists.
+    static func importModule(from sourceURL: URL) throws -> ModuleInfo {
+        let accessed = sourceURL.startAccessingSecurityScopedResource()
+        defer {
+            if accessed { sourceURL.stopAccessingSecurityScopedResource() }
+        }
+
+        let destination = userModulesDirectory().appendingPathComponent(sourceURL.lastPathComponent)
+
+        if FileManager.default.fileExists(atPath: destination.path) {
+            throw ModuleImportError.alreadyExists(sourceURL.lastPathComponent)
+        }
+
+        try FileManager.default.copyItem(at: sourceURL, to: destination)
+
+        let filename = destination.deletingPathExtension().lastPathComponent
+        return ModuleInfo(id: filename, path: destination, source: .user)
     }
 
     // MARK: - Private
@@ -64,4 +86,15 @@ struct ModuleInfo: Identifiable {
 enum ModuleSource {
     case bundled
     case user
+}
+
+enum ModuleImportError: LocalizedError {
+    case alreadyExists(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .alreadyExists(let name):
+            return "A module named \"\(name)\" already exists."
+        }
+    }
 }

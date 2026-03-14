@@ -58,7 +58,10 @@ struct InspectorView: View {
     @Environment(UserDataStore.self) private var userDataStore
     @Environment(UIStateStore.self) private var uiStateStore
 
-    @State private var inspectorTab: InspectorTab = .strongs
+    private var inspectorTab: InspectorTab {
+        get { uiStateStore.inspectorTab }
+        nonmutating set { uiStateStore.inspectorTab = newValue }
+    }
     @State private var wordTags: [ResolvedWordTag] = []
     @State private var crossRefs: [ResolvedCrossReference] = []
     @State private var selectedStrongsEntry: StrongsEntry? = nil
@@ -72,11 +75,14 @@ struct InspectorView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Tab picker
-            Picker("Inspector", selection: $inspectorTab) {
-                Text("Strong's").tag(InspectorTab.strongs)
-                Text("Cross-Refs").tag(InspectorTab.crossRef)
-                Text("Notes").tag(InspectorTab.notes)
-                Text("Bookmarks").tag(InspectorTab.bookmarks)
+            Picker("Inspector", selection: Binding(
+                get: { uiStateStore.inspectorTab },
+                set: { uiStateStore.inspectorTab = $0 }
+            )) {
+                Text(String(localized: "inspector.strongs")).tag(InspectorTab.strongs)
+                Text(String(localized: "inspector.crossRefs")).tag(InspectorTab.crossRef)
+                Text(String(localized: "inspector.notes")).tag(InspectorTab.notes)
+                Text(String(localized: "inspector.bookmarks")).tag(InspectorTab.bookmarks)
             }
             .pickerStyle(.segmented)
             .padding(8)
@@ -121,7 +127,7 @@ struct InspectorView: View {
                         Image(systemName: "textformat.abc")
                             .font(.largeTitle)
                             .foregroundStyle(.secondary)
-                        Text("No Strong's data")
+                        Text(String(localized: "inspector.noStrongsData"))
                             .font(.headline)
                             .foregroundStyle(.secondary)
                         Text(verseId)
@@ -231,7 +237,7 @@ struct InspectorView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
-                        Text("Back to words")
+                        Text(String(localized: "inspector.backToWords"))
                     }
                     .font(.caption)
                 }
@@ -270,7 +276,7 @@ struct InspectorView: View {
                     // Derivation
                     if let derivation = entry.derivation, !derivation.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Derivation")
+                            Text(String(localized: "inspector.derivation"))
                                 .font(.caption.bold())
                                 .foregroundStyle(.tertiary)
                             Text(derivation)
@@ -282,7 +288,7 @@ struct InspectorView: View {
                     // Strong's definition
                     if let strongsDef = entry.strongsDefinition, !strongsDef.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Strong's Definition")
+                            Text(String(localized: "inspector.strongsDefinition"))
                                 .font(.caption.bold())
                                 .foregroundStyle(.tertiary)
                             Text(strongsDef)
@@ -293,7 +299,7 @@ struct InspectorView: View {
                     // KJV usage
                     if let kjvDef = entry.kjvDefinition, !kjvDef.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("KJV Usage")
+                            Text(String(localized: "inspector.kjvUsage"))
                                 .font(.caption.bold())
                                 .foregroundStyle(.tertiary)
                             Text(kjvDef)
@@ -306,13 +312,13 @@ struct InspectorView: View {
 
                     // Verses using this Strong's number
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Verses with \(entry.number)")
+                        Text(String(localized: "inspector.versesWith \(entry.number)"))
                             .font(.subheadline.bold())
 
                         if isLoadingDetail {
                             detailSkeletonView
                         } else if strongsVerses.isEmpty {
-                            Text("No verses found")
+                            Text(String(localized: "inspector.noVersesFound"))
                                 .font(.caption)
                                 .foregroundStyle(.tertiary)
                         } else {
@@ -330,7 +336,7 @@ struct InspectorView: View {
                             }
 
                             if strongsVerses.count > 20 {
-                                Text("+ \(strongsVerses.count - 20) more verses")
+                                Text(String(localized: "inspector.moreVerses \(strongsVerses.count - 20)"))
                                     .font(.caption)
                                     .foregroundStyle(.tertiary)
                                     .padding(.top, 2)
@@ -343,7 +349,7 @@ struct InspectorView: View {
                         Divider()
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Related Entries")
+                            Text(String(localized: "inspector.relatedEntries"))
                                 .font(.subheadline.bold())
 
                             ForEach(similarEntries.prefix(8)) { similar in
@@ -415,10 +421,10 @@ struct InspectorView: View {
                         Image(systemName: "arrow.triangle.branch")
                             .font(.largeTitle)
                             .foregroundStyle(.secondary)
-                        Text("No cross-references")
+                        Text(String(localized: "inspector.noCrossReferences"))
                             .font(.headline)
                             .foregroundStyle(.secondary)
-                        Text("This verse has no linked references")
+                        Text(String(localized: "inspector.noLinkedReferences"))
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                     }
@@ -446,7 +452,9 @@ struct InspectorView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.triangle.branch")
                         .foregroundStyle(Color.accentColor)
-                    Text("\(crossRefs.count) cross-reference\(crossRefs.count == 1 ? "" : "s")")
+                    Text(crossRefs.count == 1
+                        ? String(localized: "inspector.crossRefCount \(crossRefs.count)")
+                        : String(localized: "inspector.crossRefCountPlural \(crossRefs.count)"))
                         .font(.subheadline.bold())
                     Spacer()
                 }
@@ -529,7 +537,8 @@ struct InspectorView: View {
         )
 
         Task {
-            if let paneId = bibleStore.activePaneId {
+            let paneId = bibleStore.activePaneId ?? bibleStore.panes.first?.id
+            if let paneId {
                 await bibleStore.navigate(paneId: paneId, to: location)
             }
             await MainActor.run {
@@ -542,10 +551,10 @@ struct InspectorView: View {
 
     private func labelForRefType(_ type: String) -> String {
         switch type {
-        case "parallel":  return "Parallel Passages"
-        case "quotation": return "Quotations"
-        case "allusion":  return "Allusions"
-        default:          return "Related"
+        case "parallel":  return String(localized: "inspector.parallelPassages")
+        case "quotation": return String(localized: "inspector.quotations")
+        case "allusion":  return String(localized: "inspector.allusions")
+        default:          return String(localized: "inspector.related")
         }
     }
 
@@ -602,7 +611,7 @@ struct InspectorView: View {
                             .foregroundStyle(.red.opacity(0.8))
                     }
                     .buttonStyle(.plain)
-                    .help("Delete note")
+                    .help(String(localized: "inspector.deleteNote"))
                 }
             }
             .padding(.horizontal, 10)
@@ -628,10 +637,10 @@ struct InspectorView: View {
                     Image(systemName: "note.text")
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)
-                    Text("No notes yet")
+                    Text(String(localized: "inspector.noNotesYet"))
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    Text("Select a verse and start typing")
+                    Text(String(localized: "inspector.selectVerseStartTyping"))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -642,7 +651,9 @@ struct InspectorView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "note.text")
                                 .foregroundStyle(Color.accentColor)
-                            Text("\(userDataStore.notes.count) note\(userDataStore.notes.count == 1 ? "" : "s")")
+                            Text(userDataStore.notes.count == 1
+                                ? String(localized: "inspector.noteCount \(userDataStore.notes.count)")
+                                : String(localized: "inspector.noteCountPlural \(userDataStore.notes.count)"))
                                 .font(.subheadline.bold())
                             Spacer()
                         }
@@ -699,10 +710,10 @@ struct InspectorView: View {
             Image(systemName: "hand.tap")
                 .font(.largeTitle)
                 .foregroundStyle(.secondary)
-            Text("Select a verse")
+            Text(String(localized: "inspector.selectVerse"))
                 .font(.headline)
                 .foregroundStyle(.secondary)
-            Text("Tap a verse to see details")
+            Text(String(localized: "inspector.tapVerseDetails"))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -806,13 +817,27 @@ struct InspectorView: View {
             let crossVerseId = "\(book):\(chapter):\(verse)"
             let scheme = bibleStore.modules.first(where: { $0.id == moduleId })?.versificationScheme ?? .kjv
             Task {
-                let refs = await CrossReferenceService.shared.loadResolvedBidirectional(
+                async let moduleRefs = CrossReferenceService.shared.loadResolvedBidirectional(
                     moduleId: moduleId,
                     verseId: crossVerseId,
                     scheme: scheme
                 )
+                async let tskRefs = CrossReferenceService.shared.loadTSKResolved(
+                    moduleId: moduleId,
+                    book: book,
+                    chapter: chapter,
+                    verse: verse
+                )
+
+                let modResults = await moduleRefs
+                let tskResults = await tskRefs
+
+                // Merge, deduplicating by target verse
+                let existingTargets = Set(modResults.map { "\($0.targetBook):\($0.targetChapter):\($0.targetVerse)" })
+                let uniqueTsk = tskResults.filter { !existingTargets.contains("\($0.targetBook):\($0.targetChapter):\($0.targetVerse)") }
+
                 await MainActor.run {
-                    crossRefs = refs
+                    crossRefs = modResults + uniqueTsk
                     isLoadingCrossRefs = false
                 }
             }
@@ -860,7 +885,7 @@ private struct NoteEditorField: View {
 
             HStack {
                 Spacer()
-                Text(isSaved ? "Saved" : "Typing...")
+                Text(isSaved ? String(localized: "inspector.saved") : String(localized: "inspector.typing"))
                     .font(.caption2)
                     .foregroundStyle(isSaved ? .green.opacity(0.7) : .orange.opacity(0.7))
                     .padding(.trailing, 12)
@@ -917,14 +942,14 @@ struct BookmarkRowView: View {
                         .foregroundStyle(.red.opacity(0.8))
                 }
                 .buttonStyle(.plain)
-                .help("Delete bookmark")
+                .help(String(localized: "bookmarks.deleteBookmark"))
             }
             .padding(.vertical, 6)
             .padding(.horizontal, 10)
 
             // Note section
             if isEditingNote {
-                TextField("Add a note...", text: $noteText, axis: .vertical)
+                TextField(String(localized: "bookmarks.addNote"), text: $noteText, axis: .vertical)
                     .font(.caption)
                     .textFieldStyle(.plain)
                     .padding(6)
@@ -949,7 +974,7 @@ struct BookmarkRowView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "pencil.line")
                             .font(.caption2)
-                        Text(bookmark.note.isEmpty ? "Add a note..." : bookmark.note)
+                        Text(bookmark.note.isEmpty ? String(localized: "bookmarks.addNote") : bookmark.note)
                             .font(.caption)
                             .foregroundStyle(bookmark.note.isEmpty ? .tertiary : .secondary)
                             .lineLimit(2)
@@ -1001,7 +1026,7 @@ private struct NoteCreatorField: View {
                 .padding(.top, 8)
                 .overlay(alignment: .topLeading) {
                     if text.isEmpty {
-                        Text("Write a note about this verse...")
+                        Text(String(localized: "inspector.writeNoteHint"))
                             .font(.body)
                             .foregroundStyle(.tertiary)
                             .padding(.horizontal, 14)
@@ -1030,11 +1055,11 @@ private struct NoteCreatorField: View {
             HStack {
                 Spacer()
                 if !text.isEmpty && !created {
-                    Text("Will auto-save...")
+                    Text(String(localized: "inspector.willAutoSave"))
                         .font(.caption2)
                         .foregroundStyle(.orange.opacity(0.7))
                 } else if created {
-                    Text("Saved")
+                    Text(String(localized: "inspector.saved"))
                         .font(.caption2)
                         .foregroundStyle(.green.opacity(0.7))
                 }

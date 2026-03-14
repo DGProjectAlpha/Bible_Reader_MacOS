@@ -7,6 +7,9 @@ final class BibleStore {
     var panes: [ReadingPane] = []
     var activePaneId: UUID? = nil
     var loadingState: LoadingState = .idle
+    var syncEnabled: Bool = false
+    var syncedLocation: BibleLocation? = nil
+    var syncedVerseId: String? = nil
 
     var onNavigate: ((BibleLocation) async -> Void)?
 
@@ -37,6 +40,12 @@ final class BibleStore {
                     let ia = BibleBooks.sortIndex(for: a.name) ?? Int.max
                     let ib = BibleBooks.sortIndex(for: b.name) ?? Int.max
                     return ia < ib
+                }
+
+                // Register modules that have a strongs table for fallback lookups
+                if let hasStrongs = try? await databaseService.hasTable(moduleId: info.id, name: "strongs"),
+                   hasStrongs {
+                    await StrongsService.shared.registerStrongsCapableModule(info.id)
                 }
 
                 loaded.append(Module(
@@ -92,6 +101,20 @@ final class BibleStore {
 
         _ = try? await loadChapter(moduleId: location.moduleId, book: location.book, chapter: location.chapter)
         await onNavigate?(location)
+
+        if syncEnabled {
+            syncedLocation = location
+            for i in panes.indices where panes[i].id != paneId {
+                let otherModuleId = panes[i].location.moduleId
+                let converted = convertPosition(
+                    book: location.book, chapter: location.chapter, verse: 1,
+                    from: location.moduleId, to: otherModuleId
+                )
+                let syncedLoc = BibleLocation(moduleId: otherModuleId, book: converted.book, chapter: converted.chapter)
+                panes[i].location = syncedLoc
+                _ = try? await loadChapter(moduleId: otherModuleId, book: converted.book, chapter: converted.chapter)
+            }
+        }
     }
 
     func navigatePreviousChapter() async {
@@ -162,6 +185,7 @@ final class BibleStore {
     // MARK: - Pane Management
 
     func addPane(direction: SplitDirection = .horizontal) {
+        guard panes.count < 8 else { return }
         let location: BibleLocation
         if let active = panes.first(where: { $0.id == activePaneId }) {
             location = active.location
@@ -186,5 +210,15 @@ final class BibleStore {
     func setActivePane(id: UUID) {
         guard panes.contains(where: { $0.id == id }) else { return }
         activePaneId = id
+    }
+
+    // MARK: - Panel Sync
+
+    func toggleSync() {
+        syncEnabled.toggle()
+    }
+
+    func syncScrollPosition(verseId: String) {
+        syncedVerseId = verseId
     }
 }

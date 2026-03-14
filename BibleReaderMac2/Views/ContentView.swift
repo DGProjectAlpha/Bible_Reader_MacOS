@@ -5,48 +5,34 @@ struct ContentView: View {
     @Environment(UserDataStore.self) private var userDataStore
     @Environment(UIStateStore.self) private var uiStateStore
 
-    var body: some View {
-        HSplitView {
-            // Sidebar
-            if uiStateStore.sidebarVisible {
-                SidebarView()
-                    .frame(minWidth: 220, idealWidth: 280, maxWidth: 350)
-                    .background(.ultraThinMaterial)
-                    .transition(.identity)
-            }
+    private let sidebarWidth: CGFloat = 260
 
-            // Reader Area (detail)
+    var body: some View {
+        GeometryReader { geometry in
+        ZStack(alignment: .leading) {
+            // Bottom layer: ReaderArea always occupies full width
             ReaderArea()
-                .frame(minWidth: 400)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // Top layer: Sidebar overlay with glass effect
+            SidebarView(sidebarHeight: geometry.size.height)
+                .frame(width: sidebarWidth)
+                .frame(maxHeight: .infinity)
+                .glassEffect(Glass(tint: Color.accentColor.opacity(0.08)), in: UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: 16, topTrailingRadius: 16))
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: 16, topTrailingRadius: 16))
+                .offset(x: uiStateStore.sidebarVisible ? 0 : -sidebarWidth)
+                .allowsHitTesting(uiStateStore.sidebarVisible)
+                .animation(.spring(duration: 0.35, bounce: 0.2), value: uiStateStore.sidebarVisible)
         }
+        } // GeometryReader
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button {
-                    withAnimation(nil) {
-                        uiStateStore.sidebarVisible.toggle()
-                    }
+                    uiStateStore.sidebarVisible.toggle()
                 } label: {
                     Image(systemName: "sidebar.leading")
                 }
-                .help("Toggle Sidebar")
-            }
-
-            ToolbarItemGroup(placement: .automatic) {
-                Button {
-                    Task { await bibleStore.navigatePreviousChapter() }
-                } label: {
-                    Image(systemName: "chevron.left")
-                }
-                .help("Previous Chapter")
-                .keyboardShortcut("[", modifiers: .command)
-
-                Button {
-                    Task { await bibleStore.navigateNextChapter() }
-                } label: {
-                    Image(systemName: "chevron.right")
-                }
-                .help("Next Chapter")
-                .keyboardShortcut("]", modifiers: .command)
+                .help(String(localized: "toolbar.toggleSidebar"))
             }
 
             ToolbarItemGroup(placement: .automatic) {
@@ -57,7 +43,7 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "textformat.size.smaller")
                 }
-                .help("Decrease Font Size")
+                .help(String(localized: "toolbar.decreaseFontSize"))
 
                 Button {
                     if uiStateStore.fontSize < 40 {
@@ -66,38 +52,17 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "textformat.size.larger")
                 }
-                .help("Increase Font Size")
+                .help(String(localized: "toolbar.increaseFontSize"))
             }
 
-            ToolbarItemGroup(placement: .automatic) {
-                Button {
-                    withAnimation(nil) {
-                        bibleStore.addPane(direction: .horizontal)
-                    }
-                } label: {
-                    Image(systemName: "rectangle.split.2x1")
-                }
-                .help("Split Right")
-
-                Button {
-                    withAnimation(nil) {
-                        bibleStore.addPane(direction: .vertical)
-                    }
-                } label: {
-                    Image(systemName: "rectangle.split.1x2")
-                }
-                .help("Split Down")
-            }
-
-            ToolbarItem(placement: .primaryAction) {
+ToolbarItem(placement: .primaryAction) {
                 SettingsLink {
                     Image(systemName: "gearshape")
                 }
-                .help("Settings")
+                .help(String(localized: "toolbar.settings"))
                 .keyboardShortcut(",", modifiers: .command)
             }
         }
-        .animation(nil, value: uiStateStore.sidebarVisible)
     }
 
 }

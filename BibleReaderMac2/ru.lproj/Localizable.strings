@@ -1,0 +1,188 @@
+/* Localizable.strings (Russian) — BibleReaderMac2 */
+
+// MARK: - SidebarView
+
+"sidebar.bookmarks" = "Закладки";
+"sidebar.highlights" = "Выделения";
+"sidebar.notes" = "Заметки";
+"sidebar.strongsNumbers" = "Числа Стронга";
+"sidebar.crossReferences" = "Перекрёстные ссылки";
+"sidebar.search" = "Поиск";
+"sidebar.recentHistory" = "Недавнее";
+
+"sidebar.noBookmarksYet" = "Закладок пока нет";
+"sidebar.removeBookmark" = "Удалить закладку";
+"sidebar.noHighlightsYet" = "Выделений пока нет";
+"sidebar.removeHighlight" = "Убрать выделение";
+"sidebar.noNotesYet" = "Заметок пока нет";
+"sidebar.editNote" = "Редактировать заметку";
+"sidebar.deleteNote" = "Удалить заметку";
+"sidebar.save" = "Сохранить";
+"sidebar.cancel" = "Отмена";
+
+"sidebar.noStrongsData" = "Нет данных Стронга для этого стиха";
+"sidebar.selectVerseStrongs" = "Выберите стих для просмотра чисел Стронга";
+"sidebar.backToWords" = "Назад к словам";
+"sidebar.versesCount %lld" = "Стихи (%lld)";
+"sidebar.moreCount %lld" = "ещё %lld";
+"sidebar.related" = "Связанные";
+
+"sidebar.noCrossReferences" = "Нет перекрёстных ссылок для этого стиха";
+"sidebar.selectVerseCrossRefs" = "Выберите стих для просмотра перекрёстных ссылок";
+
+"sidebar.searchIn %@" = "Искать в %@…";
+"sidebar.noResultsFor %@" = "Нет результатов для «%@»";
+
+"sidebar.noRecentHistory" = "Нет недавней истории";
+"sidebar.clearHistory" = "Очистить историю";
+
+// MARK: - ReaderView
+
+"reader.noVerses" = "Нет стихов";
+
+// MARK: - ReaderArea
+
+"reader.noModuleLoaded" = "Модуль не загружен";
+"reader.importModuleHint" = "Импортируйте файл .brbmod, чтобы начать";
+"reader.closePane" = "Закрыть панель";
+
+// MARK: - PaneToolbar
+
+"pane.oldTestament" = "Ветхий Завет";
+"pane.newTestament" = "Новый Завет";
+"pane.chapter %lld" = "Гл %lld";
+"pane.verse %lld" = "Стих %lld";
+"pane.splitHorizontal" = "Разделить горизонтально";
+"pane.splitVertical" = "Разделить вертикально";
+"pane.closePane" = "Закрыть панель";
+
+// MARK: - InspectorView
+
+"inspector.strongs" = "Стронг";
+"inspector.crossRefs" = "Ссылки";
+"inspector.notes" = "Заметки";
+"inspector.bookmarks" = "Закладки";
+
+"inspector.noStrongsData" = "Нет данных Стронга";
+"inspector.selectVerse" = "Выберите стих";
+"inspector.tapVerseDetails" = "Нажмите на стих для просмотра";
+
+"inspector.backToWords" = "Назад к словам";
+"inspector.derivation" = "Происхождение";
+"inspector.strongsDefinition" = "Определение Стронга";
+"inspector.kjvUsage" = "Использование в KJV";
+"inspector.versesWith %@" = "Стихи с %@";
+"inspector.noVersesFound" = "Стихи не найдены";
+"inspector.moreVerses %lld" = "ещё %lld стихов";
+"inspector.relatedEntries" = "Связанные записи";
+
+"inspector.noCrossReferences" = "Нет перекрёстных ссылок";
+"inspector.noLinkedReferences" = "У этого стиха нет связанных ссылок";
+"inspector.crossRefCount %lld" = "%lld перекрёстная ссылка";
+"inspector.crossRefCountPlural %lld" = "%lld перекрёстных ссылок";
+"inspector.parallelPassages" = "Параллельные места";
+"inspector.quotations" = "Цитаты";
+"inspector.allusions" = "Аллюзии";
+"inspector.related" = "Связанные";
+
+"inspector.noNotesYet" = "Заметок пока нет";
+"inspector.selectVerseStartTyping" = "Выберите стих и начните вводить текст";
+"inspector.noteCount %lld" = "%lld заметка";
+"inspector.noteCountPlural %lld" = "%lld заметок";
+"inspector.deleteNote" = "Удалить заметку";
+
+"inspector.writeNoteHint" = "Напишите заметку об этом стихе...";
+"inspector.willAutoSave" = "Автосохранение...";
+"inspector.saved" = "Сохранено";
+"inspector.typing" = "Набор текста...";
+
+// MARK: - BookmarksTabView
+
+"bookmarks.title" = "Закладки";
+"bookmarks.addBookmark" = "Добавить закладку";
+"bookmarks.noBookmarksForVerse" = "Нет закладок для этого стиха";
+"bookmarks.tapToAdd" = "Нажмите + чтобы добавить";
+"bookmarks.noBookmarksYet" = "Закладок пока нет";
+"bookmarks.selectVerseToAdd" = "Выберите стих, чтобы добавить закладку";
+"bookmarks.count %lld" = "%lld закладка";
+"bookmarks.countPlural %lld" = "%lld закладок";
+"bookmarks.deleteBookmark" = "Удалить закладку";
+"bookmarks.addNote" = "Добавить заметку...";
+
+// MARK: - SearchView
+
+"search.searchIn %@" = "Искать в %@…";
+"search.noResults" = "Нет результатов";
+"search.noVersesMatch %@" = "Нет стихов, соответствующих «%@»";
+
+// MARK: - SettingsView
+
+"settings.appearance" = "Оформление";
+"settings.fontSize" = "Размер шрифта";
+"settings.fontSizeValue %lld" = "%lld пт";
+"settings.sampleText" = "Съешь ещё этих мягких французских булок, да выпей чаю.";
+"settings.installedModules" = "Установленные модули";
+"settings.noModulesFound" = "Модули не найдены";
+"settings.bundled" = "Встроенный";
+"settings.user" = "Пользовательский";
+"settings.userModulesFolder" = "Папка модулей пользователя:";
+"settings.importModule" = "Импорт модуля…";
+"settings.language" = "Язык";
+"settings.english" = "English";
+"settings.russian" = "Русский";
+"settings.about" = "О программе";
+"settings.app" = "Приложение";
+"settings.appName" = "Bible Reader";
+"settings.version" = "Версия";
+"settings.build" = "Сборка";
+"settings.platform" = "Платформа";
+"settings.platformValue" = "macOS (SwiftUI)";
+"settings.aboutDescription" = "Быстрая офлайн-программа для чтения Библии с поддержкой конкорданса Стронга.";
+"settings.importError" = "Ошибка импорта";
+"settings.ok" = "ОК";
+"settings.unknownError" = "Неизвестная ошибка";
+
+// MARK: - ContentView (Toolbar)
+
+"toolbar.toggleSidebar" = "Боковая панель";
+"toolbar.previousChapter" = "Предыдущая глава";
+"toolbar.nextChapter" = "Следующая глава";
+"toolbar.decreaseFontSize" = "Уменьшить шрифт";
+"toolbar.increaseFontSize" = "Увеличить шрифт";
+"toolbar.splitRight" = "Разделить вправо";
+"toolbar.splitDown" = "Разделить вниз";
+"toolbar.settings" = "Настройки";
+
+// MARK: - VerseRow
+
+"verse.removeBookmark" = "Удалить закладку";
+"verse.bookmark" = "Закладка";
+"verse.removeHighlight" = "Убрать выделение";
+"verse.highlight" = "Выделить";
+"verse.editNote" = "Редактировать заметку";
+"verse.addNote" = "Добавить заметку";
+"verse.copyVerse" = "Копировать стих";
+"verse.delete" = "Удалить";
+"verse.cancel" = "Отмена";
+"verse.save" = "Сохранить";
+"verse.noteFor %@ %lld %lld" = "Заметка для %@ %lld:%lld";
+
+// MARK: - BibleReaderMac2App (Command Menu)
+
+"menu.sidebar" = "Боковая панель";
+"menu.strongsNumbers" = "Числа Стронга";
+"menu.crossReferences" = "Перекрёстные ссылки";
+"menu.notes" = "Заметки";
+"menu.search" = "Поиск";
+
+// MARK: - Bookmark Colors
+
+"color.yellow" = "Жёлтый";
+"color.blue" = "Синий";
+"color.green" = "Зелёный";
+"color.orange" = "Оранжевый";
+"color.purple" = "Фиолетовый";
+
+// MARK: - Common
+
+"common.kjvPrefix %@" = "KJV: %@";

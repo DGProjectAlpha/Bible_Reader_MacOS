@@ -7,7 +7,13 @@ final class UIStateStore {
     var selectedVerseId: String? = nil
     var searchQuery: String = ""
     var searchResults: [Verse] = []
+    var searchModuleId: String = ""
     var expandedSidebarSections: Set<String> = []
+    var inspectorTab: InspectorTab = .strongs
+    var inspectorVisible: Bool = false
+    var selectedStrongsId: String? = nil
+
+    @ObservationIgnored @AppStorage("appLanguage") var appLanguage: String = "en"
 
     var fontSize: Double = UserDefaults.standard.double(forKey: "fontSize") == 0
         ? 16.0
@@ -51,8 +57,9 @@ final class UIStateStore {
             return
         }
         do {
+            let moduleId = searchModuleId.isEmpty ? bibleStore.activeModuleId : searchModuleId
             searchResults = try await bibleStore.searchVerses(
-                moduleId: bibleStore.activeModuleId,
+                moduleId: moduleId,
                 query: searchQuery
             )
         } catch {

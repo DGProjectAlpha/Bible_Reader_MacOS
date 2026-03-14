@@ -37,6 +37,8 @@
 		A1000021B /* CrossReferenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000011B /* CrossReferenceService.swift */; };
 		A1000021C /* BookmarksTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000011C /* BookmarksTabView.swift */; };
 		A1000021D /* PaneToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000011D /* PaneToolbar.swift */; };
+		A1000021E /* SelectableVerseText.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000011E /* SelectableVerseText.swift */; };
+		A1000021F /* HighlightBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000011F /* HighlightBubble.swift */; };
 		A10000220 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000150 /* Assets.xcassets */; };
 		A10000221 /* BundledModules in Resources */ = {isa = PBXBuildFile; fileRef = A10000152 /* BundledModules */; };
 /* End PBXBuildFile section */
@@ -73,6 +75,8 @@
 		A1000011B /* CrossReferenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossReferenceService.swift; sourceTree = "<group>"; };
 		A1000011C /* BookmarksTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksTabView.swift; sourceTree = "<group>"; };
 		A1000011D /* PaneToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneToolbar.swift; sourceTree = "<group>"; };
+		A1000011E /* SelectableVerseText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectableVerseText.swift; sourceTree = "<group>"; };
+		A1000011F /* HighlightBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightBubble.swift; sourceTree = "<group>"; };
 		A10000150 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A10000151 /* BibleReaderMac2.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BibleReaderMac2.entitlements; sourceTree = "<group>"; };
 		A10000152 /* BundledModules */ = {isa = PBXFileReference; lastKnownFileType = folder; path = BundledModules; sourceTree = "<group>"; };
@@ -153,6 +157,8 @@
 				A10000111 /* SettingsView.swift */,
 				A10000113 /* SidebarView.swift */,
 				A10000112 /* VerseRow.swift */,
+				A1000011E /* SelectableVerseText.swift */,
+				A1000011F /* HighlightBubble.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -285,6 +291,8 @@
 				A1000021A /* ModuleManager.swift in Sources */,
 				A1000021B /* CrossReferenceService.swift in Sources */,
 				A1000021D /* PaneToolbar.swift in Sources */,
+				A1000021E /* SelectableVerseText.swift in Sources */,
+				A1000021F /* HighlightBubble.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

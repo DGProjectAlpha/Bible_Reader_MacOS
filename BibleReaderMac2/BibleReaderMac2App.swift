@@ -12,6 +12,7 @@ struct BibleReaderMac2App: App {
                 .environment(bibleStore)
                 .environment(userDataStore)
                 .environment(uiStateStore)
+                .environment(\.locale, Locale(identifier: uiStateStore.appLanguage))
                 .task {
                     bibleStore.onNavigate = { location in
                         await userDataStore.addToHistory(location)
@@ -21,26 +22,26 @@ struct BibleReaderMac2App: App {
                 }
         }
         .commands {
-            CommandMenu("Sidebar") {
-                Button("Strong's Numbers") {
+            CommandMenu(String(localized: "menu.sidebar")) {
+                Button(String(localized: "menu.strongsNumbers")) {
                     uiStateStore.sidebarVisible = true
                     uiStateStore.expandedSidebarSections.insert(SidebarSection.strongs.rawValue)
                 }
                 .keyboardShortcut("1", modifiers: .command)
 
-                Button("Cross-References") {
+                Button(String(localized: "menu.crossReferences")) {
                     uiStateStore.sidebarVisible = true
                     uiStateStore.expandedSidebarSections.insert(SidebarSection.crossReferences.rawValue)
                 }
                 .keyboardShortcut("2", modifiers: .command)
 
-                Button("Notes") {
+                Button(String(localized: "menu.notes")) {
                     uiStateStore.sidebarVisible = true
                     uiStateStore.expandedSidebarSections.insert(SidebarSection.notes.rawValue)
                 }
                 .keyboardShortcut("3", modifiers: .command)
 
-                Button("Search") {
+                Button(String(localized: "menu.search")) {
                     uiStateStore.sidebarVisible = true
                     uiStateStore.expandedSidebarSections.insert(SidebarSection.search.rawValue)
                 }
@@ -50,7 +51,10 @@ struct BibleReaderMac2App: App {
 
         Settings {
             SettingsView()
+                .environment(bibleStore)
+                .environment(userDataStore)
                 .environment(uiStateStore)
+                .environment(\.locale, Locale(identifier: uiStateStore.appLanguage))
         }
     }
 }

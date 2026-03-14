@@ -1,23 +1,27 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(UIStateStore.self) private var uiStateStore
+    @Environment(BibleStore.self) private var bibleStore
     @State private var installedModules: [ModuleInfo] = []
+    @State private var importError: String?
+    @State private var showImportError = false
 
     var body: some View {
         @Bindable var uiState = uiStateStore
 
         Form {
-            Section("Appearance") {
+            Section(String(localized: "settings.appearance")) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Font Size")
+                        Text("settings.fontSize")
                         Spacer()
-                        Text("\(Int(uiState.fontSize)) pt")
+                        Text(String(localized: "settings.fontSizeValue \(Int(uiState.fontSize))"))
                             .foregroundStyle(.secondary)
                     }
                     Slider(value: $uiState.fontSize, in: 10...40, step: 1) {
-                        Text("Font Size")
+                        Text("settings.fontSize")
                     }
                     HStack {
                         Text("A")
@@ -30,14 +34,14 @@ struct SettingsView: View {
                     }
                 }
 
-                Text("The quick brown fox jumps over the lazy dog.")
+                Text("settings.sampleText")
                     .font(.system(size: uiState.fontSize))
                     .padding(.vertical, 4)
             }
 
-            Section("Installed Modules") {
+            Section(String(localized: "settings.installedModules")) {
                 if installedModules.isEmpty {
-                    Text("No modules found")
+                    Text("settings.noModulesFound")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(installedModules) { module in
@@ -46,7 +50,7 @@ struct SettingsView: View {
                                 Text(module.id)
                                     .fontWeight(.medium)
                                 Spacer()
-                                Text(module.source == .bundled ? "Bundled" : "User")
+                                Text(module.source == .bundled ? String(localized: "settings.bundled") : String(localized: "settings.user"))
                                     .font(.caption)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
@@ -63,7 +67,7 @@ struct SettingsView: View {
                     }
                 }
 
-                Text("User modules folder:")
+                Text("settings.userModulesFolder")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 4)
@@ -71,30 +75,70 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
+
+                Button {
+                    importModule()
+                } label: {
+                    Label(String(localized: "settings.importModule"), systemImage: "square.and.arrow.down")
+                }
             }
 
-            Section("About") {
-                LabeledContent("App") {
-                    Text("Bible Reader")
+            Section(String(localized: "settings.language")) {
+                Picker(String(localized: "settings.language"), selection: $uiState.appLanguage) {
+                    Text("settings.english").tag("en")
+                    Text("settings.russian").tag("ru")
                 }
-                LabeledContent("Version") {
+            }
+
+            Section(String(localized: "settings.about")) {
+                LabeledContent(String(localized: "settings.app")) {
+                    Text("settings.appName")
+                }
+                LabeledContent(String(localized: "settings.version")) {
                     Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
                 }
-                LabeledContent("Build") {
+                LabeledContent(String(localized: "settings.build")) {
                     Text(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")
                 }
-                LabeledContent("Platform") {
-                    Text("macOS (SwiftUI)")
+                LabeledContent(String(localized: "settings.platform")) {
+                    Text("settings.platformValue")
                 }
-                Text("A fast, offline Bible reader with Strong's concordance support.")
+                Text("settings.aboutDescription")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+        .alert(String(localized: "settings.importError"), isPresented: $showImportError) {
+            Button(String(localized: "settings.ok"), role: .cancel) {}
+        } message: {
+            Text(importError ?? String(localized: "settings.unknownError"))
         }
         .formStyle(.grouped)
         .frame(width: 450, height: 400)
         .onAppear {
             installedModules = ModuleManager.discoverModules()
+        }
+    }
+
+    private func importModule() {
+        Task { @MainActor in
+            let panel = NSOpenPanel()
+            panel.allowedContentTypes = [UTType(filenameExtension: "brbmod") ?? .data]
+            panel.allowsMultipleSelection = false
+            panel.canChooseDirectories = false
+            panel.canChooseFiles = true
+            panel.message = "Select a Bible module (.brbmod) to import"
+
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+
+            do {
+                try ModuleManager.importModule(from: url)
+                try await bibleStore.loadModules()
+                installedModules = ModuleManager.discoverModules()
+            } catch {
+                importError = error.localizedDescription
+                showImportError = true
+            }
         }
     }
 }
