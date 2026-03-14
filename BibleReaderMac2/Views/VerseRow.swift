@@ -14,7 +14,6 @@ struct VerseRow: View {
     @State private var noteText = ""
     @State private var hasTextSelection = false
     @State private var selectionRect: CGRect = .zero
-    @State private var showHighlightBubble = false
 
     private var verseId: String { verse.id }
 
@@ -44,11 +43,6 @@ struct VerseRow: View {
             .animation(.spring(duration: 0.25, bounce: 0.1), value: isSelected)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay { selectionOverlay }
-            .overlay(alignment: .top) { highlightBubbleOverlay }
-            .animation(.spring(duration: 0.2, bounce: 0.15), value: showHighlightBubble)
-            .onChange(of: hasTextSelection) { _, newValue in
-                if !newValue { showHighlightBubble = false }
-            }
             .contextMenu { verseContextMenu }
             .sheet(isPresented: $showNoteEditor) {
                 noteEditorSheet
@@ -62,6 +56,7 @@ struct VerseRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             noteButton
             bookmarkButton
+            highlightButton
             verseNumberButton
             verseTextContent
         }
@@ -104,6 +99,66 @@ struct VerseRow: View {
         }
     }
 
+    @State private var showHighlightPopover = false
+
+    @State private var highlightHovered = false
+
+    private var highlightButton: some View {
+        Button {
+            Task {
+                if isHighlighted {
+                    await userDataStore.removeHighlight(verseId: verseId)
+                } else {
+                    showHighlightPopover = true
+                }
+            }
+        } label: {
+            Image(systemName: isHighlighted ? "highlighter" : "highlighter")
+                .font(.system(size: fontSize * 0.55))
+                .foregroundStyle(isHighlighted ? (highlightColor ?? Color.yellow) : Color.secondary.opacity(0.4))
+                .padding(4)
+                .background {
+                    if isHighlighted || highlightHovered {
+                        Group {
+                            if #available(macOS 26.0, *) {
+                                Circle()
+                                    .fill(.clear)
+                                    .glassEffect(.regular.tint((highlightColor ?? Color.yellow).opacity(isHighlighted ? 0.15 : 0.08)), in: .circle)
+                            } else {
+                                Circle()
+                                    .fill((highlightColor ?? Color.yellow).opacity(isHighlighted ? 0.15 : 0.08))
+                                    .background(.ultraThinMaterial, in: Circle())
+                            }
+                        }
+                        .transition(.scale.combined(with: .opacity))
+                    }
+                }
+                .frame(width: 24, height: 24, alignment: .center)
+                .animation(.spring(duration: 0.3, bounce: 0.15), value: isHighlighted)
+                .animation(.easeInOut(duration: 0.2), value: highlightHovered)
+        }
+        .buttonStyle(.plain)
+        .help(isHighlighted ? String(localized: "verse.removeHighlight") : String(localized: "verse.highlight"))
+        .onHover { hovering in
+            highlightHovered = hovering
+            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+        .popover(isPresented: $showHighlightPopover, arrowEdge: .bottom) {
+            HighlightBubble(
+                isHighlighted: isHighlighted,
+                onColorSelected: { color in
+                    Task { await addHighlight(color: color) }
+                    showHighlightPopover = false
+                },
+                onClear: {
+                    Task { await userDataStore.removeHighlight(verseId: verseId) }
+                    showHighlightPopover = false
+                }
+            )
+            .padding(4)
+        }
+    }
+
     private var verseNumberButton: some View {
         Button {
             onSelect()
@@ -128,7 +183,6 @@ struct VerseRow: View {
             onSelectionChange: { selected, rect in
                 hasTextSelection = selected
                 selectionRect = rect
-                if selected { showHighlightBubble = true }
             },
             onWordTap: verse.strongsNumbers.isEmpty ? nil : { strongsId in
                 onStrongsTap(strongsId)
@@ -158,27 +212,6 @@ struct VerseRow: View {
         }
     }
 
-    @ViewBuilder
-    private var highlightBubbleOverlay: some View {
-        if showHighlightBubble {
-            HighlightBubble(
-                isHighlighted: isHighlighted,
-                onColorSelected: { color in
-                    Task { await addHighlight(color: color) }
-                    showHighlightBubble = false
-                    hasTextSelection = false
-                },
-                onClear: {
-                    Task { await userDataStore.removeHighlight(verseId: verseId) }
-                    showHighlightBubble = false
-                    hasTextSelection = false
-                }
-            )
-            .offset(y: -40)
-            .transition(.scale.combined(with: .opacity))
-            .zIndex(100)
-        }
-    }
 
     @ViewBuilder
     private var verseContextMenu: some View {

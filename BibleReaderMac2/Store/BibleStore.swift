@@ -187,16 +187,19 @@ final class BibleStore {
     func addPane(direction: SplitDirection = .horizontal) {
         guard panes.count < 8 else { return }
         let location: BibleLocation
-        if let active = panes.first(where: { $0.id == activePaneId }) {
-            location = active.location
+        let insertIndex: Int
+        if let activeIndex = panes.firstIndex(where: { $0.id == activePaneId }) {
+            location = panes[activeIndex].location
+            insertIndex = activeIndex + 1
         } else if let firstModule = modules.first, let firstBook = firstModule.books.first {
             location = BibleLocation(moduleId: firstModule.id, book: firstBook.id, chapter: 1)
+            insertIndex = panes.count
         } else {
             return
         }
 
         let pane = ReadingPane(id: UUID(), location: location, splitDirection: direction)
-        panes.append(pane)
+        panes.insert(pane, at: insertIndex)
         activePaneId = pane.id
     }
 

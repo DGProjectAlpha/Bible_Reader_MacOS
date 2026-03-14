@@ -71,9 +71,9 @@ struct SidebarView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "bookmark.fill")
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Text("sidebar.bookmarks")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
                 .contentShape(Rectangle())
@@ -83,7 +83,7 @@ struct SidebarView: View {
             .padding(.horizontal, 6)
             .background(
                 uiStateStore.isSectionExpanded(.bookmarks)
-                    ? Color.accentColor.opacity(0.15)
+                    ? Color.primary.opacity(0.08)
                     : Color.clear,
                 in: RoundedRectangle(cornerRadius: 8)
             )
@@ -147,9 +147,9 @@ struct SidebarView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "highlighter")
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Text("sidebar.highlights")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
                 .contentShape(Rectangle())
@@ -159,7 +159,7 @@ struct SidebarView: View {
             .padding(.horizontal, 6)
             .background(
                 uiStateStore.isSectionExpanded(.highlights)
-                    ? Color.accentColor.opacity(0.15)
+                    ? Color.primary.opacity(0.08)
                     : Color.clear,
                 in: RoundedRectangle(cornerRadius: 8)
             )
@@ -271,9 +271,9 @@ struct SidebarView: View {
                 HStack {
                     Image(systemName: "note.text")
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Text("sidebar.notes")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
                 .contentShape(Rectangle())
@@ -283,7 +283,7 @@ struct SidebarView: View {
             .padding(.horizontal, 6)
             .background(
                 uiStateStore.isSectionExpanded(.notes)
-                    ? Color.accentColor.opacity(0.15)
+                    ? Color.primary.opacity(0.08)
                     : Color.clear,
                 in: RoundedRectangle(cornerRadius: 8)
             )
@@ -391,9 +391,9 @@ struct SidebarView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "character.book.closed")
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Text("sidebar.strongsNumbers")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
                 .contentShape(Rectangle())
@@ -403,7 +403,7 @@ struct SidebarView: View {
             .padding(.horizontal, 6)
             .background(
                 uiStateStore.isSectionExpanded(.strongs)
-                    ? Color.accentColor.opacity(0.15)
+                    ? Color.primary.opacity(0.08)
                     : Color.clear,
                 in: RoundedRectangle(cornerRadius: 8)
             )
@@ -442,8 +442,11 @@ struct SidebarView: View {
         }
     }
 
+    @State private var hoveredWordTag: Int? = nil
+
     private func sidebarWordTagRow(_ tag: ResolvedWordTag) -> some View {
-        Button {
+        let isHovered = hoveredWordTag == tag.id
+        return Button {
             guard let entry = tag.entry else { return }
             selectedStrongsNumber = tag.strongsNumber
             selectedStrongsEntry = entry
@@ -473,12 +476,33 @@ struct SidebarView: View {
                     }
                 }
             }
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                if #available(macOS 26.0, *) {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.clear)
+                        .glassEffect(.regular.tint(Color.accentColor.opacity(isHovered ? 0.12 : 0)), in: RoundedRectangle(cornerRadius: 8))
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isHovered ? Color.accentColor.opacity(0.08) : Color.clear)
+                }
+            }
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            hoveredWordTag = hovering ? tag.id : nil
+        }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
     }
 
+    @State private var hoveredVerseRef: UUID? = nil
+    @State private var hoveredSimilar: String? = nil
+
     private var strongsDetailContent: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
+            // Back button
             Button {
                 selectedStrongsEntry = nil
                 selectedStrongsNumber = nil
@@ -487,14 +511,28 @@ struct SidebarView: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "chevron.left")
+                        .imageScale(.small)
                     Text("sidebar.backToWords")
                 }
                 .font(.caption)
+                .padding(.vertical, 3)
+                .padding(.horizontal, 8)
+                .background {
+                    if #available(macOS 26.0, *) {
+                        Capsule()
+                            .fill(.clear)
+                            .glassEffect(.regular.tint(Color.accentColor.opacity(0.1)), in: Capsule())
+                    } else {
+                        Capsule()
+                            .fill(Color.accentColor.opacity(0.08))
+                    }
+                }
             }
             .buttonStyle(.plain)
             .foregroundStyle(Color.accentColor)
 
             if let entry = selectedStrongsEntry {
+                // Entry header card
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(entry.number)
@@ -524,18 +562,32 @@ struct SidebarView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background {
+                    if #available(macOS 26.0, *) {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(.clear)
+                            .glassEffect(.regular.tint(Color.accentColor.opacity(0.06)), in: RoundedRectangle(cornerRadius: 10))
+                    } else {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.accentColor.opacity(0.05))
+                    }
+                }
 
+                // Verses section
                 if isLoadingDetail {
                     ProgressView()
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 6)
                 } else if !strongsVerses.isEmpty {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text("sidebar.versesCount \(strongsVerses.count)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .padding(.top, 4)
+                            .padding(.top, 2)
                         ForEach(strongsVerses.prefix(15)) { ref in
+                            let isRefHovered = hoveredVerseRef == ref.id
                             Button {
                                 navigateToStrongsVerse(ref)
                             } label: {
@@ -548,8 +600,25 @@ struct SidebarView: View {
                                         .foregroundStyle(.secondary)
                                         .lineLimit(2)
                                 }
+                                .padding(.vertical, 3)
+                                .padding(.horizontal, 6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background {
+                                    if #available(macOS 26.0, *) {
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(.clear)
+                                            .glassEffect(.regular.tint(Color.accentColor.opacity(isRefHovered ? 0.10 : 0)), in: RoundedRectangle(cornerRadius: 6))
+                                    } else {
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(isRefHovered ? Color.accentColor.opacity(0.06) : Color.clear)
+                                    }
+                                }
                             }
                             .buttonStyle(.plain)
+                            .onHover { hovering in
+                                hoveredVerseRef = hovering ? ref.id : nil
+                            }
+                            .animation(.easeInOut(duration: 0.15), value: isRefHovered)
                         }
                         if strongsVerses.count > 15 {
                             Text("sidebar.moreCount \(strongsVerses.count - 15)")
@@ -559,13 +628,15 @@ struct SidebarView: View {
                     }
                 }
 
+                // Related entries
                 if !similarEntries.isEmpty {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text("sidebar.related")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .padding(.top, 4)
+                            .padding(.top, 2)
                         ForEach(similarEntries.prefix(6)) { similar in
+                            let isSimilarHovered = hoveredSimilar == similar.number
                             Button {
                                 selectedStrongsEntry = similar
                                 selectedStrongsNumber = similar.number
@@ -580,13 +651,29 @@ struct SidebarView: View {
                                             .font(.caption)
                                     }
                                 }
+                                .padding(.vertical, 3)
+                                .padding(.horizontal, 6)
+                                .background {
+                                    if #available(macOS 26.0, *) {
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(.clear)
+                                            .glassEffect(.regular.tint(Color.accentColor.opacity(isSimilarHovered ? 0.10 : 0)), in: RoundedRectangle(cornerRadius: 6))
+                                    } else {
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(isSimilarHovered ? Color.accentColor.opacity(0.06) : Color.clear)
+                                    }
+                                }
                             }
                             .buttonStyle(.plain)
+                            .onHover { hovering in
+                                hoveredSimilar = hovering ? similar.number : nil
+                            }
+                            .animation(.easeInOut(duration: 0.15), value: isSimilarHovered)
                         }
                     }
                 }
 
-                // "See all verses" button — triggers search filtered by Strong's number
+                // "See all verses" button with glass capsule
                 Button {
                     uiStateStore.searchQuery = entry.number
                     uiStateStore.expandedSidebarSections.insert(SidebarSection.search.rawValue)
@@ -600,10 +687,21 @@ struct SidebarView: View {
                     }
                     .font(.caption)
                     .foregroundStyle(Color.accentColor)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 5)
+                    .padding(.horizontal, 10)
+                    .background {
+                        if #available(macOS 26.0, *) {
+                            Capsule()
+                                .fill(.clear)
+                                .glassEffect(.regular.tint(Color.accentColor.opacity(0.1)), in: Capsule())
+                        } else {
+                            Capsule()
+                                .fill(Color.accentColor.opacity(0.08))
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
-                .padding(.top, 4)
+                .padding(.top, 2)
             }
         }
     }
@@ -619,9 +717,9 @@ struct SidebarView: View {
                 HStack {
                     Image(systemName: "arrow.triangle.branch")
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Text("sidebar.crossReferences")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
                 .contentShape(Rectangle())
@@ -631,7 +729,7 @@ struct SidebarView: View {
             .padding(.horizontal, 6)
             .background(
                 uiStateStore.isSectionExpanded(.crossReferences)
-                    ? Color.accentColor.opacity(0.15)
+                    ? Color.primary.opacity(0.08)
                     : Color.clear,
                 in: RoundedRectangle(cornerRadius: 8)
             )
@@ -692,9 +790,9 @@ struct SidebarView: View {
                 HStack {
                     Image(systemName: "magnifyingglass")
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Text("sidebar.search")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
                 .contentShape(Rectangle())
@@ -704,7 +802,7 @@ struct SidebarView: View {
             .padding(.horizontal, 6)
             .background(
                 uiStateStore.isSectionExpanded(.search)
-                    ? Color.accentColor.opacity(0.15)
+                    ? Color.primary.opacity(0.08)
                     : Color.clear,
                 in: RoundedRectangle(cornerRadius: 8)
             )
@@ -786,9 +884,9 @@ struct SidebarView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "clock")
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Text("sidebar.recentHistory")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
                 .contentShape(Rectangle())
@@ -798,7 +896,7 @@ struct SidebarView: View {
             .padding(.horizontal, 6)
             .background(
                 uiStateStore.isSectionExpanded(.recentHistory)
-                    ? Color.accentColor.opacity(0.15)
+                    ? Color.primary.opacity(0.08)
                     : Color.clear,
                 in: RoundedRectangle(cornerRadius: 8)
             )

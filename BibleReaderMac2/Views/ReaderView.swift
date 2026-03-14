@@ -68,6 +68,7 @@ struct ReaderView: View {
                                 uiState.selectedVerseId = verse.id
                                 uiState.inspectorTab = .crossRef
                                 uiState.sidebarVisible = true
+                                uiState.expandedSidebarSections.insert(SidebarSection.crossReferences.rawValue)
                             },
                             onStrongsTap: { strongsId in
                                 uiState.selectedVerseId = verse.id
