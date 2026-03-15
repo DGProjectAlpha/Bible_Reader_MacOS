@@ -541,7 +541,7 @@ private struct FontConfigSection: View {
                         Spacer()
                         Picker("", selection: Binding(
                             get: { config.family },
-                            set: { wizardStore[keyPath: keyPath].family = $0 }
+                            set: { newVal in @Bindable var store = wizardStore; store[keyPath: keyPath].family = newVal }
                         )) {
                             ForEach(Self.availableFontFamilies, id: \.self) { family in
                                 Text(family).tag(family)
@@ -558,7 +558,7 @@ private struct FontConfigSection: View {
                         Slider(
                             value: Binding(
                                 get: { config.size },
-                                set: { wizardStore[keyPath: keyPath].size = $0 }
+                                set: { newVal in @Bindable var store = wizardStore; store[keyPath: keyPath].size = newVal }
                             ),
                             in: 8...36,
                             step: 1
@@ -573,7 +573,7 @@ private struct FontConfigSection: View {
                     HStack(spacing: 16) {
                         Toggle(isOn: Binding(
                             get: { config.isBold },
-                            set: { wizardStore[keyPath: keyPath].isBold = $0 }
+                            set: { newVal in @Bindable var store = wizardStore; store[keyPath: keyPath].isBold = newVal }
                         )) {
                             Text("Bold")
                                 .font(.caption)
@@ -582,7 +582,7 @@ private struct FontConfigSection: View {
 
                         Toggle(isOn: Binding(
                             get: { config.isItalic },
-                            set: { wizardStore[keyPath: keyPath].isItalic = $0 }
+                            set: { newVal in @Bindable var store = wizardStore; store[keyPath: keyPath].isItalic = newVal }
                         )) {
                             Text("Italic")
                                 .font(.caption)
