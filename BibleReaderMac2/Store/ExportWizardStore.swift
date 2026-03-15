@@ -206,6 +206,7 @@ struct ExportFontConfig: Equatable {
     static let defaultReference = ExportFontConfig(family: "System", size: 14, isBold: true, isItalic: false)
     static let defaultNote = ExportFontConfig(family: "System", size: 12, isBold: false, isItalic: true)
 
+    @MainActor
     static func defaultVerseText(from uiState: UIStateStore) -> ExportFontConfig {
         ExportFontConfig(family: uiState.fontFamily, size: uiState.fontSize, isBold: false, isItalic: false)
     }
