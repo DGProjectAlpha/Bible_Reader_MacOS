@@ -12,7 +12,7 @@ struct BibleReaderMac2App: App {
                 .environment(bibleStore)
                 .environment(userDataStore)
                 .environment(uiStateStore)
-                .environment(\.locale, Locale(identifier: uiStateStore.appLanguage))
+                .environment(\EnvironmentValues.locale, Locale(identifier: uiStateStore.appLanguage))
                 .preferredColorScheme(uiStateStore.appearanceMode.colorScheme)
                 .task {
                     bibleStore.onNavigate = { location in
@@ -54,9 +54,9 @@ struct BibleReaderMac2App: App {
                 .environment(bibleStore)
                 .environment(userDataStore)
                 .environment(uiStateStore)
-                .environment(\.locale, Locale(identifier: uiStateStore.appLanguage))
+                .environment(\EnvironmentValues.locale, Locale(identifier: uiStateStore.appLanguage))
                 .preferredColorScheme(uiStateStore.appearanceMode.colorScheme)
-                .glassEffect(.regular)
+                .background(.ultraThinMaterial)
                 .frame(minWidth: 350, minHeight: 400)
                 .onAppear {
                     DispatchQueue.main.async {
@@ -87,7 +87,7 @@ struct BibleReaderMac2App: App {
                     .environment(bibleStore)
                     .environment(userDataStore)
                     .environment(uiStateStore)
-                    .environment(\.locale, Locale(identifier: uiStateStore.appLanguage))
+                    .environment(\EnvironmentValues.locale, Locale(identifier: uiStateStore.appLanguage))
                     .preferredColorScheme(uiStateStore.appearanceMode.colorScheme)
             }
         }
@@ -100,7 +100,7 @@ struct BibleReaderMac2App: App {
                 .environment(bibleStore)
                 .environment(userDataStore)
                 .environment(uiStateStore)
-                .environment(\.locale, Locale(identifier: uiStateStore.appLanguage))
+                .environment(\EnvironmentValues.locale, Locale(identifier: uiStateStore.appLanguage))
                 .preferredColorScheme(uiStateStore.appearanceMode.colorScheme)
         }
     }
