@@ -296,7 +296,7 @@ private struct OrderingPreview: View {
                     .padding(12)
             } else {
                 let maxItems = 8
-                var shown = 0
+                let shown = 0
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
