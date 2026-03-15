@@ -68,7 +68,7 @@ private struct ExportSectionView: View {
 
                         Image(systemName: icon)
                             .font(.subheadline)
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(Color.accentColor)
 
                         Text(title)
                             .font(.headline)
@@ -304,7 +304,7 @@ private struct OrderingPreview: View {
                             if wizardStore.groupByBook && !group.bookName.isEmpty {
                                 Text(group.bookName)
                                     .font(.caption.bold())
-                                    .foregroundStyle(.accentColor)
+                                    .foregroundStyle(Color.accentColor)
                                     .padding(.horizontal, 12)
                                     .padding(.top, 8)
                                     .padding(.bottom, 2)
@@ -508,7 +508,7 @@ private struct FontConfigSection: View {
 
                     Image(systemName: icon)
                         .font(.subheadline)
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(Color.accentColor)
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text(title)
@@ -798,7 +798,7 @@ private struct ExportFormatSection: View {
 
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(Color.accentColor)
                         .font(.title3)
                 }
             }
