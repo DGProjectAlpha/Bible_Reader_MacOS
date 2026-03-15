@@ -19,6 +19,10 @@
 		A10000209 /* HighlightedVerse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000109 /* HighlightedVerse.swift */; };
 		A1000020A /* Verse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010A /* Verse.swift */; };
 		A10000222 /* SearchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000120 /* SearchResult.swift */; };
+		A10000230 /* ExportWizardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000130 /* ExportWizardStore.swift */; };
+		A10000231 /* ExportWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000131 /* ExportWizardView.swift */; };
+		F7E1A2B3C4D5E6F7A8B90011 /* ExportStepViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E1A2B3C4D5E6F7A8B90010 /* ExportStepViews.swift */; };
+		A10000233 /* DetachedPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000132 /* DetachedPaneView.swift */; };
 		A1000020B /* UserDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010B /* UserDataStore.swift */; };
 		A1000020C /* UIStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010C /* UIStateStore.swift */; };
 		A1000020D /* BibleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010D /* BibleStore.swift */; };
@@ -59,6 +63,10 @@
 		A10000109 /* HighlightedVerse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightedVerse.swift; sourceTree = "<group>"; };
 		A1000010A /* Verse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Verse.swift; sourceTree = "<group>"; };
 		A10000120 /* SearchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResult.swift; sourceTree = "<group>"; };
+		A10000130 /* ExportWizardStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportWizardStore.swift; sourceTree = "<group>"; };
+		A10000131 /* ExportWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportWizardView.swift; sourceTree = "<group>"; };
+		F7E1A2B3C4D5E6F7A8B90010 /* ExportStepViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportStepViews.swift; sourceTree = "<group>"; };
+		A10000132 /* DetachedPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetachedPaneView.swift; sourceTree = "<group>"; };
 		A1000010B /* UserDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDataStore.swift; sourceTree = "<group>"; };
 		A1000010C /* UIStateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIStateStore.swift; sourceTree = "<group>"; };
 		A1000010D /* BibleStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleStore.swift; sourceTree = "<group>"; };
@@ -147,6 +155,7 @@
 				A1000010D /* BibleStore.swift */,
 				A1000010C /* UIStateStore.swift */,
 				A1000010B /* UserDataStore.swift */,
+				A10000130 /* ExportWizardStore.swift */,
 			);
 			path = Store;
 			sourceTree = "<group>";
@@ -156,6 +165,7 @@
 			children = (
 				A1000011C /* BookmarksTabView.swift */,
 				A10000114 /* ContentView.swift */,
+				A10000132 /* DetachedPaneView.swift */,
 				A1000011D /* PaneToolbar.swift */,
 				A10000110 /* InspectorView.swift */,
 				A1000010E /* ReaderArea.swift */,
@@ -166,6 +176,8 @@
 				A10000112 /* VerseRow.swift */,
 				A1000011E /* SelectableVerseText.swift */,
 				A1000011F /* HighlightBubble.swift */,
+				A10000131 /* ExportWizardView.swift */,
+				F7E1A2B3C4D5E6F7A8B90010 /* ExportStepViews.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -315,6 +327,10 @@
 				A1000021E /* SelectableVerseText.swift in Sources */,
 				A1000021F /* HighlightBubble.swift in Sources */,
 				A10000222 /* SearchResult.swift in Sources */,
+				A10000230 /* ExportWizardStore.swift in Sources */,
+				A10000231 /* ExportWizardView.swift in Sources */,
+				F7E1A2B3C4D5E6F7A8B90011 /* ExportStepViews.swift in Sources */,
+				A10000233 /* DetachedPaneView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

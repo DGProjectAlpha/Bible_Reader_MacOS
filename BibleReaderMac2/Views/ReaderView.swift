@@ -5,6 +5,7 @@ struct ReaderView: View {
     @Environment(UIStateStore.self) private var uiState
 
     let pane: ReadingPane
+    var isDetached: Bool = false
 
     @Namespace private var glassNamespace
     @State private var verses: [Verse] = []
@@ -20,6 +21,7 @@ struct ReaderView: View {
 
             PaneToolbar(
                 pane: pane,
+                isDetached: isDetached,
                 verseCount: verses.count,
                 onScrollToVerse: { verseNumber in
                     scrollTarget = verseNumber
@@ -58,6 +60,7 @@ struct ReaderView: View {
                             verse: verse,
                             isSelected: uiState.selectedVerseId == verse.id,
                             fontSize: uiState.fontSize,
+                            fontFamily: uiState.fontFamily,
                             glassNamespace: glassNamespace,
                             onSelect: {
                                 withAnimation(nil) {

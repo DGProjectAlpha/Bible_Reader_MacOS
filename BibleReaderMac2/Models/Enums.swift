@@ -45,6 +45,24 @@ enum HighlightSortMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum AppearanceMode: String, CaseIterable, Identifiable {
+    case light, dark, system
+
+    var id: String { rawValue }
+
+    var label: String {
+        rawValue.capitalized
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .light: return .light
+        case .dark: return .dark
+        case .system: return nil
+        }
+    }
+}
+
 enum SidebarSection: String, CaseIterable {
     case bookmarks = "bookmarks"
     case highlights = "highlights"

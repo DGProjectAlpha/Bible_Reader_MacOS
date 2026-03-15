@@ -53,15 +53,59 @@ struct ReaderArea: View {
 
 private struct PaneContainer: View {
     @Environment(BibleStore.self) private var bibleStore
+    @Environment(UIStateStore.self) private var uiState
     let pane: ReadingPane
+
+    private var isDetached: Bool {
+        uiState.detachedPaneIds.contains(pane.id)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            ReaderView(pane: pane)
+            if isDetached {
+                DetachedPanePlaceholder(pane: pane)
+            } else {
+                ReaderView(pane: pane)
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture {
             bibleStore.setActivePane(id: pane.id)
         }
+    }
+}
+
+private struct DetachedPanePlaceholder: View {
+    @Environment(UIStateStore.self) private var uiState
+    @Environment(BibleStore.self) private var bibleStore
+    let pane: ReadingPane
+
+    private var currentModule: Module? {
+        bibleStore.modules.first(where: { $0.id == pane.location.moduleId })
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "macwindow.on.rectangle")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+
+            Text("This pane is in a separate window.")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+            Text("\(currentModule?.abbreviation ?? pane.location.moduleId) — \(pane.location.book) \(pane.location.chapter)")
+                .font(.subheadline)
+                .foregroundStyle(.tertiary)
+
+            Button {
+                uiState.detachedPaneIds.remove(pane.id)
+            } label: {
+                Label("Dock", systemImage: "rectangle.inset.filled.and.cursorarrow")
+            }
+            .controlSize(.large)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.ultraThinMaterial)
     }
 }

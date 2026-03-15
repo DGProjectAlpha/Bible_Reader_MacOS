@@ -11,6 +11,7 @@ extension NSAttributedString.Key {
 struct SelectableVerseText: NSViewRepresentable {
     let text: String
     let fontSize: Double
+    let fontFamily: String
     let attributedText: NSAttributedString?
     let onSelectionChange: (_ hasSelection: Bool, _ selectionRect: CGRect) -> Void
     var onWordTap: ((_ strongsNumber: String) -> Void)?
@@ -76,8 +77,9 @@ struct SelectableVerseText: NSViewRepresentable {
             let paragraphStyle = NSMutableParagraphStyle()
             paragraphStyle.lineBreakMode = .byWordWrapping
 
+            let font = NSFont(name: fontFamily, size: fontSize) ?? NSFont.systemFont(ofSize: fontSize)
             let attrs: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: fontSize),
+                .font: font,
                 .foregroundColor: NSColor.labelColor,
                 .paragraphStyle: paragraphStyle
             ]

@@ -4,6 +4,7 @@ struct ContentView: View {
     @Environment(BibleStore.self) private var bibleStore
     @Environment(UserDataStore.self) private var userDataStore
     @Environment(UIStateStore.self) private var uiStateStore
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         @Bindable var uiState = uiStateStore
@@ -17,6 +18,18 @@ struct ContentView: View {
         .navigationTitle("Bible Reader")
         .toolbarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    uiStateStore.isToolsWindowDetached = true
+                    uiStateStore.sidebarVisibility = .detailOnly
+                    openWindow(id: "tools-window")
+                } label: {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                }
+                .help("Detach sidebar to floating window")
+                .disabled(uiStateStore.isToolsWindowDetached)
+            }
+
             ToolbarItemGroup(placement: .automatic) {
                 Button {
                     if uiStateStore.fontSize > 10 {

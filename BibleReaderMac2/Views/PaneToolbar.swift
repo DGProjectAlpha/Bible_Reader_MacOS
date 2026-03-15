@@ -4,7 +4,10 @@ struct PaneToolbar: View {
     @Environment(BibleStore.self) private var bibleStore
     @Environment(UIStateStore.self) private var uiState
 
+    @Environment(\.openWindow) private var openWindow
+
     let pane: ReadingPane
+    var isDetached: Bool = false
     var verseCount: Int = 0
     var onScrollToVerse: ((Int) -> Void)? = nil
 
@@ -28,9 +31,12 @@ struct PaneToolbar: View {
 
             Spacer()
 
-            splitHorizontalButton
-            splitVerticalButton
-            if bibleStore.panes.count > 1 {
+            popOutButton
+            if !isDetached {
+                splitHorizontalButton
+                splitVerticalButton
+            }
+            if !isDetached && bibleStore.panes.count > 1 {
                 closePaneButton
             }
         }
@@ -192,6 +198,20 @@ struct PaneToolbar: View {
         .disabled(pane.location.chapter >= (currentBook?.chapterCount ?? 1))
         .opacity(pane.location.chapter >= (currentBook?.chapterCount ?? 1) ? 0.3 : 1.0)
         .help(String(localized: "toolbar.nextChapter"))
+    }
+
+    // MARK: - Pop Out / Dock
+
+    private var popOutButton: some View {
+        PaneToolbarButton(systemImage: isDetached ? "rectangle.inset.filled.and.cursorarrow" : "macwindow.badge.plus") {
+            if isDetached {
+                uiState.detachedPaneIds.remove(pane.id)
+            } else {
+                uiState.detachedPaneIds.insert(pane.id)
+                openWindow(value: pane.id)
+            }
+        }
+        .help(isDetached ? String(localized: "pane.dock") : String(localized: "pane.popOut"))
     }
 
     // MARK: - Split Buttons

@@ -4,6 +4,7 @@ struct VerseRow: View {
     let verse: Verse
     let isSelected: Bool
     let fontSize: Double
+    let fontFamily: String
     let glassNamespace: Namespace.ID
     let onSelect: () -> Void
     let onVerseNumberTap: () -> Void
@@ -179,6 +180,7 @@ struct VerseRow: View {
         SelectableVerseText(
             text: verse.text,
             fontSize: fontSize,
+            fontFamily: fontFamily,
             attributedText: verse.strongsNumbers.isEmpty ? nil : strongsAttributedString,
             onSelectionChange: { selected, rect in
                 hasTextSelection = selected
@@ -340,7 +342,7 @@ struct VerseRow: View {
     private var strongsAttributedString: NSAttributedString {
         let result = NSMutableAttributedString()
         let words = verse.text.split(separator: " ", omittingEmptySubsequences: false)
-        let normalFont = NSFont.systemFont(ofSize: fontSize)
+        let normalFont = NSFont(name: fontFamily, size: fontSize) ?? NSFont.systemFont(ofSize: fontSize)
         let normalColor = NSColor.labelColor
 
         for (i, word) in words.enumerated() {

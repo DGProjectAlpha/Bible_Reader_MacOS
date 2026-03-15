@@ -58,7 +58,7 @@ struct SidebarView: View {
                 }
             }
         }
-        .background(.ultraThinMaterial)
+        .glassEffect(.regular.tint(uiStateStore.sidebarTintColor.opacity(0.15)))
         .symbolRenderingMode(.hierarchical)
         .onChange(of: uiStateStore.selectedVerseId) {
             loadStrongsData()
@@ -658,6 +658,7 @@ struct SidebarView: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "chevron.left")
+                        .symbolRenderingMode(.hierarchical)
                         .imageScale(.small)
                     Text("sidebar.back")
                 }
@@ -819,6 +820,7 @@ struct SidebarView: View {
             // Search bar
             HStack {
                 Image(systemName: "magnifyingglass")
+                    .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.secondary)
                     .font(.caption)
                 TextField(String(localized: "sidebar.search"), text: $uiState.searchQuery)
@@ -833,6 +835,7 @@ struct SidebarView: View {
                         uiStateStore.searchResults = []
                     } label: {
                         Image(systemName: "xmark.circle.fill")
+                            .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(.secondary)
                             .font(.caption)
                     }
@@ -928,6 +931,7 @@ struct SidebarView: View {
                                             .font(.subheadline)
                                     } icon: {
                                         Image(systemName: "clock")
+                                            .symbolRenderingMode(.hierarchical)
                                             .foregroundStyle(.secondary)
                                     }
                                 }

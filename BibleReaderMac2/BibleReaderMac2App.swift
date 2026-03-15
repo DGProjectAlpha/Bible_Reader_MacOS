@@ -13,6 +13,7 @@ struct BibleReaderMac2App: App {
                 .environment(userDataStore)
                 .environment(uiStateStore)
                 .environment(\.locale, Locale(identifier: uiStateStore.appLanguage))
+                .preferredColorScheme(uiStateStore.appearanceMode.colorScheme)
                 .task {
                     bibleStore.onNavigate = { location in
                         await userDataStore.addToHistory(location)
@@ -48,12 +49,59 @@ struct BibleReaderMac2App: App {
             }
         }
 
+        Window("Bible Reader — Tools", id: "tools-window") {
+            FloatingToolsView()
+                .environment(bibleStore)
+                .environment(userDataStore)
+                .environment(uiStateStore)
+                .environment(\.locale, Locale(identifier: uiStateStore.appLanguage))
+                .preferredColorScheme(uiStateStore.appearanceMode.colorScheme)
+                .glassEffect(.regular)
+                .frame(minWidth: 350, minHeight: 400)
+                .onAppear {
+                    DispatchQueue.main.async {
+                        if let window = NSApp.windows.first(where: { $0.title == "Bible Reader — Tools" }) {
+                            window.level = .floating
+                            window.isMovableByWindowBackground = true
+                            window.minSize = NSSize(width: 350, height: 400)
+                            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+                        }
+                    }
+                }
+                .onDisappear {
+                    // Fallback: also handled by willCloseNotification in FloatingToolsView
+                    if uiStateStore.isToolsWindowDetached {
+                        uiStateStore.isToolsWindowDetached = false
+                        uiStateStore.sidebarVisibility = .all
+                    }
+                }
+        }
+        .windowStyle(.titleBar)
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 500, height: 600)
+        .defaultPosition(.trailing)
+
+        WindowGroup(for: UUID.self) { $paneId in
+            if let paneId {
+                DetachedPaneView(paneId: paneId)
+                    .environment(bibleStore)
+                    .environment(userDataStore)
+                    .environment(uiStateStore)
+                    .environment(\.locale, Locale(identifier: uiStateStore.appLanguage))
+                    .preferredColorScheme(uiStateStore.appearanceMode.colorScheme)
+            }
+        }
+        .windowStyle(.titleBar)
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 600, height: 800)
+
         Settings {
             SettingsView()
                 .environment(bibleStore)
                 .environment(userDataStore)
                 .environment(uiStateStore)
                 .environment(\.locale, Locale(identifier: uiStateStore.appLanguage))
+                .preferredColorScheme(uiStateStore.appearanceMode.colorScheme)
         }
     }
 }
