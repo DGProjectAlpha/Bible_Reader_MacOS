@@ -19,7 +19,7 @@
 		A10000209 /* HighlightedVerse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000109 /* HighlightedVerse.swift */; };
 		A1000020A /* Verse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010A /* Verse.swift */; };
 		A10000222 /* SearchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000120 /* SearchResult.swift */; };
-		A10000230 /* ExportWizardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000130 /* ExportWizardStore.swift */; };
+		A10000232 /* ExportWizardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000130 /* ExportWizardStore.swift */; };
 		A10000231 /* ExportWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000131 /* ExportWizardView.swift */; };
 		F7E1A2B3C4D5E6F7A8B90011 /* ExportStepViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E1A2B3C4D5E6F7A8B90010 /* ExportStepViews.swift */; };
 		A10000233 /* DetachedPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000132 /* DetachedPaneView.swift */; };
@@ -327,7 +327,7 @@
 				A1000021E /* SelectableVerseText.swift in Sources */,
 				A1000021F /* HighlightBubble.swift in Sources */,
 				A10000222 /* SearchResult.swift in Sources */,
-				A10000230 /* ExportWizardStore.swift in Sources */,
+				A10000232 /* ExportWizardStore.swift in Sources */,
 				A10000231 /* ExportWizardView.swift in Sources */,
 				F7E1A2B3C4D5E6F7A8B90011 /* ExportStepViews.swift in Sources */,
 				A10000233 /* DetachedPaneView.swift in Sources */,
