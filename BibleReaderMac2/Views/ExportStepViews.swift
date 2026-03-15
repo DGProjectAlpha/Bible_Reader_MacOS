@@ -68,7 +68,7 @@ private struct ExportSectionView: View {
 
                         Image(systemName: icon)
                             .font(.subheadline)
-                            .foregroundStyle(.accent)
+                            .foregroundStyle(.accentColor)
 
                         Text(title)
                             .font(.headline)
@@ -304,7 +304,7 @@ private struct OrderingPreview: View {
                             if wizardStore.groupByBook && !group.bookName.isEmpty {
                                 Text(group.bookName)
                                     .font(.caption.bold())
-                                    .foregroundStyle(.accent)
+                                    .foregroundStyle(.accentColor)
                                     .padding(.horizontal, 12)
                                     .padding(.top, 8)
                                     .padding(.bottom, 2)
@@ -508,7 +508,7 @@ private struct FontConfigSection: View {
 
                     Image(systemName: icon)
                         .font(.subheadline)
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(.accentColor)
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text(title)
@@ -632,13 +632,14 @@ private struct FontConfigSection: View {
     }
 
     private func resetToDefault() {
+        @Bindable var store = wizardStore
         switch keyPath {
         case \.referenceFontConfig:
-            wizardStore[keyPath: keyPath] = .defaultReference
+            store[keyPath: keyPath] = .defaultReference
         case \.noteFontConfig:
-            wizardStore[keyPath: keyPath] = .defaultNote
+            store[keyPath: keyPath] = .defaultNote
         default:
-            wizardStore[keyPath: keyPath] = ExportFontConfig(family: "System", size: 14, isBold: false, isItalic: false)
+            store[keyPath: keyPath] = ExportFontConfig(family: "System", size: 14, isBold: false, isItalic: false)
         }
     }
 }
@@ -756,58 +757,62 @@ private struct ExportFormatSection: View {
     @Environment(ExportWizardStore.self) private var wizardStore
 
     var body: some View {
-        @Bindable var store = wizardStore
-
         VStack(alignment: .leading, spacing: 12) {
             Label("Export Format", systemImage: "doc.badge.gearshape")
                 .font(.headline)
 
             VStack(spacing: 8) {
                 ForEach(ExportFormat.allCases) { format in
-                    Button {
-                        wizardStore.exportFormat = format
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: formatIcon(format))
-                                .font(.title3)
-                                .foregroundStyle(wizardStore.exportFormat == format ? .white : .secondary)
-                                .frame(width: 32, height: 32)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(wizardStore.exportFormat == format ? Color.accentColor : Color.secondary.opacity(0.1))
-                                )
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(format.label)
-                                    .font(.body.weight(.medium))
-                                    .foregroundStyle(.primary)
-                                Text(formatDescription(format))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            if wizardStore.exportFormat == format {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.accent)
-                                    .font(.title3)
-                            }
-                        }
-                        .padding(10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(wizardStore.exportFormat == format ? Color.accentColor.opacity(0.08) : Color.clear)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(wizardStore.exportFormat == format ? Color.accentColor.opacity(0.3) : Color.primary.opacity(0.08), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
+                    formatRow(format)
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func formatRow(_ format: ExportFormat) -> some View {
+        let isSelected = wizardStore.exportFormat == format
+        Button {
+            wizardStore.exportFormat = format
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: formatIcon(format))
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? .white : .secondary)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(isSelected ? Color.accentColor : Color.secondary.opacity(0.1))
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(format.label)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.primary)
+                    Text(formatDescription(format))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.accentColor)
+                        .font(.title3)
+                }
+            }
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.accentColor.opacity(0.08) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.accentColor.opacity(0.3) : Color.primary.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private func formatIcon(_ format: ExportFormat) -> String {
@@ -1002,7 +1007,7 @@ private struct ExportActionSection: View {
                         let verse = Int(parts[2]) ?? 1
 
                         for mod in modules {
-                            if let text = try? db.fetchVerseText(moduleId: mod.id, book: book, chapter: chapter, verse: verse) {
+                            if let text = try? await db.fetchVerseText(moduleId: mod.id, book: book, chapter: chapter, verse: verse) {
                                 verseTexts.append((mod.abbreviation, text))
                             }
                         }
