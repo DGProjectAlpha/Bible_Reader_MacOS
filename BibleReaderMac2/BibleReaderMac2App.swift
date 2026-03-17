@@ -61,10 +61,10 @@ struct BibleReaderMac2App: App {
                 .onAppear {
                     DispatchQueue.main.async {
                         if let window = NSApp.windows.first(where: { $0.title == "Bible Reader — Tools" }) {
-                            window.level = .floating
+                            window.level = .normal
                             window.isMovableByWindowBackground = true
                             window.minSize = NSSize(width: 350, height: 400)
-                            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+                            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenPrimary]
                         }
                     }
                 }

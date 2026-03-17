@@ -16,47 +16,6 @@ final class UIStateStore {
     var isToolsWindowDetached: Bool = false
     var detachedPaneIds: Set<UUID> = []
 
-    var sidebarTintColor: Color {
-        get {
-            let raw = UserDefaults.standard.string(forKey: "sidebarTintColor") ?? "clear"
-            return Self.colorFromString(raw)
-        }
-        set {
-            UserDefaults.standard.set(Self.stringFromColor(newValue), forKey: "sidebarTintColor")
-        }
-    }
-
-    static let tintColorOptions: [(name: String, color: Color)] = [
-        ("clear", .clear),
-        ("blue", .blue),
-        ("purple", .purple),
-        ("green", .green),
-        ("orange", .orange),
-        ("red", .red),
-        ("pink", .pink),
-        ("teal", .teal)
-    ]
-
-    private static func colorFromString(_ raw: String) -> Color {
-        switch raw {
-        case "blue":   return .blue
-        case "purple": return .purple
-        case "green":  return .green
-        case "orange": return .orange
-        case "red":    return .red
-        case "pink":   return .pink
-        case "teal":   return .teal
-        default:       return .clear
-        }
-    }
-
-    private static func stringFromColor(_ color: Color) -> String {
-        for option in tintColorOptions where option.color == color {
-            return option.name
-        }
-        return "clear"
-    }
-
     var appLanguage: String = UserDefaults.standard.string(forKey: "appLanguage") ?? "en" {
         didSet { UserDefaults.standard.set(appLanguage, forKey: "appLanguage") }
     }

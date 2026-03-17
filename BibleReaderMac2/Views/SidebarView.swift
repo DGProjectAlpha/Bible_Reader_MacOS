@@ -59,7 +59,6 @@ struct SidebarView: View {
             }
         }
         .background(.ultraThinMaterial)
-        .tint(uiStateStore.sidebarTintColor.opacity(0.15))
         .symbolRenderingMode(.hierarchical)
         .onChange(of: uiStateStore.selectedVerseId) {
             loadStrongsData()

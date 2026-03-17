@@ -40,12 +40,13 @@ struct DetachedPaneView: View {
         .navigationTitle(windowTitle)
         .frame(minWidth: 400, minHeight: 500)
         .onAppear {
-            // Tag the NSWindow so we can identify it on close
+            // Tag the NSWindow so we can identify it on close, and enable fullscreen
             DispatchQueue.main.async {
                 for window in NSApp.windows where window.identifier == nil || window.identifier?.rawValue.isEmpty == true {
                     if window.contentView?.subviews.isEmpty == false,
                        window.title == windowTitle || window.title == "Bible Reader" {
                         window.identifier = NSUserInterfaceItemIdentifier(windowIdentifier)
+                        window.collectionBehavior.insert(.fullScreenPrimary)
                         break
                     }
                 }

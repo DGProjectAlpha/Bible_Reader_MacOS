@@ -34,8 +34,10 @@ struct SettingsView: View {
                 Label(category.rawValue, systemImage: category.icon)
                     .symbolRenderingMode(.hierarchical)
                     .tag(category)
+                    .padding(.vertical, 2)
             }
-            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
         } detail: {
             Group {
                 switch selectedCategory {
@@ -56,7 +58,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(16)
+            .padding(20)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(width: 700, height: 520)
@@ -89,7 +91,7 @@ struct ExportNotesSettingsView: View {
                             }
                         }
                     }
-                    .padding(8)
+                    .padding(12)
                 }
             }
             .formStyle(.grouped)
@@ -125,7 +127,7 @@ struct FontSettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .padding(8)
+                .padding(12)
             }
 
             GroupBox("Font Family") {
@@ -142,7 +144,7 @@ struct FontSettingsView: View {
                         .padding(.vertical, 4)
                         .foregroundStyle(.secondary)
                 }
-                .padding(8)
+                .padding(12)
             }
         }
         .formStyle(.grouped)
@@ -207,7 +209,7 @@ struct ModulesSettingsView: View {
                     }
                     .padding(.top, 4)
                 }
-                .padding(8)
+                .padding(12)
             }
         }
         .formStyle(.grouped)
@@ -255,7 +257,7 @@ struct LanguageSettingsView: View {
                     Text("Русский").tag("ru")
                 }
                 .pickerStyle(.radioGroup)
-                .padding(8)
+                .padding(12)
             }
         }
         .formStyle(.grouped)
@@ -278,34 +280,9 @@ struct ColorSettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .padding(8)
+                .padding(12)
             }
 
-            GroupBox("Sidebar Tint Color") {
-                LazyVGrid(columns: Array(repeating: GridItem(.fixed(36)), count: 8), spacing: 8) {
-                    ForEach(UIStateStore.tintColorOptions, id: \.name) { tint in
-                        Circle()
-                            .fill(tint.color == .clear ? Color.gray.opacity(0.2) : tint.color)
-                            .frame(width: 28, height: 28)
-                            .overlay {
-                                if uiState.sidebarTintColor == tint.color {
-                                    Image(systemName: "checkmark")
-                                        .font(.caption.bold())
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                            .overlay {
-                                Circle().stroke(Color.primary.opacity(0.2), lineWidth: 1)
-                            }
-                            .onTapGesture {
-                                withAnimation(.spring(duration: 0.35, bounce: 0.2)) {
-                                    uiState.sidebarTintColor = tint.color
-                                }
-                            }
-                    }
-                }
-                .padding(8)
-            }
         }
         .formStyle(.grouped)
     }
@@ -338,7 +315,7 @@ struct AboutSettingsView: View {
                          destination: URL(string: "https://github.com/DGProjectAlpha/Bible_Reader_MacOS")!)
                         .font(.caption)
                 }
-                .padding(8)
+                .padding(12)
             }
         }
         .formStyle(.grouped)
